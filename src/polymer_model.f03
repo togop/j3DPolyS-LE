@@ -2,7 +2,7 @@
 
 module PolymerModel_mod
     use Timers
-    use latice_data_mod
+    use lattice_data_mod
     use logging_mod
 
     implicit none

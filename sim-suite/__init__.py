@@ -1,2 +1,2 @@
-__name__ = 'dcc-extrusion'
-__version__ = '2020.2.0b02'
+__name__ = '3DPolyS-LE'
+__version__ = '2021.1.0b01'

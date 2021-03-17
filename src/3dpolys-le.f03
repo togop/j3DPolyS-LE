@@ -69,7 +69,7 @@ end subroutine print_version
 
 subroutine print_help()
     call print_version()
-    print*, 'Usage: dcc_extrusion [options] [<input.dat file>]'
+    print*, 'Usage: 3dpolys-le [options] [<input.dat file>]'
     print*, 'Options:'
     print*, '   -h|--help   Display this information.'
     print*, '   --log:<log level> Sets the log output level: OFF, FATAL, ERROR, WARN, INFO, DEBUG, TRACE. Default: INFO'
@@ -128,7 +128,7 @@ end subroutine check_iostat
 
 program mainprogram
     use Timers
-    use latice_data_mod
+    use lattice_data_mod
     use PolymerModel_mod
     use analyse_mod
     use mpi
@@ -555,7 +555,7 @@ program mainprogram
     kb = kb**(1. / real(ikb))
 
     !load and predefine lattice properties
-    call latice_init(kint)
+    call lattice_init(kint)
 
     if (rank >= Niter) then
         rank_Niter = 0

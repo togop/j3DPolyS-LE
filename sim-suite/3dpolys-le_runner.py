@@ -26,17 +26,6 @@ logger = logging.getLogger(f'{__init__.__name__}<{__init__.__version__}>{os.path
 p = argparse.ArgumentParser(description=f'''Running {__init__.__name__} v{__init__.__version__}.
 Run one of the following batch commands:
 
-•	grid_nlef_km: Perform a series of simulations rotating over a range of Nlef (--nlef_list) and 
-km (--km_list) parameter values. In combination with a --replace parameter.
-
-•	grid_perm_dir: Perform a series of simulations for all provided dcc_extrusion parameters, all possible values of 
-boundary_direction parameter, once apply each boundary matching score (column "score") to its boundary’s impermeability 
-(--boundary_score), then rotate over a range of -–boundary_factor parameter values between 0 and 1 with step given by 
-the --boundary_factor_step parameter. In combination with a --replace parameter.
-
-•	grid_nlef_km_dirlef: Perform a series of simulations rotating over a range of Nlef, km parameters 
-and different directional modes (unidirectional, bidirectional). In combination with a --replace parameter.
-
 •	new_stats: Perform comparative statistical analysis on all entries, representing simulations,  in a given 
 sim_stats.tsv file (--stats_file) comparing simulations with the already used or a new given (--exp_cool) experimental 
 data. In combination with a –-replace parameter.
@@ -68,21 +57,8 @@ As almost no tests prove the correctness of all possible parameter combinations 
 please check your output data and log files, and make sure all went as you have expected.
 ''', formatter_class=argparse.RawDescriptionHelpFormatter)  # RawTextHelpFormatter
 p.add_argument("run_command", help="Run batch command.",
-               choices=['grid_nlef_km', 'grid_perm_dir', 'grid_nlef_km_dirlef', 'new_stats',
-                        'decay_plots', 'chip_seq_plots', 'contact_radius_analysis',  # deprecated 'analysis_stats',
+               choices=['new_stats', 'decay_plots', 'chip_seq_plots', 'contact_radius_analysis',
                         'multi_decay_plot', 'multi_decay_exps_plot', 'run'])
-# p.add_argument("-ls", "--nlef_step", default=100, help="Nlef grid step", type=int)
-p.add_argument("--nlef_list", nargs='+', default=[50, 100, 150, 200, 300, 400, 500, 600, 800, 1000, 1200],
-               help="List of Nlef values. In combination with grid_nlef_km and grid_nlef_km_dirlef commands.", type=int)
-p.add_argument("--km_list", nargs='+', default=[5.4e-4, 3*5.4e-4, 5*5.4e-4, 7*5.4e-4, 9*5.4e-4, 12*5.4e-4],
-                                               # 0.00054, 0.00162, 0.0027, 0.00378, 0.00486, 0.00648
-                                               # 10,      30,      50,     70,      90,      120 kb/min
-                                               # 5.4e-4 = 10kb/min = 167bp/s
-               help="List of km values. In combination with grid_nlef_km and grid_nlef_km_dirlef commands.", type=float)
-# p.add_argument("-ms", "--km_step", default=4 * 2.7e-3 / 5, help="km grid step", type=float)
-p.add_argument("-bfs", "--boundary_factor_step", default=0.25, type=float,
-               help="Boundary factor step between 0 and 1 for grid simulations. "
-                    "In combination with a grid_perm_dir command.")
 p.add_argument("-bd", "--boundary_direction", default=0, type=int,
                help="Impermeability direction applied to all boundaries: -1:opposite direction, 0:both, 1:same direction."
                     " Default: 0")
@@ -139,14 +115,14 @@ p.add_argument("-l", "--nlef", default=1500, help="Nlef value to use in a simula
 p.add_argument("-m", "--km", default=2.7e-3, help="km value to use in a simulation.", type=float)
 p.add_argument("-f", "--stats_file", default="./sim_stats.csv", help="Simulation statistics' repository file.")
 p.add_argument("--stats", action='store_true',
-               help="In combination with a new_stats command to run statistical analysis (dcc_sim_stats.py) only for "
+               help="In combination with a new_stats command to run statistical analysis (3dpolys-le_stats.py) only for "
                     "entries in a given sim_stats.csv file (--stats_file) missing statistics plots.")
 p.add_argument("--all_stats", action='store_true',
-               help="In combination with a new_stats command to run statistical analysis (dcc_sim_stats.py) for all "
+               help="In combination with a new_stats command to run statistical analysis (3dpolys-le_stats.py) for all "
                     "entries in a given sim_stats.csv file (--stats_file).")
 p.add_argument("-r", "--radius_contact", default=0., type=float,
                help="Contact radius in lattice units (1=70nm) to run a single 'analyse' step "
-                    "(dcc_extrusion program module) for extracting Hi-C matrixes.")
+                    "(3dpolys-le program module) for extracting Hi-C matrixes.")
 p.add_argument("-lr", "--list_contact_radii", nargs='+', default=['2.84'],  # ['1.42', '2.13', '2.84', '3.55', '4.26'],  #, '5.0p'
                help="list of contact radii to be used by a 'contact_radius_analysis' batch command, "
                     "a <p> at the end denote use of contact radius probability mode.")
@@ -196,7 +172,7 @@ class DccExtrusionArgs:
 
     def __init__(self, stats=False, all_stats=False, boundary="./mex-sites.csv", input_dat="./input.dat",
                  tads_boundary="./rex-sites.csv",
-                 stats_file="./dcc_extrusion_stats.csv",
+                 stats_file="./3dpolys-le_stats.csv",
                  exp_cool=f"{ha.PUBLISHED_FOLDER}/wt_N2_Moushumi2020_HIC1_5000.cool",
                  exp_chip=f"{ha.PUBLISHED_FOLDER}/DPY27_N2_L3_average_ce11_2kb_chrX.bedGraph",
                  exp_ins_score=f"{ha.PUBLISHED_FOLDER}/wt_N2_Brejc2017_10k_score_chrX.bedgraph",
@@ -302,7 +278,7 @@ class DccExtrusionRunner:
     def run(self, dcc_args: DccExtrusionArgs, stats_only=False, radii=[], dep_jobid: str = None,
             replace: bool = False) -> str:
         '''
-        Runs the main dcc_extrusion with given parameters either to run simulation or analysis afterwards.
+        Runs the main 3dpolys-le with given parameters either to run simulation or analysis afterwards.
         :param dcc_args: simulation parameters
         :param stats_only: do stats on analysis # TODO revise where to keep stats_only: use dcc_args.stats or not
         :param radii: list of contact radii to perform contact radius analysis after the simulation is done.
@@ -369,8 +345,8 @@ class DccExtrusionRunner:
                         run_sim_or_analysis = False
 
             if run_sim_or_analysis:
-                # LOCAL: cmd = f"../../../../bin/dcc_extrusion -o:{out} --km:{km} --nlef:{nlef} " \
-                cmd = f"run_dcc_extrusion{'_analysis' if dcc_args.analyse else ''}.sh " \
+                # LOCAL: cmd = f"../../../../bin/3dpolys-le -o:{out} --km:{km} --nlef:{nlef} " \
+                cmd = f"run_3dpolys-le{'_analysis' if dcc_args.analyse else ''}.sh " \
                       f"-o:{dcc_args.output_folder} --km:{km} --nlef:{nlef} " \
                       f"-b:{boundary} -bd:{dcc_args.boundary_direction} -bf:{dcc_args.boundary_factor} {bs_opt} " \
                       f"{z_loop} {u_opt} {init_mode} {a_opt} {r_opt} {input_dat}"
@@ -397,8 +373,8 @@ class DccExtrusionRunner:
             s_cmp_chrs = f'--cmp_chrs {" ".join(dcc_args.cmp_chrs)}' if dcc_args.cmp_chrs is not None else ''
 
         # for LOCAL use something like : #
-            # cmd = f"../../../run_dcc_sim_stats.sh " \
-            cmd = f"run_dcc_sim_stats.sh " \
+            # cmd = f"../../../run_3dpolys-le_stats.sh " \
+            cmd = f"run_3dpolys-le_stats.sh " \
                   f"-o {dcc_args.output_folder} -a {analyse_folder} --km {km} --nlef {nlef} -e {exp_cool} " \
                   f"-eis {dcc_args.exp_ins_score} " \
                   f"-b {boundary} -bd {dcc_args.boundary_direction} -bf {dcc_args.boundary_factor} {bs_opt} {r_opt_py} "\
@@ -407,71 +383,13 @@ class DccExtrusionRunner:
 
         return jobid
 
-    def grid_perm_dir(self, dcc_args: DccExtrusionArgs, boundary_factor_step: float = 0.25):
-        """
-        Perform a series of simulations for all provided dcc_extrusion parameters, all possible values of
-        boundary_direction parameter, once Apply each boundary matching score (column "score") to its boundary’s
-        impermeability (--boundary_score), than rotate over a range of -–boundary_factor parameter values between 0 and
-        1 with step given by the --boundary_factor_step parameter.
-
-        :type boundary_factor_step: float
-        :param boundary_factor_step: boundary factor step for the iteration
-        :type dcc_args: DccExtrusionArgs
-        """
-        job_count = 0
-        for bd in range(-1, 2):
-            dcc_args_grid = copy.deepcopy(dcc_args)
-            dcc_args_grid.boundary_direction = bd
-            dcc_args_grid.boundary_factor = 1.
-            dcc_args_grid.boundary_score = True
-            dcc_args_grid.output_folder = dcc_args_grid.default_output_folder()
-            cur_jobid = self.run(dcc_args_grid)
-            job_count += 1
-            logger.info(f'\n')
-
-            for bf in np.arange(1, 0, -boundary_factor_step):
-                dcc_args_grid = copy.deepcopy(dcc_args)
-                dcc_args_grid.boundary_direction = bd
-                dcc_args_grid.boundary_factor = bf
-                dcc_args_grid.boundary_score = False
-                dcc_args_grid.output_folder = dcc_args.default_output_folder()
-                cur_jobid = self.run(dcc_args_grid)
-                job_count += 1
-                logger.info(f'\n')
-        logger.info(f' Started dcc_extrusion {job_count} simulations in {len(dcc_run._running_jobids)} jobs')
-
-    def grid_nlef_km(self, dcc_args: DccExtrusionArgs, nlef_list, km_list, radii, replace):
-        for nlef in nlef_list:
-            for km in km_list:     # for km in np.arange(2.7e-3 / 5, 2 * 2.7e-3, km_step):
-                dcc_args_grid = copy.deepcopy(dcc_args)
-                dcc_args_grid.nlef = nlef
-                dcc_args_grid.km = km
-                cur_jobid = self.run(dcc_args_grid, radii=radii, replace=replace)
-
-    def grid_nlef_km_dirlef(self, dcc_args: DccExtrusionArgs, nlef_list, km_list, radii, replace):
-        for nlef in nlef_list:
-            for km in km_list:
-                # unidirectional
-                dcc_args_grid = copy.deepcopy(dcc_args)
-                dcc_args_grid.nlef = nlef
-                dcc_args_grid.km = km
-                dcc_args_grid.unidirectional = True
-                cur_jobid = self.run(dcc_args_grid, radii=radii, replace=replace)
-                # bidirectional
-                dcc_args_grid = copy.deepcopy(dcc_args)
-                dcc_args_grid.nlef = nlef
-                dcc_args_grid.km = km
-                dcc_args_grid.unidirectional = False
-                dep_jobid = None if dcc_args.simultaneously < 2 else ' ' # run simultaneously
-                cur_jobid = self.run(dcc_args_grid, radii=radii, dep_jobid=dep_jobid, replace=replace)
-
 
     def analysis_stats(self, dcc_args: DccExtrusionArgs, new_stats=False, exp_cool=None):
         """ deprecated for new_stats=False, replaced by contact_radius_analysis()
         Redo the analysis step including the stats (sim_stat.csv) or only regenerating the stats
         :param exp_cool: the experimental HiC cool file to compare with.
                             If none it will be take as it is in the sim_stats.csv file
-        :param dcc_args: the running dcc_extrusion and analysis  arguments
+        :param dcc_args: the running 3dpolys-le and analysis  arguments
         :param new_stats: whether to regenerate all statistics again (sim_stat.csv) and keep a backup copy of the old one
         :return: updated or new sim_stats.csv file and plots if requested
         """
@@ -591,7 +509,7 @@ class DccExtrusionRunner:
 
     def run_multi_decay_plot(self, dcc_args: DccExtrusionArgs, dep_jobid):
         s_cmp_chrs = f'--cmp_chrs {" ".join(dcc_args.cmp_chrs)}' if dcc_args.cmp_chrs is not None else ''
-        cmd = f"run_dcc_extrusion_runner.sh multi_decay_plot -o {dcc_args.output_folder} -e {dcc_args.exp_cool}" \
+        cmd = f"run_3dpolys-le_runner.sh multi_decay_plot -o {dcc_args.output_folder} -e {dcc_args.exp_cool}" \
               f" {s_cmp_chrs}"
         return self._job_runner.run_cmd(cmd, dep_jobid)
 
@@ -706,17 +624,7 @@ if __name__ == "__main__":
                                 cmp_chrs=args.cmp_chrs,
                                 output_folder=args.output_folder)
     dcc_run = DccExtrusionRunner(job_runner=JOB_RUNNER)
-    if args.run_command == 'grid_nlef_km':
-        dcc_run.grid_nlef_km(dcc_args, nlef_list=args.nlef_list, km_list=args.km_list, radii=args.list_contact_radii,
-                             replace=args.replace)
-    elif args.run_command == 'grid_perm_dir':
-        dcc_run.grid_perm_dir(dcc_args, boundary_factor_step=args.boundary_factor_step)
-    elif args.run_command == 'grid_nlef_km_dirlef':
-        dcc_run.grid_nlef_km_dirlef(dcc_args, nlef_list=args.nlef_list, km_list=args.km_list,
-                                    radii=args.list_contact_radii, replace=args.replace)
-#    elif args.run_command == 'analysis_stats':  # deprecated
-#        dcc_run.analysis_stats(dcc_args)  # this will include stats
-    elif args.run_command == 'new_stats':
+    if args.run_command == 'new_stats':
         dcc_run.analysis_stats(dcc_args, new_stats=True, exp_cool=args.exp_cool)
     elif args.run_command == 'decay_plots':
         dcc_run.decay_plots(dcc_args, res=args.resolution, replace=args.replace, use_threading=args.threading)

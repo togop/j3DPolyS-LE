@@ -34,20 +34,6 @@ echo "Install $( cat requirements.txt )"
 echo "run: ${CONDA_PACKAGE} install --file requirements.txt"
 ${CONDA_PACKAGE} install --file requirements.txt
 
-# only install conda R if there is no local R otherwise you get conflicts
-#R_VERSION="3.6.1"
-#Rinstalled=`which R`
-#if [ -z ${Rinstalled} ]
-#then
-#  #'wget https://cran.r-project.org/src/base/R-3/R-${R_VERSION}.tar.gz
-#  #tar -xzvf  R-${R_VERSION}.tar.gz
-#  conda install -c r r-base r-essentials
-#  conda install -c bioconda bioconductor-biocinstaller
-#else
-#  echo ""
-#  echo "Detected existing R installation "${Rinstalled}
-#fi
-
 sed -i.bak '/CONDA_ACTIVATE=/d' ~/.bashrc
 BIN_DIR="$(pwd)/bin"
 sed -i.bak '/export PATH=".*dcc-extrusion\/bin"/d' ~/.bashrc

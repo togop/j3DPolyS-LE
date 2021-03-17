@@ -1,6 +1,6 @@
 ! Created by  on 09.10.19.
 
-module latice_data_mod
+module lattice_data_mod
     implicit none
 
     public
@@ -10,7 +10,7 @@ module latice_data_mod
     integer :: voisnn(13, 13, 13), connec(13, 13, 13)
     integer :: lv4(12, 4)  ! 4: size of the second ring
 
-    public :: latice_load, latice_init
+    public :: lattice_load, lattice_init
 
     ! vectors from the center to all possible
     DATA voisxyz/0., 0., 0., &
@@ -398,13 +398,13 @@ module latice_data_mod
 
     contains
 
-        subroutine latice_load()  ! dir)
+        subroutine lattice_load()  ! dir)
             implicit none
             ! character (*), intent(in) :: dir
             integer :: i, j
             integer :: rc
 
-            print*, 'loading latice data voisxyz.out, costhet.out, voisnn.out, voisnn and connec.out. ', &
+            print*, 'loading lattice data voisxyz.out, costhet.out, voisnn.out, voisnn and connec.out. ', &
                     'DEPRECATED as it is done internally!'
 
             open(15, file = 'voisxyz.out', action='read', iostat = rc)
@@ -423,9 +423,9 @@ module latice_data_mod
             close(16)
             close(17)
             close(18)
-        end subroutine latice_load
+        end subroutine lattice_load
 
-        subroutine latice_init(kint)
+        subroutine lattice_init(kint)
             implicit none
 
             real, intent(in) :: kint
@@ -450,6 +450,6 @@ module latice_data_mod
                 costhet(1, i) = x;
                 costhet(i, 1) = x;
             end do
-        end subroutine latice_init
+        end subroutine lattice_init
 
-end module latice_data_mod
+end module lattice_data_mod

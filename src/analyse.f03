@@ -1,5 +1,5 @@
 module analyse_mod
-    use latice_data_mod
+    use lattice_data_mod
     use PolymerModel_mod
     use logging_mod
     !    USE ISO_C_BINDING
