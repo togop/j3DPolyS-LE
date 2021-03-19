@@ -68,8 +68,8 @@ CHI2_RANGE_NUM = 100
 
 CHI2_USE_SEM = True
 
-#FIG_FORMAT = 'svg'
-FIG_FORMAT = 'png'
+FIG_FORMAT = 'svg'
+#FIG_FORMAT = 'png'
 
 # simulation output files
 DR_OUT = 'dr.out'
@@ -332,6 +332,9 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
         tad_start = tadi[0]
         tad_end = tadi[1]
         tadi_size = (tad_end - tad_start) // res
+        toti_PFS = 0
+        toti_PS = 0
+        toti_FS = 0
         if tadi_size == 0:
             logger.info(f'skip TAD:{tad_start}-{tad_end}, size:{tadi_size}')
         else:
@@ -352,9 +355,6 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
             # log_base = 2  # 10 is too sparse  # e = math.exp(1)
             # max_x = max(1, np.int(math.log(tadi_size, log_base)))
             # np.log((tad_end - tad_start) / res)  # /np.log(log_base))
-            toti_PFS = 0
-            toti_PS = 0
-            toti_FS = 0
             dist_range = get_chi2_dist_range(chi2_mode, res, tadi_size)
             # logger.info('chi2 used distances: ' + ', '.join(map(str, dist_range)))
             # dist_range = remove_duplicates(dist_range)   # so far not needed
