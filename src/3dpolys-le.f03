@@ -8,7 +8,7 @@ end function path_separator
 character(len = 1000) function find_path_program()
     character(len = 100000) :: path
     integer :: i, j
-    character(*), parameter :: program_bin = 'dcc-extrusion/bin' !not optimal to look for: if instalation folder changes
+    character(*), parameter :: program_bin = '3dpolys-le/bin' !not optimal to look for: if instalation folder changes
     !character(*), parameter :: program_bin = 'anaconda3/bin' ! used just for local test
 
     call get_environment_variable('PATH', path)
@@ -25,7 +25,7 @@ subroutine print_version()
     character(*), parameter :: VERSION = '2020.1.0b11'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = 'dcc-extrusion', program__version = 'unknown'
+    character(25) :: var_name, program_name = '3dpolys-le', program__version = 'unknown'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -173,7 +173,7 @@ program mainprogram
     integer*4 :: status = 0
     integer :: rc
     character(len = 20) :: col1, col2, col3, col4
-    type(Logger) :: log = Logger(source = 'dcc-extrusion', level = LOG_INFO)
+    type(Logger) :: log = Logger(source = '3dpolys-le', level = LOG_INFO)
     integer :: hic3d_factor = 0
     logical :: use_boundary_score = .false.
     logical :: z_loop = .false.

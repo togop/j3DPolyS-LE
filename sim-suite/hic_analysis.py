@@ -731,7 +731,7 @@ def find_insulation_score(hic_h5, res=EXP_RESOLUTION, plot=True, dummy_sim=False
             tracks_config.write(configfile)
         # plot to PDF
         cmd = f"hicPlotTADs --tracks {tracks_ini} --region {SIM_CHR}:1-{chr_size} -t '{out_prefix} TADs on X' -o {out_prefix}_tads.pdf"
-        if dummy_sim:  # conda activate DCC-EXTRUSION-env
+        if dummy_sim:  # conda activate 3dpolys-le
             cmd = f"echo {cmd}"
         status, stout = subprocess.getstatusoutput(cmd)
         logger.info(f" call: {cmd}\n\t {stout}")

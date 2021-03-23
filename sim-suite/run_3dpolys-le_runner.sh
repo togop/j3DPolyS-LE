@@ -12,7 +12,7 @@
 ##  SBATCH --ntasks-per-node=20
 ##  SBATCH --cpus-per-task=20
 
-source ${CONDA_ACTIVATE} DCC-EXTRUSION-env
+source ${CONDA_ACTIVATE} 3dpolys-le
 
 echo "CALL: 3dpolys-le_runner.py $@"
 #../../../
