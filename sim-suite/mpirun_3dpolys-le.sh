@@ -5,6 +5,7 @@ PARAMS=""
 OUT_DIR=./out
 ANALYSE=""
 BOUNDARY=""
+LEF_BINDING_SITES=""
 BOUNDARY_FACTOR=""
 BOUNDARY_DIRECTION=""
 BOUNDARY_SCORE=""
@@ -40,6 +41,11 @@ while (( "$#" )); do
     -b:*|--boundary:*)
         BOUNDARY=$1
         echo "argument BOUNDARY: $1"
+        shift
+        ;;
+    -lbs:*|--lef_binding_sites:*)
+        LEF_BINDING_SITES=$1
+        echo "argument LEF_BINDING_SITES: $1"
         shift
         ;;
     -bf:*|--boundary_factor:*)
@@ -147,5 +153,5 @@ then
     rm -r ${OUT_DIR}
 fi
 
-echo "CALL: mpirun 3dpolys-le -o:${OUT_DIR} ${ANALYSE} ${BOUNDARY} ${BOUNDARY_FACTOR} ${BOUNDARY_DIRECTION} ${BOUNDARY_SCORE} ${Z_LOOP} ${UNIDIRECTIONAL} ${RADIUS_CONTACT} ${CONTACT_PROBABILITY} ${NLEF} ${KM} ${INIT_MODE} ${LOG} ${HIC3D} ${PCA} ${INPUT_DAT_FILE}" # --mca orte_base_help_aggregate 0
-mpirun             3dpolys-le -o:${OUT_DIR} ${ANALYSE} ${BOUNDARY} ${BOUNDARY_FACTOR} ${BOUNDARY_DIRECTION} ${BOUNDARY_SCORE} ${Z_LOOP} ${UNIDIRECTIONAL} ${RADIUS_CONTACT} ${CONTACT_PROBABILITY} ${NLEF} ${KM} ${INIT_MODE} ${LOG} ${HIC3D} ${PCA} ${INPUT_DAT_FILE}
+echo "CALL: mpirun 3dpolys-le -o:${OUT_DIR} ${ANALYSE} ${BOUNDARY} ${LEF_BINDING_SITES} ${BOUNDARY_FACTOR} ${BOUNDARY_DIRECTION} ${BOUNDARY_SCORE} ${Z_LOOP} ${UNIDIRECTIONAL} ${RADIUS_CONTACT} ${CONTACT_PROBABILITY} ${NLEF} ${KM} ${INIT_MODE} ${LOG} ${HIC3D} ${PCA} ${INPUT_DAT_FILE}" # --mca orte_base_help_aggregate 0
+mpirun             3dpolys-le -o:${OUT_DIR} ${ANALYSE} ${BOUNDARY} ${LEF_BINDING_SITES} ${BOUNDARY_FACTOR} ${BOUNDARY_DIRECTION} ${BOUNDARY_SCORE} ${Z_LOOP} ${UNIDIRECTIONAL} ${RADIUS_CONTACT} ${CONTACT_PROBABILITY} ${NLEF} ${KM} ${INIT_MODE} ${LOG} ${HIC3D} ${PCA} ${INPUT_DAT_FILE}
