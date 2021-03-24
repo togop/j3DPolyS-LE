@@ -79,7 +79,9 @@ subroutine print_help()
     print*, '   -a|--analyse:<analyse folder> Perform analyse step on an already done simulation&
             & and store results in a given folder.'
     print*, '   -b|--boundary:<boundary sites file> Boundary sites file in a csv format with the following columns:&
-            & name,midpoint,impermeability,score,b-position,strand. Default: <input.dat folder>/mex-sites.csv'
+            & name,midpoint,impermeability,score,b-position,strand. Default: no bondaries'
+    print*, '   -lbs|--lef_binding_sites:<loop extrusion binding sites file> LEFs binding sites file in a csv format&
+            & with the following columns: name,position,length,probability. Default: if not given, the whole polymer'
     print*, '   -r|--radius_contact:<radius> contact radius in lattice unit (1=70nm) for extracting Hi-C matrixes, Default: 1.42'
     print*, '   -cp|--contact_probability Together with the contact radius use contact probability with the formula&
             & (1 - <actual_radius_contact>^2 / <radius_contact param>^2),&
@@ -141,6 +143,7 @@ program mainprogram
     character(1000) :: input_folder
     character(1000) :: output_folder = ''
     character(1000) :: boundary_file = ''
+    character(1000) :: lef_binding_sites = ''
     character(20) :: opt_s = ''
     integer :: ai = 1  ! input argument position the input.dat in the CLI, the ai+1 is the output folder
     character(1) :: path_separator, path_sep
@@ -156,6 +159,10 @@ program mainprogram
     ! real :: seed
     type(Timer) :: crono
     real, dimension(:, :), allocatable :: boundary  ! (strand -/+, permeability)
+    integer, dimension(:), allocatable :: binding_site_pos
+    real, dimension(:), allocatable :: binding_site_prob
+    integer :: binding_sites_count = 0 ! deafault: there is no lef_binding_site file so the whole polymer is binding site
+    integer :: binding_site_pos_i = 0
     real :: boundary_factor = 1., boundary_score = 1.  ! impermeabale boundary
     integer :: boundary_direction = 0 ! same direction
     integer, parameter :: resolution_factor = 2000
@@ -186,8 +193,16 @@ program mainprogram
         real :: impermeability
         real :: score
     end type BoundarySite
-
     type(BoundarySite) :: boundary_site
+
+    type :: BindingSite
+        character(len = 20) :: name
+        integer :: position
+        integer :: length
+        real :: probability
+    end type BindingSite
+    type(BindingSite) :: binding_site
+
     real :: impermeability_prev
     integer :: strand
 
@@ -242,6 +257,12 @@ program mainprogram
                 boundary_file = trim(input_options(i + 1:))
                 if (rank == 0) then
                     call log%info('input ' // trim(input_options(:i)) // trim(boundary_file))
+                end if
+            elseif ((index(input_options, '--lef_binding_sites:') > 0).or.(index(input_options, '-lbs:') > 0)) then
+                i = index(input_options, ':')
+                lef_binding_sites = trim(input_options(i + 1:))
+                if (rank == 0) then
+                    call log%info('input ' // trim(input_options(:i)) // trim(lef_binding_sites))
                 end if
             elseif ((index(input_options, '--radius_contact:') > 0).or.(index(input_options, '-r:') > 0)) then
                 i = index(input_options, ':')
@@ -427,99 +448,158 @@ program mainprogram
     end if
     close(10)
 
-    if (trim(boundary_file) == '') then
-        ! default boundaries in the order: mex-sites.csv, rex-sites.csv
-        boundary_file = trim(input_folder) // 'mex-sites.csv'
-        inquire(file = trim(boundary_file), exist = file_exists)
-        if (.NOT.file_exists) then
-            boundary_file = trim(input_folder) // 'rex-sites.csv'
-        end if
-    end if
+    if (trim(boundary_file) /= '') then
+        open(10, file = trim(boundary_file), action = 'read', iostat = rc)
+        if (rc == 0) then
+            if (rank == 0) then
+                call log%info('Load boundaries file ' // trim(boundary_file) // ' with boundary_foctor ' // &
+                        trim(strf(boundary_factor)) // ' ...')
+            end if
+            read(10, *) col1, col2, col3, col4
+            if ((col1 == 'name').and.(col2=='midpoint').and.(col3=='impermeability')) then
+                do
+                    read(10, *, iostat = rc) boundary_site
+                    if (rc /= 0) exit
+                    !print*, boundary_site
+                    i = 1 + boundary_site%midpoint / resolution_factor ! indexing starts from 1
+                    if ((boundary_direction * boundary_site%impermeability) < 0) then
+                        strand = 1
+                    else if ((boundary_direction * boundary_site%impermeability) > 0) then
+                        strand = 2
+                    else
+                        strand = 0  ! both
+                    end if
+    !                call log%info('Nchain: ' // trim(str(Nchain)) // ', boundary_site%impermeability: ' &
+    !                        // trim(strf(boundary_site%impermeability)) // ', strand: ' // trim(str(strand)) &
+    !                        // ', i: ' // trim(str(i)) &
+    !                        // ', boundary_site%midpoint: ' // trim(str(boundary_site%midpoint)))
+                    if ((i <= Nchain) .and. (boundary_site%impermeability /= 0)) then
+                        impermeability_prev = 0
+                        ! print*, 'boundary(' // trim(str(strand)) // ', ' // trim(str(i)) // ')=' // &
+                        !        trim(strf(boundary(max(1, strand), i)))
+                        if (boundary(max(1, strand), i) /= 0) then
+                            impermeability_prev = boundary(max(1, strand), i)
+                            if (rank == 0) then
+                                call log%info('update boundary-site[' // trim(str(strand)) // ',' // trim(str(i)) // ']=' // &
+                                        trim(boundary_site%name) // ', prev.impermeability: ' // &
+                                        trim(strf(impermeability_prev)) // ' with ' // trim(strf(boundary_site%impermeability)))
+                            end if
+                        end if
 
-    open(10, file = trim(boundary_file), action = 'read', iostat = rc)
-    if (rc == 0) then
-        if (rank == 0) then
-            call log%info('Load boundaries file ' // trim(boundary_file) // ' with boundary_foctor ' // &
-                    trim(strf(boundary_factor)) // ' ...')
-        end if
-        read(10, *) col1, col2, col3, col4
-        if ((col1 == 'name').and.(col2=='midpoint').and.(col3=='impermeability')) then
-            do
-                read(10, *, iostat = rc) boundary_site
-                if (rc /= 0) exit
-                !print*, boundary_site
-                i = 1 + boundary_site%midpoint / resolution_factor ! indexing starts from 1
-                if ((boundary_direction * boundary_site%impermeability) < 0) then
-                    strand = 1
-                else if ((boundary_direction * boundary_site%impermeability) > 0) then
-                    strand = 2
-                else
-                    strand = 0  ! both
-                end if
-!                call log%info('Nchain: ' // trim(str(Nchain)) // ', boundary_site%impermeability: ' &
-!                        // trim(strf(boundary_site%impermeability)) // ', strand: ' // trim(str(strand)) &
-!                        // ', i: ' // trim(str(i)) &
-!                        // ', boundary_site%midpoint: ' // trim(str(boundary_site%midpoint)))
-                if ((i <= Nchain) .and. (boundary_site%impermeability /= 0)) then
-                    impermeability_prev = 0
-                    ! print*, 'boundary(' // trim(str(strand)) // ', ' // trim(str(i)) // ')=' // &
-                    !        trim(strf(boundary(max(1, strand), i)))
-                    if (boundary(max(1, strand), i) /= 0) then
-                        impermeability_prev = boundary(max(1, strand), i)
+                        ! call log%info('boundary_score col4: ' // trim(col4))
+                        if (use_boundary_score.and.(col4=='score')) then
+                            boundary_score = boundary_site%score / 10.
+                        else
+                            boundary_score = 1.
+                        end if
+                        ! print*, 'old impermeability_prev: ' // trim(strf(impermeability_prev))
+                        impermeability_prev = 1 - (1 - impermeability_prev) * &
+                                (1 - abs(boundary_site%impermeability * boundary_factor * boundary_score))
+                        ! print*, 'new impermeability_prev: ' // trim(strf(impermeability_prev)) // &
+                        !         ' by boundary_factor:' // trim(strf(boundary_factor)) // &
+                        !        ' and boundary_score:' // trim(strf(boundary_score))
+                        if (strand /= 0) then
+                            boundary(strand, i) = impermeability_prev
+                        else
+                            boundary(1, i) = impermeability_prev
+                            boundary(2, i) = impermeability_prev
+                        end if
                         if (rank == 0) then
-                            call log%info('update boundary-site[' // trim(str(strand)) // ',' // trim(str(i)) // ']=' // &
-                                    trim(boundary_site%name) // ', prev.impermeability: ' // trim(strf(impermeability_prev)) // &
-                                    ' with ' // trim(strf(boundary_site%impermeability)))
+                            call log%info('set boundary-site[' // trim(str(strand)) // ',' // trim(str(i)) // ']=' // &
+                                    trim(boundary_site%name) // ', impermeability: ' // &
+                                    trim(strf(boundary(max(1, strand), i))))
+                        end if
+                    else
+                        if (rank == 0) then
+                            call log%warn('skip boundary-site[' // trim(str(strand)) // ',' // trim(str(i)) // ']=' // &
+                                    trim(boundary_site%name) // ') out of boundary size or impermeability = 0')
                         end if
                     end if
+                end do
+            else
+                if (rank == 0) then
+                    call log%error('wrong format for boundary sites: ' // col1 // col2 // col3 // ' but expected: ' // &
+                            'name midpoint impermeability. STOP PROCEEDING. Please provide a correct boundary.csv file.')
 
-                    ! call log%info('boundary_score col4: ' // trim(col4))
-                    if (use_boundary_score.and.(col4=='score')) then
-                        boundary_score = boundary_site%score / 10.
-                    else
-                        boundary_score = 1.
-                    end if
-                    ! print*, 'old impermeability_prev: ' // trim(strf(impermeability_prev))
-                    impermeability_prev = 1 - (1 - impermeability_prev) * &
-                            (1 - abs(boundary_site%impermeability * boundary_factor * boundary_score))
-                    ! print*, 'new impermeability_prev: ' // trim(strf(impermeability_prev)) // &
-                    !         ' by boundary_factor:' // trim(strf(boundary_factor)) // &
-                    !        ' and boundary_score:' // trim(strf(boundary_score))
-                    if (strand /= 0) then
-                        boundary(strand, i) = impermeability_prev
-                    else
-                        boundary(1, i) = impermeability_prev
-                        boundary(2, i) = impermeability_prev
-                    end if
-                    if (rank == 0) then
-                        call log%info('set boundary-site[' // trim(str(strand)) // ',' // trim(str(i)) // ']=' // &
-                                trim(boundary_site%name) // ', impermeability: ' // &
-                                trim(strf(boundary(max(1, strand), i))))
-                    end if
-                else
-                    if (rank == 0) then
-                        call log%warn('skip boundary-site[' // trim(str(strand)) // ',' // trim(str(i)) // ']=' // &
-                                trim(boundary_site%name) // ') out of boundary size or impermeability = 0')
-                    end if
+                    call MPI_FINALIZE(ierr)
+                    if (ierr /= 0) error stop 'mpi finalize error'
+
+                    call exit(1)
                 end if
-            end do
+            end if
         else
             if (rank == 0) then
-                call log%error('wrong format for boundary sites: ' // col1 // col2 // col3 // ' but expected: ' // &
-                        'name midpoint impermeability. STOP PROCEEDING. Please provide a correct boundary.csv file.')
-
-                call MPI_FINALIZE(ierr)
-                if (ierr /= 0) error stop 'mpi finalize error'
-
-                call exit(1)
+                call log%error('Cound not find ' // trim(boundary_file) // ' file!')
             end if
         end if
-    else
-        if (rank == 0) then
-            call log%error('Cound not find ' // trim(boundary_file) // ' file!')
-        end if
+        close(10)
     end if
-    close(10)
+
+    if (trim(lef_binding_sites) /= '') then
+        open(10, file = trim(lef_binding_sites), action = 'read', iostat = rc)
+        if (rc == 0) then
+            if (rank == 0) then
+                call log%info('Load lef_binding_sites file ' // trim(lef_binding_sites) // ' ...')
+            end if
+            read(10, *) col1, col2, col3, col4
+            if ((col1 == 'name').and.(col2=='position').and.(col3=='length').and.(col4=='probability')) then
+                ! count binding sitees
+                do
+                    read(10, *, iostat = rc) binding_site
+                    binding_sites_count = binding_sites_count + binding_site%length
+                    if (rc /= 0) exit
+                end do
+                if (rank == 0) then
+                    call log%info('Adding ' // trim(str(binding_sites_count)) // ' LEFs binding sites...')
+                end if
+
+                allocate (binding_site_pos(binding_sites_count))
+                allocate (binding_site_prob(binding_sites_count))
+
+                ! start from the beginning and prepare binding_site_pos
+                ! call FSEEK(10, 0, 0, rc) ! didn't work
+                close(10)
+                open(10, file = trim(lef_binding_sites), action = 'read', iostat = rc)
+
+                read(10, *) col1, col2, col3, col4 ! skip header
+                binding_sites_count = 0
+                binding_site_pos_i = 0
+                do
+                    read(10, *, iostat = rc) binding_site
+                    if (rc /= 0) exit
+                    do binding_site_pos_i = (binding_site%position/resolution_factor), &
+                            (binding_site%position/resolution_factor + binding_site%length - 1)
+                        binding_sites_count = binding_sites_count + 1
+                        binding_site_pos(binding_sites_count) = binding_site_pos_i
+                        binding_site_prob(binding_sites_count) = binding_site%probability
+                        if (rank == 0) then
+                            call log%info('Added  LEFs binding site: binding_site_pos(' // trim(str(binding_sites_count)) // &
+                                    ')=' // trim(str(binding_site_pos_i)) // &
+                                    ' with probability ' // trim(strf(binding_site%probability)))
+                        end if
+                    end do
+                end do
+                if (rank == 0) then
+                    call log%info('Added ' // trim(str(binding_sites_count)) // ' LEFs binding sites.')
+                end if
+            else
+                if (rank == 0) then
+                    call log%error('wrong format for lef binding sites: ' // col1 // col2 // col3 // ' but expected: ' // &
+                            'name position length probability. STOP PROCEEDING. Please provide a correct binding_sites.csv file.')
+
+                    call MPI_FINALIZE(ierr)
+                    if (ierr /= 0) error stop 'mpi finalize error'
+
+                    call exit(1)
+                end if
+            end if
+        else
+            if (rank == 0) then
+                call log%error('Cound not find ' // trim(lef_binding_sites) // ' file!')
+            end if
+        end if
+        close(10)
+    end if
 
     !the first and last monomer should be impenetrable
     boundary(1, 1) = 1.
@@ -600,9 +680,10 @@ program mainprogram
 
             !generate initial configuration
             model = PolymerModel(L = L, Nchain = Nchain, iku = iku, ikm = ikm, ikb = ikb, Nleffree = Nlef, &
-                    kb = kb, ku = ku, km = km, Ea = Ea, z_loop = z_loop, unidirectional = unidirectional)
+                    kb = kb, ku = ku, km = km, Ea = Ea, z_loop = z_loop, unidirectional = unidirectional, &
+                    binding_sites_count = binding_sites_count)
 
-            call model%init(boundary, init_mode)
+            call model%init(boundary, binding_site_pos, binding_site_prob, init_mode)  ! TODO add binding_site_pos
 
             call model%do_simulation(trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
 

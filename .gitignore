@@ -2,3 +2,4 @@
 bin/
 cmake-build
 cmake-build-debug
+out/

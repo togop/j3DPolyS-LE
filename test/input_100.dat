@@ -1,0 +1,14 @@
+100 ::Nchain
+4 ::L
+10 ::Niter
+11 ::Nmeas
+12000 ::Ninter
+1.17 ::kint
+2.8e-3 ::kb
+2e-3 ::ku
+3e-1 ::km
+0. ::Ea
+10 ::Nlef
+50 ::burnin
+0 ::burnout
+3 ::burnoutM

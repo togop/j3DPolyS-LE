@@ -26,12 +26,15 @@ module PolymerModel_mod
         real, public :: kb, ku, km, Ea
         logical, public :: z_loop = .false.
         logical, public :: unidirectional = .false.
+        integer, public :: binding_sites_count = 0
         ! allocatable
         integer, dimension(:, :), allocatable :: config
         integer, dimension(:, :), allocatable :: bittable
         real, dimension(:, :), allocatable :: dr
         integer, dimension(:, :), allocatable :: contact
         real, dimension(:, :), allocatable :: boundary
+        integer, dimension(:), allocatable :: binding_site_pos
+        real, dimension(:), allocatable :: binding_site_prob
 
     contains
         procedure, public :: init, do_simulation, trialmoveex, trialmovetad, trialbound, trialunbound, unbound_all, &
@@ -42,10 +45,12 @@ module PolymerModel_mod
 
 contains
 
-    subroutine init(self, boundary, init_mode)
+    subroutine init(self, boundary, binding_site_pos, binding_site_prob, init_mode)
         implicit none
         class (PolymerModel), intent(inout) :: self
         real, dimension(:, :) :: boundary
+        integer, dimension(:) :: binding_site_pos
+        real, dimension(:) :: binding_site_prob
         character(len = 1), intent(in) :: init_mode
 
         call log%set_level(global_log_level)
@@ -53,6 +58,8 @@ contains
         call self%allocate()
 
         self%boundary = boundary
+        self%binding_site_pos = binding_site_pos
+        self%binding_site_prob = binding_site_prob
         !print*, 'initialize boundary ', shape(boundary), shape(self%boundary)
 
         call self%initbitable()
@@ -91,6 +98,8 @@ contains
         allocate (self%dr(3, self%Nchain))
         allocate (self%contact(3, self%Nchain))
         allocate (self%boundary(2, self%Nchain))
+        allocate (self%binding_site_pos( self%binding_sites_count))
+        allocate (self%binding_site_prob( self%binding_sites_count))
 
         return
     end subroutine allocate
@@ -662,7 +671,15 @@ contains
         real*8 :: randomnumber
 
         !choose randomly a monomer
-        n = int(self%Nchain * randomnumber()) + 1
+        if (self%binding_sites_count > 0) then
+            ! we have binding sites
+            n = int(self%binding_sites_count * randomnumber()) + 1
+            ! TODO check with Daniel how to use  self%binding_site_prob(n)
+            n = self%binding_site_pos(n)
+        else
+            ! no binding sites: the whole polymer is binding sites
+            n = int(self%Nchain * randomnumber()) + 1
+        end if
 
         id = self%contact(1, n)
         if (id==0) then !if the bin is not occupied by a leg, try to randomly insert a LEF to NN sites
@@ -671,7 +688,6 @@ contains
             end do
             d = int(2 * randomnumber()) + 1
             if (d==1) then
-                ! bugfix IFs and ands  ! TODO maybe remind Daniel
                 if (n>1) then
                     if (self%contact(1, n - 1)==0) then
                         self%contact(1, n) = n - 1
