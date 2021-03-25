@@ -58,8 +58,10 @@ contains
         call self%allocate()
 
         self%boundary = boundary
-        self%binding_site_pos = binding_site_pos
-        self%binding_site_prob = binding_site_prob
+        if (self%binding_sites_count > 0) then
+            self%binding_site_pos = binding_site_pos
+            self%binding_site_prob = binding_site_prob
+        end if
         !print*, 'initialize boundary ', shape(boundary), shape(self%boundary)
 
         call self%initbitable()
@@ -98,8 +100,10 @@ contains
         allocate (self%dr(3, self%Nchain))
         allocate (self%contact(3, self%Nchain))
         allocate (self%boundary(2, self%Nchain))
-        allocate (self%binding_site_pos( self%binding_sites_count))
-        allocate (self%binding_site_prob( self%binding_sites_count))
+        if (self%binding_sites_count > 0) then
+            allocate (self%binding_site_pos( self%binding_sites_count))
+            allocate (self%binding_site_prob( self%binding_sites_count))
+        end if
 
         return
     end subroutine allocate

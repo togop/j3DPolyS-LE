@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.13)
 #cmake_policy(VERSION 3.5)
 cmake_policy(SET CMP0068 NEW)
-project(3dpolys--le VERSION 0.9 LANGUAGES Fortran)
+project(3dpolys--le VERSION 2021.1 LANGUAGES Fortran)
 enable_language(Fortran C)
 
 #SET(CMAKE_C_COMPILER   /usr/local/bin/gcc-9)
@@ -17,7 +17,7 @@ if(NOT hasMPI)
 endif()
 
 set(TARGET 3dpolys-le)
-set(PYTHONPATH src)
+set(PYTHONPATH sim-suite)
 #set(PYTHON_FILES sim-suite/__init__.py sim-suite/hic_analysis.py sim-suite/hic_analysis_sim_vs_exp.py sim-suite/plot_hic.py sim-suite/plot_sim_stats_3d.py sim-suite/plot_configs_3d.py)
 set(PYTHON_FILES sim-suite/__init__.py sim-suite/hic_analysis.py sim-suite/3dpolys-le_runner.py sim-suite/hic_converters.py sim-suite/job_runner.py)
 set(SOURCE_FILES src/logging.f03 src/randomnumber.f03 src/kinds.f03 src/timers.f03 src/lattice_data.f03 src/polymer_model.f03 src/analyse.f03 src/3dpolys-le.f03)
@@ -54,10 +54,7 @@ message( STATUS "C compiler: " ${CMAKE_C_COMPILER} )
 message( STATUS "CMAKE_MODULE_PATH: " ${CMAKE_MODULE_PATH} )
 message( STATUS "CMAKE_Fortran_MODULE_DIRECTORY: " ${CMAKE_Fortran_MODULE_DIRECTORY} )
 
-find_package(HDF5 REQUIRED COMPONENTS Fortran Fortran_HL)
-#add_library(hdf5::hdf5 INTERFACE IMPORTED)
-#set_property(TARGET hdf5::hdf5 PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${HDF5_Fortran_INCLUDE_DIRS})
-#set_property(TARGET hdf5::hdf5 PROPERTY INTERFACE_LINK_LIBRARIES ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
+find_package(HDF5 REQUIRED COMPONENTS Fortran)
 
 message( STATUS "HDF5_FOUND: " ${HDF5_FOUND} )
 message( STATUS "HDF5_Fortran_LIBRARIES: " ${HDF5_Fortran_LIBRARIES})  # /usr/local/Cellar/hdf5/1.10.5_1/lib/
@@ -81,36 +78,10 @@ message(STATUS "-- OS_PLATFORM:            " ${OS_PLATFORM})
 
 # HDF5 support
 
-if(APPLE)
-    message( STATUS "OS: APPLE")
-    # locations on my Mac (todor)
-    ##set(HDF5_LIBRARY_DIRS /usr/local/lib)   # /usr/local/Cellar/hdf5/1.10.5_1/lib/)
-    #set(HDF5_Fortran_INCLUDE_DIRS /usr/local/include)
-    set(HDF5_FOUND TRUE)
-    #elseif(LINUX)
-elseif(UNIX)
-    # for Linux, BSD, Solaris, Minix
-    message( STATUS "OS: Linux, BSD, Solaris, Minix")
-
-    if( ${CMAKE_SYSTEM_NAME} STREQUAL "Debian")
-        message( STATUS "OS: Debian ...  use found")
-    else()
-        message( STATUS "OS: OTHER (maybe Ubuntu) ...  use our cluster location")
-        # locations on our server
-        #set(HDF5_LIBRARY_DIRS /usr/lib/x86_64-linux-gnu/hdf5/serial/) # /home/jsemple/mysoftware/hdf5-1.10.5/hdf5/lib/)   # this was not fond
-        # set(HDF5_Fortran_INCLUDE_DIRS /home/jsemple/mysoftware/hdf5-1.10.5/hdf5/include) # this as fond
-        #set(HDF5_FOUND TRUE)
-    endif()
-else()
-    message( STATUS "OS: OTHER ...  use found")
-endif()
-
 if(HDF5_FOUND)
     message( STATUS "Set link_directories: " ${HDF5_LIBRARY_DIRS})
     message( STATUS "Set include_directories: " ${HDF5_Fortran_INCLUDE_DIRS})
-    #link_directories( ${HDF5_LIBRARY_DIRS} ) #/usr/local/Cellar/hdf5/1.10.5_1/lib/ )
     include_directories(${HDF5_Fortran_INCLUDE_DIRS})
-    #    set(_hdf5_libs hdf5 hdf5_fortran)
 endif()
 
 if(CMAKE_Fortran_COMPILER MATCHES "gfortran*")
@@ -131,7 +102,6 @@ if (${CMAKE_BUILD_TYPE} MATCHES "Release")
 elseif (${CMAKE_BUILD_TYPE} MATCHES "Debug")
     message( STATUS "Fortran compiler flags:" ${CMAKE_Fortran_FLAGS_DEBUG})
 endif()
-
 
 # -------------------------------------------------------------------------------------------------------------------------
 # Libraries
@@ -174,22 +144,6 @@ add_executable(${TARGET} ${SOURCE_FILES})
 ##target_include_directories(${TARGET} PRIVATE ${HDF5_INCLUDE_DIRS})
 target_link_libraries(${TARGET} ${RANDOMNUMBER} ${KINDS} ${TIMERS} ${LATTICE_DATA} ${POLYMER_MODEL} ${ANALYSE} MPI::MPI_Fortran) ## ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
 set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE Fortran)
-
-#[[
-install(
-        TARGETS
-        ${ANALYSE}
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-)
-
-set(CMAKE_MODULE_PATH ./src)
-
-find_package(PythonInterp 3.5 REQUIRED)
-find_package(PythonLibs 3.5 REQUIRED)
-#find_package(PythonExtensions REQUIRED)
-#find_package(F2PY REQUIRED)
-]]
 
 # data files
 #configure_file(src/input_100.dat ${EXECUTABLE_OUTPUT_PATH}/input.dat COPYONLY)

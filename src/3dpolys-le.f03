@@ -1,12 +1,12 @@
 character(len = 1) function path_separator()
-    character(len = 100000) :: path
+    character(len = 10000) :: path
     call get_environment_variable('PATH', path)
     path_separator = path(1:1)
     ! print*, 'path=', trim(path), ' path_separator=', path_separator
 end function path_separator
 
 character(len = 1000) function find_path_program()
-    character(len = 100000) :: path
+    character(len = 10000) :: path
     integer :: i, j
     character(*), parameter :: program_bin = '3dpolys-le/bin' !not optimal to look for: if instalation folder changes
     !character(*), parameter :: program_bin = 'anaconda3/bin' ! used just for local test
