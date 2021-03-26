@@ -521,11 +521,11 @@ program mainprogram
                     call log%error('wrong format for boundary sites: ' // col1 // col2 // col3 // ' but expected: ' // &
                             'name midpoint impermeability. STOP PROCEEDING. Please provide a correct boundary.csv file.')
 
-                    call MPI_FINALIZE(ierr)
-                    if (ierr /= 0) error stop 'mpi finalize error'
-
-                    call exit(1)
                 end if
+                call MPI_FINALIZE(ierr)
+                if (ierr /= 0) error stop 'mpi finalize error'
+
+                call exit(1)
             end if
         else
             if (rank == 0) then
@@ -587,11 +587,11 @@ program mainprogram
                     call log%error('wrong format for lef binding sites: ' // col1 // col2 // col3 // ' but expected: ' // &
                             'name position length probability. STOP PROCEEDING. Please provide a correct binding_sites.csv file.')
 
-                    call MPI_FINALIZE(ierr)
-                    if (ierr /= 0) error stop 'mpi finalize error'
-
-                    call exit(1)
                 end if
+                call MPI_FINALIZE(ierr)
+                if (ierr /= 0) error stop 'mpi finalize error'
+
+                call exit(1)
             end if
         else
             if (rank == 0) then

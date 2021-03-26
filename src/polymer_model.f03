@@ -680,6 +680,7 @@ contains
             n = int(self%binding_sites_count * randomnumber()) + 1
             ! TODO check with Daniel how to use  self%binding_site_prob(n)
             n = self%binding_site_pos(n)
+            ! call log%debug('Loading LEF at site: binding_site_pos(' // trim(str(n)))
         else
             ! no binding sites: the whole polymer is binding sites
             n = int(self%Nchain * randomnumber()) + 1
