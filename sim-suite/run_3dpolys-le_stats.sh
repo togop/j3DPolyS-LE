@@ -2,7 +2,7 @@
 
 ## Allocate resources
 #SBATCH --job-name="3dpolys-le_stats"
-#SBATCH --mail-user=todor.gitchev@izb.unibe.ch
+##SBATCH --mail-user=todor.gitchev@izb.unibe.ch
 #SBATCH --mail-type=fail
 #SBATCH --time=0-05:00:00
 #SBATCH --mem-per-cpu=16G
