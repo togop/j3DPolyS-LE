@@ -143,7 +143,7 @@ else:
     ins_score_spearmanr.pvalue = 0.
 
 chip_out_file = os.path.join(args.analyse, ha.CHIP_OUT)
-chip_corr = ha.get_chip_correlation(chip_out_file, args.exp_chip, args.boundary, args.bin_size,
+chip_corr = 0, 0, 0  # ha.get_chip_correlation(chip_out_file, args.exp_chip, args.boundary, args.bin_size,
                                     correlation=chip_correlation, plot=True, replace=args.replace)
 
 # import matplotlib.pyplot as plt
