@@ -117,8 +117,8 @@ if not os.path.exists(sim_hic_mcool):
                                                             chi2_mode=ha.CHI2_MODE_LINEAR)
 
 # calculate insulation score
-sim_ins_score = ha.find_insulation_score(sim_hic_file, res=ha.EXP_RESOLUTION, dummy_sim=dummy_sim)
-if os.path.exists(sim_ins_score):
+sim_ins_score = "depreceted" # ha.find_insulation_score(sim_hic_file, res=ha.EXP_RESOLUTION, dummy_sim=dummy_sim)
+if False:  # os.path.exists(sim_ins_score):
     # compare L2(sim_ins_score, exp_ins_score)
     exp_ins_score_pd = pd.read_csv(exp_ins_score, delimiter='\t', encoding='utf-8',
                                    names=['chr', 'start', 'end', 'score'])
