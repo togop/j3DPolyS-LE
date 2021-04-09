@@ -105,16 +105,16 @@ if not os.path.exists(sim_hic_mcool):
 
 # need only normed for chi2_log and chi2_linear and for given tads-boundary sites and 1tad(the whole chromosome)
 # TODO clean uneeded statistics and be avare that chi2-min.bed file will be save unders the same name
-(chi2_log_1tad, alpha_log_1tad) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
-                                                            res=ha.RESOLUTION, tads_boundary=None, norm=True,
-                                                            chi2_mode=ha.CHI2_MODE_LOG)
-(chi2_lin_1tad, alpha_lin_1tad) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
-                                                            res=ha.RESOLUTION, tads_boundary=None, norm=True,
-                                                            chi2_mode=ha.CHI2_MODE_LINEAR)
+(chi2_log_1tad, alpha_log_1tad) = (0, 0) # ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
+                                     #                       res=ha.RESOLUTION, tads_boundary=None, norm=True,
+                                     #                       chi2_mode=ha.CHI2_MODE_LOG)
+(chi2_lin_1tad, alpha_lin_1tad) = (0, 0) # ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
+                                         #                   res=ha.RESOLUTION, tads_boundary=None, norm=True,
+                                         #                   chi2_mode=ha.CHI2_MODE_LINEAR)
 
-(chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS, res=ha.RESOLUTION,
-                                                  tads_boundary=tads_boundary, norm=True,
-                                                  chi2_mode=ha.CHI2_MODE_LINEAR)  # , plot=True)
+(chi2_lin, alpha_lin) = (0, 0) # ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS, res=ha.RESOLUTION,
+                               #                   tads_boundary=tads_boundary, norm=True,
+                               #                   chi2_mode=ha.CHI2_MODE_LINEAR)  # , plot=True)
 
 (chi2_log, alpha_log) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS, res=ha.RESOLUTION,
                                                   tads_boundary=tads_boundary, norm=True, chi2_mode=ha.CHI2_MODE_LOG)
