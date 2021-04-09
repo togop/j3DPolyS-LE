@@ -104,17 +104,20 @@ if not os.path.exists(sim_hic_mcool):
     sim_hic_mcool = ha.hic_to_mcool(sim_hic_file, ha.SIM_CHR, ha.SIM_RESOLUTION, ha.SIM_FACTORS)
 
 # need only normed for chi2_log and chi2_linear and for given tads-boundary sites and 1tad(the whole chromosome)
-(chi2_log, alpha_log) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS, res=ha.RESOLUTION,
-                                                  tads_boundary=tads_boundary, norm=True, chi2_mode=ha.CHI2_MODE_LOG)
-(chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS, res=ha.RESOLUTION,
-                                                  tads_boundary=tads_boundary, norm=True,
-                                                  chi2_mode=ha.CHI2_MODE_LINEAR)  # , plot=True)
+# TODO clean uneeded statistics and be avare that chi2-min.bed file will be save unders the same name
 (chi2_log_1tad, alpha_log_1tad) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
                                                             res=ha.RESOLUTION, tads_boundary=None, norm=True,
                                                             chi2_mode=ha.CHI2_MODE_LOG)
 (chi2_lin_1tad, alpha_lin_1tad) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
                                                             res=ha.RESOLUTION, tads_boundary=None, norm=True,
                                                             chi2_mode=ha.CHI2_MODE_LINEAR)
+
+(chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS, res=ha.RESOLUTION,
+                                                  tads_boundary=tads_boundary, norm=True,
+                                                  chi2_mode=ha.CHI2_MODE_LINEAR)  # , plot=True)
+
+(chi2_log, alpha_log) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS, res=ha.RESOLUTION,
+                                                  tads_boundary=tads_boundary, norm=True, chi2_mode=ha.CHI2_MODE_LOG)
 
 # calculate insulation score
 sim_ins_score = "depreceted" # ha.find_insulation_score(sim_hic_file, res=ha.EXP_RESOLUTION, dummy_sim=dummy_sim)
