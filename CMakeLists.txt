@@ -159,7 +159,7 @@ configure_file(sim-suite/run_3dpolys-le.sh ${EXECUTABLE_OUTPUT_PATH}/run_3dpolys
 configure_file(sim-suite/run_3dpolys-le_analysis.sh ${EXECUTABLE_OUTPUT_PATH}/run_3dpolys-le_analysis.sh COPYONLY)
 configure_file(sim-suite/run_3dpolys-le_runner.sh ${EXECUTABLE_OUTPUT_PATH}/run_3dpolys-le_runner.sh COPYONLY)
 #configure_file(sim-suite/run_plot_chi2-min_time_hist.sh ${EXECUTABLE_OUTPUT_PATH}/run_plot_chi2-min_time_hist.sh COPYONLY)
-configure_file(sim-suite/run_plot_hic.sh ${EXECUTABLE_OUTPUT_PATH}/run_plot_hic.sh COPYONLY)
+#configure_file(sim-suite/run_plot_hic.sh ${EXECUTABLE_OUTPUT_PATH}/run_plot_hic.sh COPYONLY)
 #configure_file(sim-suite/run_plot_hic3d.sh ${EXECUTABLE_OUTPUT_PATH}/run_plot_hic3d.sh COPYONLY)
 configure_file(sim-suite/run_3dpolys-le_stats.sh ${EXECUTABLE_OUTPUT_PATH}/run_3dpolys-le_stats.sh COPYONLY)
 configure_file(sim-suite/__init__.py ${EXECUTABLE_OUTPUT_PATH}/__init__.py COPYONLY)
