@@ -2,15 +2,12 @@
 
 import logging
 import re
-import os
 import subprocess
 
 from abc import ABC, abstractmethod
 
-import __init__
-
 # Initialization
-logger = logging.getLogger(f'{__init__.__name__}<{__init__.__version__}>{os.path.basename(__file__)}')
+logger = logging.getLogger(__name__)
 
 
 class JobRunner(ABC):

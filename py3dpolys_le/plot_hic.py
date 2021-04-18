@@ -1,25 +1,17 @@
 #! /usr/bin/env python
 
-import __init__
+import argparse
+import logging
+import os
+import sys
+
 import h5py
 import numpy as np
-#from matplotlib import pyplot as plt
-#from sklearn.preprocessing import StandardScaler
-#from sklearn.decomposition import PCA
-#from hic2cool import hic2cool_convert
-#import cooler
-from matplotlib import pyplot as plt, cm
-#from matplotlib.colors import LinearSegmentedColormap
-#import csv
 import pandas as pd
-
-import sys
-import os
-import logging
-import argparse
+from matplotlib import pyplot as plt
 
 # Initialization
-logger = logging.getLogger(__init__.__name__)
+logger = logging.getLogger(__name__)
 
 
 def run(input_dat, output_folder, cmap, file_ext, m=None, chi2_alpha=1):
@@ -101,7 +93,7 @@ def run(input_dat, output_folder, cmap, file_ext, m=None, chi2_alpha=1):
             # print("end")
 
 
-if __name__ == "__main__":
+def main():
     p = argparse.ArgumentParser()
     p.add_argument("-i", "--input_dat", default="../input.dat", help="Input.dat file used from a simulation.")
     p.add_argument("-o", "--output_folder", default=".",
@@ -136,3 +128,6 @@ if __name__ == "__main__":
 #  hicFindTADs -m hic_41.hdf5.2000.cool --outPrefix hic_41 --correctForMultipleTesting None --minBoundaryDistance 4000 --numberOfProcessors 1
 #  hicPCA -m hic_41.hdf5.2000.cool -o hic_41_pca1.bw hic_41_pca2.bw --format bigwig
 #  hicPlotMatrix -m hic_41.hdf5.2000.cool -o hic_41_pca1.png --perChr --bigwig hic_41_pca1.bw
+
+if __name__ == '__main__':
+    main()

@@ -2,4 +2,5 @@
 bin/
 cmake-build
 cmake-build-debug
+polys3d_le.egg-info/
 out/

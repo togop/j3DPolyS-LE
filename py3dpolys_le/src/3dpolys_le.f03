@@ -8,7 +8,7 @@ end function path_separator
 character(len = 1000) function find_path_program()
     character(len = 10000) :: path
     integer :: i, j
-    character(*), parameter :: program_bin = '3dpolys-le/bin' !not optimal to look for: if instalation folder changes
+    character(*), parameter :: program_bin = '3dpolys_le/bin' !not optimal to look for: if instalation folder changes
     !character(*), parameter :: program_bin = 'anaconda3/bin' ! used just for local test
 
     call get_environment_variable('PATH', path)
@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2020.1.0b11'
+    character(*), parameter :: VERSION = '2020.1.1'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys-le', program__version = 'unknown'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = 'unknown'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -69,13 +69,14 @@ end subroutine print_version
 
 subroutine print_help()
     call print_version()
-    print*, 'Usage: 3dpolys-le [options] [<input.dat file>]'
+    print*, 'Usage: py3dpolys_le [options] [<3dpolys_le.cfg file>]'
     print*, 'Options:'
     print*, '   -h|--help   Display this information.'
     print*, '   --log:<log level> Sets the log output level: OFF, FATAL, ERROR, WARN, INFO, DEBUG, TRACE. Default: INFO'
     print*, '   --hic3d:<hic3d_factor>    Produce hic3d-map with the given factor (resolution) on the last measurement &
             & otherwise do not. Deafault: not'
-    print*, '   -o|--output_folder:<output folder> Path to a simulation output folder. Default: the folder of the input.dat file.'
+    print*, '   -o|--output_folder:<output folder> Path to a simulation output folder. Default: the folder of the &
+            & 3dpolys_le.cfg file.'
     print*, '   -a|--analyse:<analyse folder> Perform analyse step on an already done simulation&
             & and store results in a given folder.'
     print*, '   -b|--boundary:<boundary sites file> Boundary sites file in a csv format with the following columns:&
@@ -96,11 +97,11 @@ subroutine print_help()
     print*, '   -im|--init_mode:<init_mosw>: Initial folding mode: h for helices-like, z for zigzag-like polymer state.'
     print*, '   -z|--z_loop : Allow z_loop for LEFs move, where LEFs can traverse one another. Default: false'
     print*, '   -u|--unidirectional : Unidirectional mode for LEFs move otherwise bidirectional. Default: false=bidirectional'
-    print*, '<input.dat file>: path to the inpit.dat file. Default: ./input.dat'
-    print*, '<output folder>: path to output folder. Default: the folder of the <input.dat file>'
+    print*, '<3dpolys_le.cfg file>: path to the inpit.dat file. Default: ./3dpolys_le.cfg'
+    print*, '<output folder>: path to output folder. Default: the folder of the <3dpolys_le.cfg file>'
     print*, 'inpiut.dat format:'
     print*, '<value> ::<name>'
-    print*, 'parameters in this order:'
+    print*, 'parameters in a configuration file (3dpolys_le.cfg):'
     print*, 'Nchain     Polymer chain length in monomers of 2kb.'
     print*, 'L          Polymer compartment box size L (choose L so that Nchain/(4*L^3) ~ 0.5).'
     print*, 'Niter      Number of iterations, aka number of independent trajectories as polymer replicas.'
@@ -135,6 +136,7 @@ program mainprogram
     use analyse_mod
     use mpi
     use logging_mod
+    use lib_conf
 
     implicit none
 
@@ -145,13 +147,13 @@ program mainprogram
     character(1000) :: boundary_file = ''
     character(1000) :: lef_binding_sites = ''
     character(20) :: opt_s = ''
-    integer :: ai = 1  ! input argument position the input.dat in the CLI, the ai+1 is the output folder
+    integer :: ai = 1  ! input argument position the 3dpolys_le.cfg in the CLI, the ai+1 is the output folder
     character(1) :: path_separator, path_sep
-    character :: init_mode = 'h'
+    character(1) :: init_mode = ''
 
-    integer :: L, Nchain, Niter, Nmeas, Ninter, iku, ikm, ikb, Nlef, Nlef_opt = 0, burnin = 0, burnout = 0, burnoutM = 0
+    integer :: L, Nchain, Niter, Nmeas, Ninter, iku, ikm, ikb, Nlef = 0, burnin = 0, burnout = 0, burnoutM = 0
     !integer :: simburnin = 0, burn_Nmeas = 0
-    real :: kint, kb, ku, km, km_opt = 0., Ea
+    real :: kint, kb, ku, km = 0., Ea
 
     integer :: i, time
     !real :: pt
@@ -163,12 +165,12 @@ program mainprogram
     real, dimension(:), allocatable :: binding_site_prob
     integer :: binding_sites_count = 0 ! deafault: there is no lef_binding_site file so the whole polymer is binding site
     integer :: binding_site_pos_i = 0
-    real :: boundary_factor = 1., boundary_score = 1.  ! impermeabale boundary
-    integer :: boundary_direction = 0 ! same direction
+    real :: boundary_factor = 0., boundary_score = 0.  ! impermeabale boundary
+    integer :: boundary_direction = -9 ! not defned direction
     integer, parameter :: resolution_factor = 2000
     type(PolymerModel) :: model
     type(ModelParameters) :: params
-    real :: radius_contact = 1.42 !in lattice unit (recall: 1 lattice unit=70nm)
+    real :: radius_contact = 0 !in lattice unit (recall: 1 lattice unit=70nm)
     logical :: use_contact_probability = .false.
     logical :: do_analyse = .false.
     character(1000) :: analyse_folder = ''
@@ -180,7 +182,7 @@ program mainprogram
     integer*4 :: status = 0
     integer :: rc
     character(len = 20) :: col1, col2, col3, col4
-    type(Logger) :: log = Logger(source = '3dpolys-le', level = LOG_INFO)
+    type(Logger) :: log = Logger(source = '3dpolys_le', level = LOG_INFO)
     integer :: hic3d_factor = 0
     logical :: use_boundary_score = .false.
     logical :: z_loop = .false.
@@ -289,16 +291,16 @@ program mainprogram
             elseif ((index(input_options, '--nlef:') > 0).or.(index(input_options, '-l:') > 0)) then
                 i = index(input_options, ':')
                 opt_s = trim(input_options(i + 1:))
-                READ(opt_s, *) Nlef_opt
+                READ(opt_s, *) Nlef
                 if (rank == 0) then
-                    call log%info('input ' // trim(input_options(:i)) // trim(str(Nlef_opt)))
+                    call log%info('input ' // trim(input_options(:i)) // trim(str(Nlef)))
                 end if
             elseif ((index(input_options, '--km:') > 0).or.(index(input_options, '-m:') > 0)) then
                 i = index(input_options, ':')
                 opt_s = trim(input_options(i + 1:))
-                READ(opt_s, *) km_opt
+                READ(opt_s, *) km
                 if (rank == 0) then
-                    call log%info('input ' // trim(input_options(:i)) // trim(strf(km_opt)))
+                    call log%info('input ' // trim(input_options(:i)) // trim(strf(km)))
                 end if
             elseif ((index(input_options, '--boundary_factor:') > 0).or.(index(input_options, '-bf:') > 0)) then
                 i = index(input_options, ':')
@@ -354,7 +356,7 @@ program mainprogram
         end do
         CALL get_command_argument(ai, input_dat_file)
     else
-        input_dat_file = './input.dat'
+        input_dat_file = './3dpolys_le.cfg'
     end if
 
     call log%debug('MPI running rank: ' // trim(str(rank)))
@@ -388,50 +390,88 @@ program mainprogram
         call log%info('Output folder: ' // trim(output_folder))
     end if
 
-    open(10, file = trim(input_dat_file), action = 'read', iostat = rc)
-    if (rc /= 0) then
-        call log%error('File input.dat file not found: ' // trim(input_dat_file) // ' for rank:' // trim(str(rank)))
+    call load_config_file(input_dat_file)
+    call read_config('Nchain',    Nchain)
+    call read_config('L',    L)
+    call read_config('Niter',    Niter)
+    call read_config('Nmeas',    Nmeas)
+    call read_config('Ninter',   Ninter)
+    ! call read_config('kint',     kint) ! not used
+    call read_config('kb',       kb)
+    call read_config('ku',       ku)
+    if (km == 0.) then
+        call read_config('km',   km)
+    end if
+    call read_config('Ea',       Ea)
+    if (Nlef == 0.) then
+        call read_config('Nlef', Nlef)
+    end if
+    call read_config('burnin',   burnin)
+    call read_config('burnout',  burnout)
+    call read_config('burnoutM', burnoutM)
+    if (init_mode == '') then
+        call read_config('init_mode', init_mode)
+    end if
+    if (boundary_file == '') then
+        call read_config('boundary', boundary_file, default='')
+    end if
+    if (lef_binding_sites == '') then
+        call read_config('lef_binding_sites', lef_binding_sites, default='')
+    end if
+    if (boundary_factor == 0.) then
+        call read_config('boundary_factor', boundary_factor)
+    end if
+    if (boundary_score == 0.) then
+        call read_config('boundary_score', boundary_score)
+    end if
+    if (boundary_direction < -1) then
+        call read_config('boundary_direction', boundary_direction)
+    end if
+    if (.not.z_loop) then
+        call read_config('z_loop', z_loop)
+    end if
+    if (.not.unidirectional) then
+        call read_config('unidirectional', unidirectional)
+    end if
+    if (radius_contact == 0.) then
+        call read_config('radius_contact', radius_contact)
+    end if
 
-        call MPI_FINALIZE(ierr)
-        if (ierr /= 0) error stop 'mpi finalize error'
+    ! loaded input parameters:
+    if (rank == 0) then
+        call log%info('Nchain=' // trim(str(Nchain)  ))
+        call log%info('L=' // trim(str(L)  ))
+        call log%info('Niter=' // trim(str(Niter)  ))
+        call log%info('Nmeas=' // trim(str(Nmeas)  ))
+        call log%info('Ninter=' // trim(str(Ninter) ))
+        call log%info('kint=' // trim(strf(kint)   ))
+        call log%info('kb=' // trim(strf(kb)     ))
+        call log%info('ku=' // trim(strf(ku)     ))
+        call log%info('km=' // trim(strf(km)     ))
+        call log%info('Ea=' // trim(strf(Ea)     ))
+        call log%info('Nlef=' // trim(str(Nlef)   ))
+        call log%info('burnin=' // trim(str(burnin) ))
+        call log%info('burnout=' // trim(str(burnout)))
+        call log%info('burnoutM=' // trim(str(burnoutM)))
 
-        call exit(1)
+        call log%info('init_mode=' // trim(init_mode))
+        call log%info('boundary=' // trim(boundary_file))
+        call log%info('lef_binding_sites=' // trim(lef_binding_sites))
+        call log%info('boundary_factor=' // trim(strf(boundary_factor)))
+        call log%info('boundary_score=' // trim(strf(boundary_score)))
+        call log%info('boundary_direction=' // trim(str(boundary_direction)))
+        if (z_loop) then
+            call log%info('z_loop=true')
+        else
+            call log%info('z_loop=false')
+        end if
+        if (unidirectional) then
+            call log%info('unidirectional=true')
+        else
+            call log%info('unidirectional=false')
+        end if
+        call log%info('radius_contact=' // trim(strf(radius_contact)))
     end if
-    read(10, *, iostat = rc) Nchain !chain size
-    call check_iostat(10, rc)
-    read(10, *, iostat = rc) L !box size L (choose L so that Nchain/(4L^3)~0.5)
-    call check_iostat(10, rc)
-    read(10, *, iostat = rc) Niter !number of iterations, aka number of independent trajectories
-    call check_iostat(10, rc)
-    read(10, *, iostat = rc) Nmeas !number of measures, aka number of snapshots
-    call check_iostat(10, rc)
-    read(10, *, iostat = rc) Ninter !interval between measures, aka number of MCS between two snapshots
-    call check_iostat(10, rc)
-    read(10, *, iostat = rc) kint !bending energy of the polymer (do not change)
-    call check_iostat(10, rc)
-    read(10, *, iostat = rc) kb !binding rate (do not change)
-    call check_iostat(10, rc)
-    read(10, *, iostat = rc) ku !half-unbinding rate (do not change)
-    call check_iostat(10, rc)
-    read(10, *, iostat = rc) km !rate of movement
-    call check_iostat(10, rc)
-    if (km_opt > 0.) then
-        km = km_opt
-    end if
-    read(10, *, iostat = rc) Ea !energy of extrusion (passive: Ea=0, facilitated Ea<0)
-    call check_iostat(10, rc)
-    read(10, *, iostat = rc) Nlef !maximal number of LEF (average number of bound extruders=Nlef kb/(kb+2ku)
-    call check_iostat(10, rc)
-    if (Nlef_opt > 0.) then
-        Nlef = Nlef_opt
-    end if
-    read(10, *, iostat = rc) burnin !number of steps before introducing the LEF
-    call check_iostat(10, rc)
-    read(10, *, iostat = rc) burnout !fix number of steps after the last simulation measurement with removed LEF (time for relaxing)
-    call check_iostat(10, rc)
-    read(10, *, iostat = rc) burnoutM !fix number of measurements at the end with removed LEF (time for relaxing)
-    call check_iostat(10, rc)
-    close(10)
 
     !load the local state of the 2kbp-bins
     ! used to init a polymermodel.boundary
@@ -682,6 +722,14 @@ program mainprogram
             model = PolymerModel(L = L, Nchain = Nchain, iku = iku, ikm = ikm, ikb = ikb, Nleffree = Nlef, &
                     kb = kb, ku = ku, km = km, Ea = Ea, z_loop = z_loop, unidirectional = unidirectional, &
                     binding_sites_count = binding_sites_count)
+
+            if (i == 1) then
+                open(20, file = trim(output_folder) // '3dpoys_le.cfg', action = 'write', status = 'new', iostat = rc)
+                call model%output_parameters(20, init_mode, boundary_file, lef_binding_sites, &
+                        boundary_factor, boundary_score, boundary_direction, &
+                        Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
+                close(20)
+            end if
 
             call model%init(boundary, binding_site_pos, binding_site_prob, init_mode)  ! TODO add binding_site_pos
 
