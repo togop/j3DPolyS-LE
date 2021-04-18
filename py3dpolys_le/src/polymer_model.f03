@@ -20,9 +20,6 @@ module PolymerModel_mod
     type PolymerModel
         private
         integer, public :: L, Nchain, iku, ikm, ikb, Nleffree
-        ! GLOBAL: integer ::voisnn(13,13,13),opp(13),connec(13,13,13)
-        ! GLOBAL: real,dimension(3,13)	::voisxyz
-        ! GLOBAL: real,dimension(13,13)	::costhet
         real, public :: kb, ku, km, Ea
         logical, public :: z_loop = .false.
         logical, public :: unidirectional = .false.
@@ -38,7 +35,7 @@ module PolymerModel_mod
 
     contains
         procedure, public :: init, do_simulation, trialmoveex, trialmovetad, trialbound, trialunbound, unbound_all, &
-                erase, output
+                erase, output, output_parameters
         procedure :: allocate, initbitable, initconfig4, initconfig4_zigzag
         final :: deallocate
     end type PolymerModel
@@ -817,6 +814,8 @@ contains
 
         integer :: j
 
+        ! TODO output model parameters
+
         do j = 1, self%Nchain
             ! TODO maybe possible to write thw whole chain in one round
             write(10, *) self%config(:, j) !the configuration: config(1,j)=node where monomer j is located, config(2,j)=direction of the vector between j and j+1
@@ -830,6 +829,69 @@ contains
         flush(12)
         flush(14)
 
+        return
+    end subroutine
+
+    subroutine output_parameters(self, fout, init_mode, boundary_file, lef_binding_sites, &
+            boundary_factor, boundary_score, boundary_direction, &
+            Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
+        implicit none
+        class (PolymerModel), intent(inout) :: self
+        integer, intent(in) :: fout
+        character(len = 1), intent(in) :: init_mode
+        character(*), intent(in) :: boundary_file
+        character(*), intent(in) :: lef_binding_sites
+        real, intent(in) :: boundary_factor
+        real, intent(in) :: boundary_score
+        integer, intent(in) :: boundary_direction
+        integer, intent(in) :: Niter
+        integer, intent(in) :: Ninter
+        integer, intent(in) :: Nmeas
+        integer, intent(in) :: burnin
+        integer, intent(in) :: burnout
+        integer, intent(in) :: burnoutM
+        real, intent(in) :: radius_contact
+
+        write(fout, *) '# polymer characteristics'
+        write(fout, *) 'Nchain=' // trim(str(self%Nchain))
+        write(fout, *) 'L=' // trim(str(self%L))
+        write(fout, *) 'Ea=' // trim(strf(self%Ea))
+        write(fout, *) 'init_mode=' // trim(init_mode)
+
+        write(fout, *) '# measurements'
+        write(fout, *) 'Niter=' // trim(str(Niter))
+        write(fout, *) 'Ninter=' // trim(str(Ninter))
+        write(fout, *) 'Nmeas=' // trim(str(Nmeas))
+        write(fout, *) 'burnin=' // trim(str(burnin))
+        write(fout, *) 'burnout=' // trim(str(burnout))
+        write(fout, *) 'burnoutM=' // trim(str(burnoutM))
+
+        write(fout, *) '# Loop-Extrusion factors'
+        write(fout, *) 'kb=' // trim(strf(self%kb))
+        write(fout, *) 'ku=' // trim(strf(self%ku))
+        write(fout, *) 'km=' // trim(strf(self%km))
+        write(fout, *) 'Nlef=' // trim(str(self%Nleffree))
+
+        write(fout, *) 'boundary=' // trim(boundary_file)
+        write(fout, *) 'lef_binding_sites=' // trim(lef_binding_sites)
+        write(fout, *) 'boundary_factor=' // trim(strf(boundary_factor))
+        write(fout, *) 'boundary_score=' // trim(strf(boundary_score))
+        write(fout, *) 'boundary_direction=' // trim(str(boundary_direction))
+        if (self%z_loop) then
+            write(fout, *) 'z_loop=true'
+        else
+            write(fout, *) 'z_loop=false'
+        end if
+        if (self%unidirectional) then
+            write(fout, *) 'unidirectional=true'
+        else
+            write(fout, *) 'unidirectional=false'
+        end if
+
+        write(fout, *) '# analysis: experiments in silico:'
+        write(fout, *) 'radius_contact=' // trim(strf(radius_contact))
+
+        flush(fout)
         return
     end subroutine
 

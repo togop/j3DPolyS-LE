@@ -1,18 +1,19 @@
 #! /usr/bin/env python
 
-import __init__
+import argparse
+import logging
+import os
+import sys
+
+import cooler
 import numpy as np
 import pandas as pd
-import cooler
-from matplotlib import pyplot as plt
 
-import sys
-import os
-import logging
-import argparse
+from . import hic_converters as hc
+from ._version import __version__
 
 # Initialization
-logger = logging.getLogger(__init__.__name__)
+logger = logging.getLogger(__name__)
 
 
 def diff_matrix_to_cool(matrix1_file, matrix2_file, chr, resolution):
@@ -86,7 +87,7 @@ def hic_to_cool(hic, chr, resolution, cool_file):
                 'bin-size': resolution,
                 'storage-mode': 'symmetric-upper',
                 'genome-assembly': 'ce11',
-                'generated-by': __init__.__name__ + '-' + __init__.__version__,
+                'generated-by': __name__ + '-' + __version__,
                 # 'creation-date': datetime.date.today()
                 }
 

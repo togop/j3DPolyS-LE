@@ -1,7 +1,7 @@
 #! /bin/bash
 
 ## Allocate resources
-#SBATCH --job-name="3dpolys-le"
+#SBATCH --job-name="3dpolys_le"
 #SBATCH --mail-user=todor.gitchev@izb.unibe.ch
 #SBATCH --mail-type=fail
 #SBATCH --time=5-00:00:00
@@ -12,4 +12,5 @@
 ##  SBATCH --ntasks-per-node=20
 ##  SBATCH --cpus-per-task=20
 
-mpirun_3dpolys-le.sh "$@"
+# --mca orte_base_help_aggregate 0
+mpirun 3dpolys_le "$@"

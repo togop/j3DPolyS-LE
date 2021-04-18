@@ -5,25 +5,24 @@ import copy
 import fnmatch
 import logging
 import os
-import sys
 import threading
-from typing import Union
 
 import numpy as np
 import pandas as pd
+import sys
+import pkg_resources
 
-import __init__
-import hic_analysis as ha
-from job_runner import JobRunner, SlurmJobRunner, ShellJobRunner, DummyJobRunner
+from . import hic_analysis as ha
+from .job_runner import JobRunner, SlurmJobRunner, ShellJobRunner, DummyJobRunner
 
 JOB_RUNNER: JobRunner = SlurmJobRunner()  # default
 
 EXP_COOL_AS_STATS = '.'
 
 # Initialization
-logger = logging.getLogger(f'{__init__.__name__}<{__init__.__version__}>{os.path.basename(__file__)}')
+logger = logging.getLogger(__name__)
 
-p = argparse.ArgumentParser(description=f'''Running {__init__.__name__} v{__init__.__version__}.
+p = argparse.ArgumentParser(description=f'''Running 3dpolys_le_runner.
 Run one of the following batch commands:
 
 •	new_stats: Perform comparative statistical analysis on all entries, representing simulations,  in a given 
@@ -115,14 +114,14 @@ p.add_argument("-l", "--nlef", default=1500, help="Nlef value to use in a simula
 p.add_argument("-m", "--km", default=2.7e-3, help="km value to use in a simulation.", type=float)
 p.add_argument("-f", "--stats_file", default="./sim_stats.csv", help="Simulation statistics' repository file.")
 p.add_argument("--stats", action='store_true',
-               help="In combination with a new_stats command to run statistical analysis (3dpolys-le_stats.py) only for "
+               help="In combination with a new_stats command to run statistical analysis (3dpolys_le_stats.py) only for "
                     "entries in a given sim_stats.csv file (--stats_file) missing statistics plots.")
 p.add_argument("--all_stats", action='store_true',
-               help="In combination with a new_stats command to run statistical analysis (3dpolys-le_stats.py) for all "
+               help="In combination with a new_stats command to run statistical analysis (3dpolys_le_stats.py) for all "
                     "entries in a given sim_stats.csv file (--stats_file).")
 p.add_argument("-r", "--radius_contact", default=0., type=float,
                help="Contact radius in lattice units (1=70nm) to run a single 'analyse' step "
-                    "(3dpolys-le program module) for extracting Hi-C matrixes.")
+                    "(py3dpolys_le program module) for extracting Hi-C matrixes.")
 p.add_argument("-lr", "--list_contact_radii", nargs='+', default=['2.84'],  # ['1.42', '2.13', '2.84', '3.55', '4.26'],  #, '5.0p'
                help="list of contact radii to be used by a 'contact_radius_analysis' batch command, "
                     "a <p> at the end denote use of contact radius probability mode.")
@@ -142,8 +141,9 @@ p.add_argument("-o", "--output_folder", default="", help="Simulation output fold
 p.add_argument("-jr", "--job_runner", default='slurm', choices=['slurm', 'shell', 'dummy'],
                help="Environment mode to run jobs.  Default: slurm")
 
-
 # p.add_argument("--no_overwrite", help="Overwrite old files", action='store_false')
+
+args = p.parse_args(sys.argv[1:])
 
 
 class DccExtrusionArgs:
@@ -172,7 +172,7 @@ class DccExtrusionArgs:
 
     def __init__(self, stats=False, all_stats=False, boundary="./mex-sites.csv", input_dat="./input.dat",
                  tads_boundary="./rex-sites.csv",
-                 stats_file="./3dpolys-le_stats.csv",
+                 stats_file="./py3dpolys_le-le_stats.csv",
                  exp_cool=f"{ha.PUBLISHED_FOLDER}/wt_N2_Moushumi2020_HIC1_5000.cool",
                  exp_chip=f"{ha.PUBLISHED_FOLDER}/DPY27_N2_L3_average_ce11_2kb_chrX.bedGraph",
                  exp_ins_score=f"{ha.PUBLISHED_FOLDER}/wt_N2_Brejc2017_10k_score_chrX.bedgraph",
@@ -224,7 +224,7 @@ class DccExtrusionArgs:
         z_opt = '_z-loop' if self.z_loop else ''
         u_opt = '_unidir' if self.unidirectional else ''
         im_opt = f'_im-{self.init_mode}' if self.init_mode else ''
-        return os.path.join('.', f'out-Nlef{self.nlef}-km{self.km:7.5f}-bd{self.boundary_direction}'
+        return os.path.join('', f'out-Nlef{self.nlef}-km{self.km:7.5f}-bd{self.boundary_direction}'
                                  f'-bf{self.boundary_factor}{bs_opt}{im_opt}{z_opt}{u_opt}', r_dir)
 
 
@@ -278,7 +278,7 @@ class DccExtrusionRunner:
     def run(self, dcc_args: DccExtrusionArgs, stats_only=False, radii=[], dep_jobid: str = None,
             replace: bool = False) -> str:
         '''
-        Runs the main 3dpolys-le with given parameters either to run simulation or analysis afterwards.
+        Runs the main py3dpolys_le with given parameters either to run simulation or analysis afterwards.
         :param dcc_args: simulation parameters
         :param stats_only: do stats on analysis # TODO revise where to keep stats_only: use dcc_args.stats or not
         :param radii: list of contact radii to perform contact radius analysis after the simulation is done.
@@ -345,8 +345,8 @@ class DccExtrusionRunner:
                         run_sim_or_analysis = False
 
             if run_sim_or_analysis:
-                # LOCAL: cmd = f"../../../../bin/3dpolys-le -o:{out} --km:{km} --nlef:{nlef} " \
-                cmd = f"run_3dpolys-le{'_analysis' if dcc_args.analyse else ''}.sh " \
+                # LOCAL: cmd = f"../../../../bin/py3dpolys_le -o:{out} --km:{km} --nlef:{nlef} " \
+                cmd = f"run_3dpolys_le{'_analysis' if dcc_args.analyse else ''}.sh " \
                       f"-o:{dcc_args.output_folder} --km:{km} --nlef:{nlef} " \
                       f"-b:{boundary} -bd:{dcc_args.boundary_direction} -bf:{dcc_args.boundary_factor} {bs_opt} " \
                       f"{z_loop} {u_opt} {init_mode} {a_opt} {r_opt} {input_dat}"
@@ -373,8 +373,7 @@ class DccExtrusionRunner:
             s_cmp_chrs = f'--cmp_chrs {" ".join(dcc_args.cmp_chrs)}' if dcc_args.cmp_chrs is not None else ''
 
         # for LOCAL use something like : #
-            # cmd = f"../../../run_3dpolys-le_stats.sh " \
-            cmd = f"run_3dpolys-le_stats.sh " \
+            cmd = f"run_3dpolys_le_stats.sh " \
                   f"-o {dcc_args.output_folder} -a {analyse_folder} --km {km} --nlef {nlef} -e {exp_cool} " \
                   f"-eis {dcc_args.exp_ins_score} " \
                   f"-b {boundary} -bd {dcc_args.boundary_direction} -bf {dcc_args.boundary_factor} {bs_opt} {r_opt_py} "\
@@ -389,7 +388,7 @@ class DccExtrusionRunner:
         Redo the analysis step including the stats (sim_stat.csv) or only regenerating the stats
         :param exp_cool: the experimental HiC cool file to compare with.
                             If none it will be take as it is in the sim_stats.csv file
-        :param dcc_args: the running 3dpolys-le and analysis  arguments
+        :param dcc_args: the running py3dpolys_le and analysis  arguments
         :param new_stats: whether to regenerate all statistics again (sim_stat.csv) and keep a backup copy of the old one
         :return: updated or new sim_stats.csv file and plots if requested
         """
@@ -509,7 +508,7 @@ class DccExtrusionRunner:
 
     def run_multi_decay_plot(self, dcc_args: DccExtrusionArgs, dep_jobid):
         s_cmp_chrs = f'--cmp_chrs {" ".join(dcc_args.cmp_chrs)}' if dcc_args.cmp_chrs is not None else ''
-        cmd = f"run_3dpolys-le_runner.sh multi_decay_plot -o {dcc_args.output_folder} -e {dcc_args.exp_cool}" \
+        cmd = f"run_3dpolys_le_runner.sh multi_decay_plot -o {dcc_args.output_folder} -e {dcc_args.exp_cool}" \
               f" {s_cmp_chrs}"
         return self._job_runner.run_cmd(cmd, dep_jobid)
 
@@ -598,11 +597,11 @@ class DccExtrusionRunner:
                                     plot=True, replace=replace)
 
 
-if __name__ == "__main__":
+def main():
+    global JOB_RUNNER
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("").setLevel(logging.INFO)
 
-    args = p.parse_args(sys.argv[1:])
     if args.cmp_chrs is not None:
         logger.warning(f'Overwriting the default hic_analysis.CHR_SYNONYMS: { ",".join(args.cmp_chrs)} '
                        f'with which HiCs will be compared!')
@@ -610,9 +609,9 @@ if __name__ == "__main__":
 
     if args.job_runner == 'slurm':
         JOB_RUNNER = SlurmJobRunner()
-    elif  args.job_runner == 'shell':
+    elif args.job_runner == 'shell':
         JOB_RUNNER = ShellJobRunner()
-    elif  args.job_runner == 'dummy':
+    elif args.job_runner == 'dummy':
         JOB_RUNNER = DummyJobRunner()
 
     dcc_args = DccExtrusionArgs(boundary=args.boundary, input_dat=args.input_dat, tads_boundary=args.tads_boundary,
@@ -638,4 +637,14 @@ if __name__ == "__main__":
         dcc_run.multi_decay_exps_plot(args.exp_cools, args.output_folder, hic_chrs=args.hic_chrs, res=args.resolution,
                                       replace=args.replace)
     elif args.run_command == 'run':
-        dcc_run.run(dcc_args, radii=args.list_contact_radii, replace=args.replace)
+        print("print 3dpolys_le input.dat")
+        dat = pkg_resources.resource_filename(__name__, 'data/input.dat')
+        polysim_le = pkg_resources.resource_filename(__name__, 'bin/3dpolys_le')
+        print(open(dat, "r").read())
+        print(f'CALL: {polysim_le} -h')
+        os.system(f'{polysim_le} -h')
+        # dcc_run.run(dcc_args, radii=args.list_contact_radii, replace=args.replace)
+
+
+if __name__ == '__main__':
+    main()

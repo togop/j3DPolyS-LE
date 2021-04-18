@@ -4,27 +4,26 @@ import fnmatch
 import logging
 import math
 import os
+import pathlib
 import re
 import subprocess
-import pathlib
 
 import cooler
+import dask.array as da
 import h5py
 import numpy as np
 import pandas as pd
 import pyranges as pr
 from matplotlib import pyplot as plt
 from scipy import stats
-import dask.array as da
 
-# import higlass.tilesets as ts
-import __init__
+#from _version import __name__, __version__
 
 # from matplotlib import cm
 # from matplotlib.colors import LinearSegmentedColormap
 
 # Initialization
-logger = logging.getLogger(f'{__init__.__name__}<{__init__.__version__}>{os.path.basename(__file__)}')
+logger = logging.getLogger(__name__)
 
 PUBLISHED = 'published'
 # used to set default paths
@@ -233,7 +232,7 @@ def hic_to_cooler(hic_file, chr=SIM_CHR, resolution=SIM_RESOLUTION, count_ampl=H
                     'bin-size': resolution,
                     'storage-mode': 'symmetric-upper',
                     'assembly': 'ce11',
-                    'generated-by': __init__.__name__ + '-' + __init__.__version__,
+                    'generated-by': __name__ + '-' + __version__,
                     # 'creation-date': datetime.date.today()
                     }
 
@@ -731,7 +730,7 @@ def find_insulation_score(hic_h5, res=EXP_RESOLUTION, plot=True, dummy_sim=False
             tracks_config.write(configfile)
         # plot to PDF
         cmd = f"hicPlotTADs --tracks {tracks_ini} --region {SIM_CHR}:1-{chr_size} -t '{out_prefix} TADs on X' -o {out_prefix}_tads.pdf"
-        if dummy_sim:  # conda activate 3dpolys-le
+        if dummy_sim:  # conda activate py3dpolys_le
             cmd = f"echo {cmd}"
         status, stout = subprocess.getstatusoutput(cmd)
         logger.info(f" call: {cmd}\n\t {stout}")

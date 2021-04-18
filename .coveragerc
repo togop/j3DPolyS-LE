@@ -1,0 +1,12 @@
+[run]
+source=
+    py3dpolys_le/
+
+omit=
+    py3dpolys_le/__init__.py
+    py3dpolys_le/_logging.py
+    py3dpolys_le/_version.py
+
+[report]
+exclude_lines =
+    pragma: no cover
