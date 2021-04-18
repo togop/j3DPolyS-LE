@@ -852,44 +852,44 @@ contains
         integer, intent(in) :: burnoutM
         real, intent(in) :: radius_contact
 
-        write(fout, *) '# polymer characteristics'
-        write(fout, *) 'Nchain=' // trim(str(self%Nchain))
-        write(fout, *) 'L=' // trim(str(self%L))
-        write(fout, *) 'Ea=' // trim(strf(self%Ea))
-        write(fout, *) 'init_mode=' // trim(init_mode)
+        write(fout, '(a)') '# polymer characteristics'
+        write(fout, '(a)') 'Nchain=' // trim(str(self%Nchain))
+        write(fout, '(a)') 'L=' // trim(str(self%L))
+        write(fout, '(a)') 'Ea=' // trim(strf(self%Ea))
+        write(fout, '(a)') 'init_mode=' // trim(init_mode)
 
-        write(fout, *) '# measurements'
-        write(fout, *) 'Niter=' // trim(str(Niter))
-        write(fout, *) 'Ninter=' // trim(str(Ninter))
-        write(fout, *) 'Nmeas=' // trim(str(Nmeas))
-        write(fout, *) 'burnin=' // trim(str(burnin))
-        write(fout, *) 'burnout=' // trim(str(burnout))
-        write(fout, *) 'burnoutM=' // trim(str(burnoutM))
+        write(fout, '(a)') '# measurements'
+        write(fout, '(a)') 'Niter=' // trim(str(Niter))
+        write(fout, '(a)') 'Ninter=' // trim(str(Ninter))
+        write(fout, '(a)') 'Nmeas=' // trim(str(Nmeas))
+        write(fout, '(a)') 'burnin=' // trim(str(burnin))
+        write(fout, '(a)') 'burnout=' // trim(str(burnout))
+        write(fout, '(a)') 'burnoutM=' // trim(str(burnoutM))
 
-        write(fout, *) '# Loop-Extrusion factors'
-        write(fout, *) 'kb=' // trim(strf(self%kb))
-        write(fout, *) 'ku=' // trim(strf(self%ku))
-        write(fout, *) 'km=' // trim(strf(self%km))
-        write(fout, *) 'Nlef=' // trim(str(self%Nleffree))
+        write(fout, '(a)') '# Loop-Extrusion factors'
+        write(fout, '(a)') 'kb=' // trim(strf(self%kb))
+        write(fout, '(a)') 'ku=' // trim(strf(self%ku))
+        write(fout, '(a)') 'km=' // trim(strf(self%km))
+        write(fout, '(a)') 'Nlef=' // trim(str(self%Nleffree))
 
-        write(fout, *) 'boundary=' // trim(boundary_file)
-        write(fout, *) 'lef_binding_sites=' // trim(lef_binding_sites)
-        write(fout, *) 'boundary_factor=' // trim(strf(boundary_factor))
-        write(fout, *) 'boundary_score=' // trim(strf(boundary_score))
-        write(fout, *) 'boundary_direction=' // trim(str(boundary_direction))
+        write(fout, '(a)') 'boundary=' // trim(boundary_file)
+        write(fout, '(a)') 'lef_binding_sites=' // trim(lef_binding_sites)
+        write(fout, '(a)') 'boundary_factor=' // trim(strf(boundary_factor))
+        write(fout, '(a)') 'boundary_score=' // trim(strf(boundary_score))
+        write(fout, '(a)') 'boundary_direction=' // trim(str(boundary_direction))
         if (self%z_loop) then
-            write(fout, *) 'z_loop=true'
+            write(fout, '(a)') 'z_loop=true'
         else
-            write(fout, *) 'z_loop=false'
+            write(fout, '(a)') 'z_loop=false'
         end if
         if (self%unidirectional) then
-            write(fout, *) 'unidirectional=true'
+            write(fout, '(a)') 'unidirectional=true'
         else
-            write(fout, *) 'unidirectional=false'
+            write(fout, '(a)') 'unidirectional=false'
         end if
 
-        write(fout, *) '# analysis: experiments in silico:'
-        write(fout, *) 'radius_contact=' // trim(strf(radius_contact))
+        write(fout, '(a)') '# analysis: experiments in silico:'
+        write(fout, '(a)') 'radius_contact=' // trim(strf(radius_contact))
 
         flush(fout)
         return

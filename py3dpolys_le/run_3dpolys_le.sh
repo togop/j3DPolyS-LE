@@ -13,4 +13,4 @@
 ##  SBATCH --cpus-per-task=20
 
 # --mca orte_base_help_aggregate 0
-mpirun 3dpolys_le "$@"
+mpirun bin/3dpolys_le "$@"
