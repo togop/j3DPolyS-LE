@@ -26,7 +26,7 @@ from development branch:
 ```
 cd 3DPolyS-LE 
 
-# optional
+# optional or as troubleshooting for problems with the python environment
 make env
 conda activate py3dpolys_le
 
