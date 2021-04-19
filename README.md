@@ -6,15 +6,14 @@
 
 Required packages and libraries:
 
-_ git client version 2.17.1;_
-_ gcc compiler version 7.5.0 or higher;_
-_ gfortran compiler version 7.5.0 or higher;_
-_ MPI implementation like MPICH and libmpich-dev (Debian/Ubuntu) or openMPI ; _
-_ HDF5 libraries. Debian/Ubuntu: libhdf5-103 libhdf5-cpp-103 libhdf5-dev libhdf5-mpich-dev;_
-_ CMake version 3.13.0 or higher;_
-_ Python 3.8, all required packages are listed in the environment.yml file and alternatively for development environment you can use the requirements_dev.txt file;_
-_ Conda version 4.8.2 or higher._
-
+-  git client version 2.17.1;_
+-  gcc compiler version 7.5.0 or higher;_
+-  gfortran compiler version 7.5.0 or higher;_
+-  MPI implementation like MPICH and libmpich-dev (Debian/Ubuntu) or openMPI ; _
+-  HDF5 libraries. Debian/Ubuntu: libhdf5-103 libhdf5-cpp-103 libhdf5-dev libhdf5-mpich-dev;_
+-  CMake version 3.13.0 or higher;_
+-  Python 3.8, all required packages are listed in the environment.yml file and alternatively for development environment you can use the requirements_dev.txt file;_
+-  Conda version 4.8.2 or higher._
 
 
 from master branch:
