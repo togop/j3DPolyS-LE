@@ -13,4 +13,4 @@
 ##  SBATCH --cpus-per-task=20
 
 echo "CALL: mpirun 3dpolys_le $@"
-mpirun 3dpolys_le "$@"
+mpirun bin/3dpolys_le "$@"
