@@ -346,8 +346,9 @@ class DccExtrusionRunner:
             if run_sim_or_analysis:
                 # LOCAL: cmd = f"../../../../bin/py3dpolys_le -o:{out} --km:{km} --nlef:{nlef} " \
                 # TODO how to choose different batch configuration for: {'_analysis' if dcc_args.analyse else ''}
+                cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')
                 bin3dpolys_le = pkg_resources.resource_filename(__name__, 'bin/3dpolys_le')
-                cmd = f"mpirun {bin3dpolys_le} " \
+                cmd = f"{cmd_sh} mpirun {bin3dpolys_le} " \
                       f"-o:{dcc_args.output_folder} --km:{km} --nlef:{nlef} " \
                       f"-b:{boundary} -lbs:{dcc_args.lef_binding_sites} " \
                       f"-bd:{dcc_args.boundary_direction} -bf:{dcc_args.boundary_factor} {bs_opt} " \
