@@ -12,8 +12,8 @@ import pandas as pd
 import sys
 import pkg_resources
 
-import hic_analysis as ha
-from job_runner import JobRunner, CfgJobRunner
+from . import hic_analysis as ha
+from .job_runner import JobRunner, CfgJobRunner
 
 # JOB_RUNNER: JobRunner = CfgJobRunner()  # default
 
@@ -141,7 +141,7 @@ p.add_argument("-cp", "--contact_probability", action='store_true',
 p.add_argument("--bin_size", default=1, help="Chip-seq bin size used for plotting. Default: 1 = 2kb", type=int)
 p.add_argument("--correlation", default='spearman', choices=['spearmanr', 'pearsonr'],
                help="Correlation method to use to compare Chip-seq profiles.")
-p.add_argument("-o", "--output_folder", default="", help="Simulation output folder.")
+p.add_argument("-o", "--output_folder", default=".", help="Simulation output folder.")
 #p.add_argument("-jr", "--job_runner", default='slurm', choices=['slurm', 'shell', 'dummy'],
 #               help="Environment mode to run jobs.  Default: slurm")
 
