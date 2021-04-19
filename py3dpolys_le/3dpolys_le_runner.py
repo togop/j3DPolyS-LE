@@ -12,10 +12,10 @@ import pandas as pd
 import sys
 import pkg_resources
 
-from . import hic_analysis as ha
-from .job_runner import JobRunner, SlurmJobRunner, ShellJobRunner, DummyJobRunner
+import hic_analysis as ha
+from job_runner import JobRunner, CfgJobRunner
 
-JOB_RUNNER: JobRunner = SlurmJobRunner()  # default
+# JOB_RUNNER: JobRunner = CfgJobRunner()  # default
 
 EXP_COOL_AS_STATS = '.'
 
@@ -61,8 +61,11 @@ p.add_argument("run_command", help="Run batch command.",
 p.add_argument("-bd", "--boundary_direction", default=0, type=int,
                help="Impermeability direction applied to all boundaries: -1:opposite direction, 0:both, 1:same direction."
                     " Default: 0")
-p.add_argument("-b", "--boundary", default="./mex-sites.csv",
+p.add_argument("-b", "--boundary", default="",
                help="Boundary sites file in CSV format used in a simulation.")
+p.add_argument("-lbs", "---lef_binding_sites", default="",
+               help="<loop extrusion binding sites file> LEFs binding sites file in a csv format with the following "
+                    "columns: name,position,length,probability. Default: if not given, the whole polymer.")
 p.add_argument("--hic_chrs", nargs='*', default=None,
                help="Synonyms of the chromosome from Hi-C matrixes to be compared. "
                     "Default X, set by constant hic_analysis.py::CHR_SYNONYMS = CHR_X_SYNONYMS.")
@@ -72,29 +75,30 @@ p.add_argument("--cmp_chrs", nargs='*', default=None,
 p.add_argument("-z", "--z_loop", action='store_true', help="Allow z_loop for LEFs move in a simulation.")
 p.add_argument("-u", "--unidirectional", action='store_true',
                help="Unidirectional mode for LEFs move otherwise bidirectional.")
-p.add_argument("-im", "--init_mode", default='h',
+p.add_argument("-im", "--init_mode", default='z',
                help="Initial folding mode: h for helices like, z for zigzag like polymer state. "
-                    "Default: h.")
+                    "Default: z.")
 p.add_argument("-t", "--tads_boundary", default="./rex-sites.csv",
                help="TADs boundary file used to calculate the chi-2-min score in the same format as the "
                     "boundary sites file used for simulation. Default: <input.dat folder>/no-boundary.csv "
                     "for the whole chromosome as 1 TAD.")
-p.add_argument("-e", "--exp_cool", nargs='?', default=f"{ha.PUBLISHED_FOLDER}/wt_N2_Moushumi2020_HIC1_5000.cool",
+p.add_argument("-e", "--exp_cool", nargs='?',
+               # default=f"{ha.PUBLISHED_FOLDER}/wt_N2_Moushumi2020_HIC1_5000.cool",
                help=f"Experimental cooler (.cool) file with which a simulation data to be compared. "
                     f"When used in combination with a new_stats command, if the value is '{EXP_COOL_AS_STATS}', "
                     f"it will use values stored in a given sim_stats.tsv file (--stats_file).")
 p.add_argument("-es", "--exp_cools", nargs='+',   # TODO maybe rename it as it is used for mixed list of datasets
-               default=[f"{ha.PUBLISHED_FOLDER}/wt_N2_Brejc2017_5000.cool",
-                        f"{ha.PUBLISHED_FOLDER}/wt_N2_Anderson2019_5000.cool",
-                        f"{ha.PUBLISHED_FOLDER}/wt_N2_Crane2015_5000.cool",
-                        # f"{ha.PUBLISHED_FOLDER}/wt_N2_Moushumi2019_HIC_3_6_7_5k.cool", # old
-                        f"{ha.PUBLISHED_FOLDER}/wt_N2_Moushumi2020_HIC1_5000.cool",
-                        f"{ha.PUBLISHED_FOLDER}/dpy21mut_y607_Brejc2017_5000.cool",
-                        f"{ha.PUBLISHED_FOLDER}/SDC2mut_SRy93_Anderson2019_5000.cool",
-                        f"{ha.PUBLISHED_FOLDER}/DCmut_SRy93_Crane2015_5000.cool",
-                        f"{ha.PUBLISHED_FOLDER}/dpy26mut_TEVpos_Moushumi2019_HIC_10_13_5k.cool",
-                        f"{ha.PUBLISHED_FOLDER}/dpy26mut_TEVneg_Moushumi2019_HIC_8_12_5k.cool"
-                        ],
+               # default=[f"{ha.PUBLISHED_FOLDER}/wt_N2_Brejc2017_5000.cool",
+               #          f"{ha.PUBLISHED_FOLDER}/wt_N2_Anderson2019_5000.cool",
+               #          f"{ha.PUBLISHED_FOLDER}/wt_N2_Crane2015_5000.cool",
+               #          # f"{ha.PUBLISHED_FOLDER}/wt_N2_Moushumi2019_HIC_3_6_7_5k.cool", # old
+               #          f"{ha.PUBLISHED_FOLDER}/wt_N2_Moushumi2020_HIC1_5000.cool",
+               #          f"{ha.PUBLISHED_FOLDER}/dpy21mut_y607_Brejc2017_5000.cool",
+               #          f"{ha.PUBLISHED_FOLDER}/SDC2mut_SRy93_Anderson2019_5000.cool",
+               #          f"{ha.PUBLISHED_FOLDER}/DCmut_SRy93_Crane2015_5000.cool",
+               #          f"{ha.PUBLISHED_FOLDER}/dpy26mut_TEVpos_Moushumi2019_HIC_10_13_5k.cool",
+               #          f"{ha.PUBLISHED_FOLDER}/dpy26mut_TEVneg_Moushumi2019_HIC_8_12_5k.cool"
+               #          ],
                help=f"In combination with a 'multi_decay_exps_plot' command sets the list of experimental cooler files "
                     f"(.cool) or simulation Hi-C HDF5 files, and calculates chi2-min scores to compare them all with "
                     f"the first one in the list in a multi distance-contact-decay plot.")
@@ -102,15 +106,15 @@ p.add_argument("-ec", "--exp_chip",
                default=f"{ha.PUBLISHED_FOLDER}/DPY27_N2_L3_average_ce11_2kb_chrX.bedGraph",
                help=f"Experimental ChIP-seq file (in .bedGraph format) with which simulation’s ChIP-seq file "
                     f"({ha.CHIP_OUT}) to be compared.")
-p.add_argument("-eis", "--exp_ins_score",
-               default=f"{ha.PUBLISHED_FOLDER}/wt_N2_Brejc2017_10k_score_chrX.bedgraph",
-               help=f"Experimental insulation score file (in .bedGraph format) only for chromosome X. Value "
-                    f"'{EXP_COOL_AS_STATS}' indicates to use stored values from a given sim_stats.csv file "
-                    f"(--stats_file).")
+# p.add_argument("-eis", "--exp_ins_score",
+#               default=f"{ha.PUBLISHED_FOLDER}/wt_N2_Brejc2017_10k_score_chrX.bedgraph",
+#               help=f"Experimental insulation score file (in .bedGraph format) only for chromosome X. Value "
+#                    f"'{EXP_COOL_AS_STATS}' indicates to use stored values from a given sim_stats.csv file "
+#                    f"(--stats_file).")
 p.add_argument("-res", "--resolution", default=ha.RESOLUTION, type=int,
                help="Resolution for distance-contact-decay plots.")
-p.add_argument("-i", "--input_dat", default="./input.dat", help="Input.dat file used from a simulation.")
-p.add_argument("-l", "--nlef", default=1500, help="Nlef value to use in a simulation.", type=int)
+p.add_argument("-i", "--input_cfg", default="./input.cfg", help="Input.cfg file used from a simulation.")
+p.add_argument("-l", "--nlef", default=200, help="Nlef value to use in a simulation.", type=int)
 p.add_argument("-m", "--km", default=2.7e-3, help="km value to use in a simulation.", type=float)
 p.add_argument("-f", "--stats_file", default="./sim_stats.csv", help="Simulation statistics' repository file.")
 p.add_argument("--stats", action='store_true',
@@ -138,8 +142,8 @@ p.add_argument("--bin_size", default=1, help="Chip-seq bin size used for plottin
 p.add_argument("--correlation", default='spearman', choices=['spearmanr', 'pearsonr'],
                help="Correlation method to use to compare Chip-seq profiles.")
 p.add_argument("-o", "--output_folder", default="", help="Simulation output folder.")
-p.add_argument("-jr", "--job_runner", default='slurm', choices=['slurm', 'shell', 'dummy'],
-               help="Environment mode to run jobs.  Default: slurm")
+#p.add_argument("-jr", "--job_runner", default='slurm', choices=['slurm', 'shell', 'dummy'],
+#               help="Environment mode to run jobs.  Default: slurm")
 
 # p.add_argument("--no_overwrite", help="Overwrite old files", action='store_false')
 
@@ -147,10 +151,11 @@ args = p.parse_args(sys.argv[1:])
 
 
 class DccExtrusionArgs:
-    input_dat: str
+    input_cfg: str
     output_folder: str
     analyse: str
     boundary: str
+    lef_binding_sites: str
     tads_boundary: str
     stats_file: str
     exp_cool: str
@@ -170,12 +175,12 @@ class DccExtrusionArgs:
     simultaneously: int
     cmp_chrs: list
 
-    def __init__(self, stats=False, all_stats=False, boundary="./mex-sites.csv", input_dat="./input.dat",
+    def __init__(self, stats=False, all_stats=False, boundary="", lef_binding_sites="", input_cfg="./input.cfg",
                  tads_boundary="./rex-sites.csv",
-                 stats_file="./py3dpolys_le-le_stats.csv",
+                 stats_file="./py3dpolys_le_stats.csv",
                  exp_cool=f"{ha.PUBLISHED_FOLDER}/wt_N2_Moushumi2020_HIC1_5000.cool",
                  exp_chip=f"{ha.PUBLISHED_FOLDER}/DPY27_N2_L3_average_ce11_2kb_chrX.bedGraph",
-                 exp_ins_score=f"{ha.PUBLISHED_FOLDER}/wt_N2_Brejc2017_10k_score_chrX.bedgraph",
+                 # exp_ins_score=f"{ha.PUBLISHED_FOLDER}/wt_N2_Brejc2017_10k_score_chrX.bedgraph",
                  nlef=1500, km=2.7e-3, radius_contact=0, contact_probability=False,
                  boundary_direction=0, boundary_factor=1., boundary_score=False, z_loop=False, unidirectional=False,
                  init_mode='m',
@@ -183,12 +188,13 @@ class DccExtrusionArgs:
         self.output_folder = output_folder
         self.analyse = analyse
         self.boundary = boundary
-        self.input_dat = input_dat
+        self.lef_binding_sites = lef_binding_sites
+        self.input_cfg = input_cfg
         self.tads_boundary = tads_boundary
         self.stats_file = stats_file
         self.exp_cool = exp_cool
         self.exp_chip = exp_chip
-        self.exp_ins_score = exp_ins_score
+        # self.exp_ins_score = exp_ins_score
         self.nlef = nlef
         self.km = km
         self.radius_contact = radius_contact
@@ -265,14 +271,7 @@ class DccExtrusionRunner:
         return pd.read_csv(stats_file, delimiter=',', encoding='utf-8', header=0,
                            dtype={'boundary_direction': np.str, 'boundary_score': np.str,
                                   'km': np.str, 'radius_contact': np.str,
-                                  'chi2_log': np.str, 'alpha_log': np.str, 'chi2_lin': np.str, 'alpha_lin': np.str,
-                                  'chi2_log_1tad': np.str, 'alpha_log_1tad': np.str,
-                                  'chi2_lin_1tad': np.str, 'alpha_lin_1tad': np.str,
-                                  'ins_score_l2': np.str,
-                                  'ins_score_pearsonr': np.str, 'ins_score_pearsonr_pval': np.str,
-                                  'ins_score_spearmanr': np.str, 'ins_score_spearmanr_pval': np.str,
-                                  f'chip_{ha.DEFAULT_CHIP_CORRELATION}': np.str,
-                                  f'chip_{ha.DEFAULT_CHIP_CORRELATION}_pval': np.str, f'chip_l2': np.str})
+                                  'chi2_log': np.str, 'alpha_log': np.str, 'chi2_lin': np.str, 'alpha_lin': np.str})
         # , engine='python')
 
     def run(self, dcc_args: DccExtrusionArgs, stats_only=False, radii=[], dep_jobid: str = None,
@@ -303,7 +302,7 @@ class DccExtrusionRunner:
 
         # TODO create simulation argument object: input.dat + other.params => maybe json object
         boundary = dcc_args.boundary
-        input_dat = dcc_args.input_dat
+        input_cfg = dcc_args.input_cfg
         stats_file = dcc_args.stats_file
         exp_cool = dcc_args.exp_cool
         nlef = dcc_args.nlef
@@ -346,10 +345,13 @@ class DccExtrusionRunner:
 
             if run_sim_or_analysis:
                 # LOCAL: cmd = f"../../../../bin/py3dpolys_le -o:{out} --km:{km} --nlef:{nlef} " \
-                cmd = f"run_3dpolys_le{'_analysis' if dcc_args.analyse else ''}.sh " \
+                # TODO how to choose different batch configuration for: {'_analysis' if dcc_args.analyse else ''}
+                bin3dpolys_le = pkg_resources.resource_filename(__name__, 'bin/3dpolys_le')
+                cmd = f"mpirun {bin3dpolys_le} " \
                       f"-o:{dcc_args.output_folder} --km:{km} --nlef:{nlef} " \
-                      f"-b:{boundary} -bd:{dcc_args.boundary_direction} -bf:{dcc_args.boundary_factor} {bs_opt} " \
-                      f"{z_loop} {u_opt} {init_mode} {a_opt} {r_opt} {input_dat}"
+                      f"-b:{boundary} -lbs:{dcc_args.lef_binding_sites} " \
+                      f"-bd:{dcc_args.boundary_direction} -bf:{dcc_args.boundary_factor} {bs_opt} " \
+                      f"{z_loop} {u_opt} {init_mode} {a_opt} {r_opt} {input_cfg}"
                 jobid = self._job_runner.run_cmd(cmd, prev_jobid)
 
         if not dep_jobid and jobid:
@@ -373,11 +375,11 @@ class DccExtrusionRunner:
             s_cmp_chrs = f'--cmp_chrs {" ".join(dcc_args.cmp_chrs)}' if dcc_args.cmp_chrs is not None else ''
 
         # for LOCAL use something like : #
-            cmd = f"run_3dpolys_le_stats.sh " \
+            cmd = f"3dpolys_le_stats " \
                   f"-o {dcc_args.output_folder} -a {analyse_folder} --km {km} --nlef {nlef} -e {exp_cool} " \
-                  f"-eis {dcc_args.exp_ins_score} " \
-                  f"-b {boundary} -bd {dcc_args.boundary_direction} -bf {dcc_args.boundary_factor} {bs_opt} {r_opt_py} "\
-                  f"-i {input_dat} -f {stats_file} {s_cmp_chrs}"
+                  f"-b {boundary} -bd {dcc_args.boundary_direction} -bf {dcc_args.boundary_factor} {bs_opt} {r_opt_py} " \
+                  f"-i {input_cfg} -f {stats_file} {s_cmp_chrs}"
+                #  f"-eis {dcc_args.exp_ins_score} " \
             jobid = self._job_runner.run_cmd(cmd, stats_dep_jobid)  # need to wait for before continue with multi-decay
 
         return jobid
@@ -425,7 +427,7 @@ class DccExtrusionRunner:
                 dcc_args_analysis.boundary_score = str2bool(sim['boundary_score']) if columns.__contains__(
                     'boundary_score') else False
                 dcc_args_analysis.tads_boundary = sim['tads']
-                dcc_args_analysis.input_dat = sim['input.dat']
+                dcc_args_analysis.input_cfg = sim['input.dat']
                 dcc_args_analysis.nlef = sim['nlef']
                 dcc_args_analysis.km = sim['km']
                 rcp = sim['radius_contact']   # in the sim_stat.csv is saved in this format TODO use proper column name
@@ -598,7 +600,7 @@ class DccExtrusionRunner:
 
 
 def main():
-    global JOB_RUNNER
+    # global JOB_RUNNER
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("").setLevel(logging.INFO)
 
@@ -607,14 +609,10 @@ def main():
                        f'with which HiCs will be compared!')
         ha.CHR_SYNONYMS = args.cmp_chrs
 
-    if args.job_runner == 'slurm':
-        JOB_RUNNER = SlurmJobRunner()
-    elif args.job_runner == 'shell':
-        JOB_RUNNER = ShellJobRunner()
-    elif args.job_runner == 'dummy':
-        JOB_RUNNER = DummyJobRunner()
+    job_runner: JobRunner = CfgJobRunner(input_cfg=args.input_cfg)
 
-    dcc_args = DccExtrusionArgs(boundary=args.boundary, input_dat=args.input_dat, tads_boundary=args.tads_boundary,
+    dcc_args = DccExtrusionArgs(boundary=args.boundary, lef_binding_sites=args.lef_binding_sites,
+                                input_cfg=args.input_cfg, tads_boundary=args.tads_boundary,
                                 stats_file=args.stats_file, exp_cool=args.exp_cool, nlef=args.nlef, km=args.km,
                                 radius_contact=args.radius_contact, contact_probability=args.contact_probability,
                                 boundary_direction=args.boundary_direction,
@@ -622,10 +620,10 @@ def main():
                                 stats=args.stats, all_stats=args.all_stats, simultaneously=args.simultaneously,
                                 cmp_chrs=args.cmp_chrs,
                                 output_folder=args.output_folder)
-    dcc_run = DccExtrusionRunner(job_runner=JOB_RUNNER)
+    dcc_run = DccExtrusionRunner(job_runner=job_runner)
     if args.run_command == 'new_stats':
         dcc_run.analysis_stats(dcc_args, new_stats=True, exp_cool=args.exp_cool)
-    elif args.run_command == 'decay_plots':
+    if args.run_command == 'decay_plots':
         dcc_run.decay_plots(dcc_args, res=args.resolution, replace=args.replace, use_threading=args.threading)
     elif args.run_command == 'chip_seq_plots':
         dcc_run.chip_seq_plots(dcc_args, bin_size=args.bin_size, correlation=args.correlation, replace=args.replace)
@@ -637,13 +635,13 @@ def main():
         dcc_run.multi_decay_exps_plot(args.exp_cools, args.output_folder, hic_chrs=args.hic_chrs, res=args.resolution,
                                       replace=args.replace)
     elif args.run_command == 'run':
-        print("print 3dpolys_le input.dat")
-        dat = pkg_resources.resource_filename(__name__, 'data/input.dat')
-        polysim_le = pkg_resources.resource_filename(__name__, 'bin/3dpolys_le')
-        print(open(dat, "r").read())
-        print(f'CALL: {polysim_le} -h')
-        os.system(f'{polysim_le} -h')
-        # dcc_run.run(dcc_args, radii=args.list_contact_radii, replace=args.replace)
+        #print("print 3dpolys_le input.dat")
+        #dat = pkg_resources.resource_filename(__name__, 'data/input.dat')
+        #polysim_le = pkg_resources.resource_filename(__name__, 'bin/3dpolys_le')
+        #print(open(dat, "r").read())
+        #print(f'CALL: {polysim_le} -h')
+        #os.system(f'{polysim_le} -h')
+        dcc_run.run(dcc_args, radii=args.list_contact_radii, replace=args.replace)
 
 
 if __name__ == '__main__':

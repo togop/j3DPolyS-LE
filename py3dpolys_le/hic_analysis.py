@@ -1,4 +1,3 @@
-import configparser
 import csv
 import fnmatch
 import logging
@@ -16,8 +15,6 @@ import pandas as pd
 import pyranges as pr
 from matplotlib import pyplot as plt
 from scipy import stats
-
-#from _version import __name__, __version__
 
 # from matplotlib import cm
 # from matplotlib.colors import LinearSegmentedColormap
@@ -232,7 +229,7 @@ def hic_to_cooler(hic_file, chr=SIM_CHR, resolution=SIM_RESOLUTION, count_ampl=H
                     'bin-size': resolution,
                     'storage-mode': 'symmetric-upper',
                     'assembly': 'ce11',
-                    'generated-by': __name__ + '-' + __version__,
+                    'generated-by': __name__,
                     # 'creation-date': datetime.date.today()
                     }
 
@@ -588,89 +585,6 @@ def get_hic_cooler_res(hic, chrs, res):  # , root_res=None, factors=None):
     return hic_cooler, hic_chrs
 
 
-def find_hic_tads(hic, hic_bg, chrs=CHR_SYNONYMS, res=RESOLUTION, min_tad_size=700000, plot=False, norm=True):
-    """
-    # Experimental: not working as good as HiCexplorer:findTads
-    """
-    hic_cooler, hic_chrs_select = get_hic_cooler_res(hic, CHR_SYNONYMS, res)  # , EXP_RESOLUTION, EXP_FACTORS)
-
-    if os.path.exists(hic_bg) and hic_bg.endswith('.hdf5') and DECAY_USE_HDF5:
-        hic_bg_mat = get_hic(hic_bg, resolution=res)
-        # hic_bg_chr = chrs[0]
-        # hic_bg_chr_size = hic_bg_mat.shape[0]
-    else:
-        hic_bg_cooler, hic_chrs_select = get_hic_cooler_res(hic_bg, chrs, res)
-        hic1_chr = hic_chrs_select # supported only one chromosome
-        hic_bg_mat = hic_bg_cooler.matrix(balance=False).fetch(hic1_chr)
-        # hic1_chr_size = hic_bg_cooler.chromsizes[hic1_chr]
-
-    log_base = 1.64  # 2 as best, 10 is too sparse  # e = math.exp(1)
-    #    tad_wins = [int(min_tad_size + res * log_base ** i + 1) for i in
-    #                range(int(np.floor(math.log(((chr_size - min_tad_size) // res), log_base))))]
-    tad_wins = [int(min_tad_size + res * 20 * i + 1) for i in
-                range((chr_size // 2 - min_tad_size - 1) // (res * 10))]
-
-    hic_name = hic[hic.rfind('/') + 1:]  # re.sub(r'data/', '', hic_file)
-    hic_bg_name = hic_bg[hic_bg.rfind('/') + 1:]  # re.sub(r'data/', '', hic_file)
-    comp_filename = f'{hic_name}_comp_{hic_bg_name}_res{res}'
-
-    # scan
-    tad_win_step = 5 * res
-    find_tads_score = pd.DataFrame(columns=['start', 'end', 'score', 'insulation', 'ntadi'])
-    # find_tads_score.set_index('midpoint')
-
-    # tads_score = np.array()
-    alpha = 0.85  # 975
-    for tad_win in tad_wins:
-        tads_score_df = pd.DataFrame([], columns=['start', 'end', 'score', 'insulation', 'ntadi'])
-        for tad_pos in range(0, chr_size - tad_win, tad_win_step):
-            tad = np.zeros((1, 2), dtype=int)
-            tad[0, 0] = tad_pos
-            tad[0, 1] = tad_pos + tad_win
-            midpoint = tad_pos + (tad_win - 1) // 2 + 1
-            (tad_chi2_min, tad_alpha_min) = chi2_minimization(hic_bg_mat, hic_cooler, chrs, res, tad, comp_filename,
-                                                              plot, norm=norm)
-            if not np.isnan(tad_chi2_min):
-                tad_df = pd.DataFrame([[tad[0, 0], tad[0, 1], tad_chi2_min, tad_chi2_min, 1]], index=[midpoint],
-                                      columns=['start', 'end', 'score', 'insulation', 'ntadi'])
-                tads_score_df = tads_score_df.append(tad_df)  # , ignore_index=True)
-        score_threshold = tads_score_df[['score']].quantile(alpha)[0]
-        # print(f' score_threshold: {score_threshold}')
-        found_tads = tads_score_df if norm else tads_score_df.loc[tads_score_df['score'] >= score_threshold]
-        print(f' find_tads_score: {find_tads_score}')
-        for midpoint, tadi in found_tads.iterrows():
-            if midpoint in find_tads_score.index:
-                find_tadi = find_tads_score.loc[midpoint]
-                # update chi2-insualtion score
-                find_tadi['insulation'] = (find_tadi['insulation'] / find_tadi['ntadi'] + tadi['insulation']) \
-                                          / (find_tadi['ntadi'] + tadi['ntadi'])
-                find_tadi['ntadi'] += tadi['ntadi']
-                if tadi['score'] >= find_tadi['score']:
-                    tadi['insulation'] = find_tadi['insulation']
-                    tadi['ntadi'] = find_tadi['ntadi']
-                    find_tads_score = find_tads_score.drop(midpoint).append(tadi)  # , ignore_index=True)
-            else:
-                find_tads_score = find_tads_score.append(tadi)
-
-    best_tads_score = find_tads_score.sort_values(by=['start', 'end'])
-    if norm:
-        score_threshold = best_tads_score[['score']].quantile(alpha)[0]
-        best_tads_score = best_tads_score.loc[best_tads_score['score'] >= score_threshold]
-
-    chr_name = hic_cooler.chromnames[chr - 1]
-    print(f' chr[{chr_name}] best_tads_score: {best_tads_score}')
-
-    with open(f'{comp_filename}_a{alpha}_norm{norm}.bed', 'w+') as f:
-        for midpoint, tadi in best_tads_score.iterrows():
-            f.write(f'{chr_name}\t{tadi[0]}\t{tadi[1]}\tID_{midpoint}\t{tadi[2]}\t.\t{tadi[0]}\t{tadi[1]}\t255,0,0\n')
-
-    # write chi2-insulation score
-    find_tads_score.sort_index(inplace=True)
-    with open(f'{comp_filename}_a{alpha}_norm{norm}_score.bedgraph', 'w+') as f:
-        for midpoint, tadi in find_tads_score.iterrows():
-            f.write(f'{chr_name}\t{midpoint - tad_win_step // 2}\t{midpoint + tad_win_step // 2}\t{tadi[3]}\n')
-
-
 def get_hic_cool(hic_h5, out_prefix, res=EXP_RESOLUTION, count_ampl=HIC_COUNT_AMPLIFIER, dummy_sim=False):
     apml_suf = __ampl_suff(count_ampl)
     hic_cool = f'{out_prefix}.cool'
@@ -685,57 +599,6 @@ def get_hic_cool(hic_h5, out_prefix, res=EXP_RESOLUTION, count_ampl=HIC_COUNT_AM
         status, stout = subprocess.getstatusoutput(cmd)
         logger.info(f" call: {cmd}\n\t {stout}")
     return hic_cool
-
-
-def find_insulation_score(hic_h5, res=EXP_RESOLUTION, plot=True, dummy_sim=False):
-    out_prefix = f'{hic_h5}.{res}'
-    hic_cool = get_hic_cool(hic_h5, out_prefix, res, dummy_sim)
-    cmd = f'hicFindTADs -m {hic_cool} --outPrefix {out_prefix} --minDepth {10 * res} --maxDepth {50 * res} --step {res} --thresholdComparisons 0.05 --delta 0.005 --correctForMultipleTesting None'
-    if dummy_sim:
-        cmd = f"echo {cmd}"
-    status, stout = subprocess.getstatusoutput(cmd)
-    logger.info(f" call: {cmd}\n\t {stout}")
-
-    insulation_score_bedgraph = f'{out_prefix}_score.bedgraph'
-    insulation_score_bw = f'{out_prefix}_score.bw'
-    cmd = f'bedGraphToBigWig {insulation_score_bedgraph} sim_chromosome_sizes.tsv {insulation_score_bw}'
-    if dummy_sim:
-        cmd = f"echo {cmd}"
-    status, stout = subprocess.getstatusoutput(cmd)
-    logger.info(f" call: {cmd}\n\t {stout}")
-
-    if plot:
-        # create _tracks.ini file
-        tracks_config = configparser.ConfigParser()
-        tracks_config['x-axis'] = {'where': 'top'}
-        tracks_config['hic matrix'] = {'file': hic_cool,
-                                       'title': f'Hi-C data {hic_h5}',
-                                       'depth': 4000000,
-                                       'transform': 'log1p',
-                                       'file_type': 'hic_matrix'
-                                       }
-        tracks_config['tads'] = {'file': f'{out_prefix}_domains.bed',
-                                 'file_type': 'domains',
-                                 'border_color': 'red',
-                                 'color': 'none',
-                                 'overlay_previous': 'share-y'
-                                 }
-        tracks_config['spacer'] = {}
-        tracks_config['insulation score'] = {'file': f'{out_prefix}_score.bw',
-                                             'height': 4,
-                                             'title': f'TAD insulation score'}
-        tracks_ini = f'{out_prefix}_tracks.ini'
-        # tracks_ini = os.path.basename(tracks_ini)  # just for local test
-        with open(tracks_ini, 'w') as configfile:
-            tracks_config.write(configfile)
-        # plot to PDF
-        cmd = f"hicPlotTADs --tracks {tracks_ini} --region {SIM_CHR}:1-{chr_size} -t '{out_prefix} TADs on X' -o {out_prefix}_tads.pdf"
-        if dummy_sim:  # conda activate py3dpolys_le
-            cmd = f"echo {cmd}"
-        status, stout = subprocess.getstatusoutput(cmd)
-        logger.info(f" call: {cmd}\n\t {stout}")
-
-    return insulation_score_bedgraph
 
 
 # deprecated(using HiExplorer): use instead plot_distance_contact_prob_decay(using Chi2-minimization)

@@ -38,8 +38,9 @@
 !
 ! Note that character variables should be enclosed in inverted commas
 ! especially when giving paths to files. Commented lines (starting with
-! a #) and blank lines are allowed. Comments directly following a
-! parameter statement on the same line are NOT allowed:
+! a #), section headers (starting with [) and blank lines are allowed.
+! Comments directly following a parameter statement on the same line are
+! NOT allowed:
 !
 ! parameter = value  # this is an INVALID comment
 !
@@ -175,7 +176,7 @@ contains
 
        ! --- Ignore lines with nothing and lines with comments --- !
 
-       if(line_temp(1:1).ne.'#'.and.trim(line_temp).ne.'') then
+       if(line_temp(1:1).ne.'#'.and.trim(line_temp).ne.''.and.line_temp(1:1).ne.'[') then
 
           n_lines = n_lines + 1
           line(n_lines) = line_temp
