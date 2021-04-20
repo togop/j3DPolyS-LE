@@ -15,6 +15,7 @@ Required packages and libraries:
 - **Python** 3.7, all required packages are listed in the requirements.txt file and alternatively in the environment.yml file;
 - **Conda** version 4.8.2 or higher.
 
+1. Clone repository
 
 from master branch:
 `git clone https://gitlab.com/togop/3DPolyS-LE.git`
@@ -22,7 +23,9 @@ from master branch:
 from development branch:
 `git clone https://gitlab.com/togop/3DPolyS-LE.git -b develop`
 
-To install run the following commands:
+2. Install 
+
+run the following commands:
 
 ```
 cd 3DPolyS-LE 
