@@ -22,11 +22,12 @@ from master branch:
 from development branch:
 `git clone https://gitlab.com/togop/3DPolyS-LE.git -b develop`
 
+To install run the following commands:
 
 ```
 cd 3DPolyS-LE 
 
-# optional or as troubleshooting for problems with the python environment
+# optional or as troubleshooting for problems with python environments
 make env
 conda activate py3dpolys_le
 
