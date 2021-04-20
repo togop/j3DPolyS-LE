@@ -41,8 +41,9 @@ Create a copy of an input.cfg file and update the parameters you want.
 An example copy of such a configuration file you can find in the package:
 https://gitlab.com/togop/3DPolyS-LE/-/blob/develop/py3dpolys_le/data/ce/input.cfg
 
-Be aware to update properly the [job_runner] section according to your system environment.
-For Slurm environment you can use such configuration:
+Be aware to update properly the _[job_runner]_ section according to your system environment.
+
+For Slurm environment you can use such a configuration:
 
 ```
 [job_runner]
