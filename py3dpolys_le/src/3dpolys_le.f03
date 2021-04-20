@@ -495,8 +495,13 @@ program mainprogram
                 call log%info('Load boundaries file ' // trim(boundary_file) // ' with boundary_foctor ' // &
                         trim(strf(boundary_factor)) // ' ...')
             end if
+            col1 = ''
+            col2 = ''
+            col3 = ''
+            col4 = ''
             read(10, *) col1, col2, col3, col4
-            if ((col1 == 'name').and.(col2=='midpoint').and.(col3=='impermeability')) then
+            ! TODO add (trim(col1) == "name").and.
+            if ((trim(col1) == 'name').and.(trim(col2)=='midpoint').and.(trim(col3)=='impermeability')) then
                 do
                     read(10, *, iostat = rc) boundary_site
                     if (rc /= 0) exit
@@ -585,9 +590,15 @@ program mainprogram
             if (rank == 0) then
                 call log%info('Load lef_binding_sites file ' // trim(lef_binding_sites) // ' ...')
             end if
+            col1 = ''
+            col2 = ''
+            col3 = ''
+            col4 = ''
             read(10, *) col1, col2, col3, col4
-            if ((col1 == 'name').and.(col2=='position').and.(col3=='length').and.(col4=='probability')) then
-                ! count binding sitees
+            ! print "(A, A, A)", 'col1[', trim(col1), ']'
+            ! TODO add (trim(col1) == "name").and.
+            if ((trim(col2)=="position").and.(trim(col3)=="length") &
+                .and.(trim(col4)=='probability')) then
                 do
                     read(10, *, iostat = rc) binding_site
                     binding_sites_count = binding_sites_count + binding_site%length
@@ -628,7 +639,7 @@ program mainprogram
                 end if
             else
                 if (rank == 0) then
-                    call log%error('wrong format for lef binding sites: ' // col1 // col2 // col3 // ' but expected: ' // &
+                    call log%error('wrong format for lef binding sites: ' // col1 // col2 // col3 // col4 // ' but expected: ' // &
                             'name position length probability. STOP PROCEEDING. Please provide a correct binding_sites.csv file.')
 
                 end if
