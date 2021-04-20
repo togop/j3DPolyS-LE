@@ -33,3 +33,22 @@ conda activate py3dpolys_le
 make all
 ```
 
+# Usage
+
+To run a simulation:
+
+Create a copy of an input.cfg file and update the parameters you want.
+An example copy of such a configuration file you can find in the package:
+https://gitlab.com/togop/3DPolyS-LE/-/blob/develop/py3dpolys_le/data/ce/input.cfg
+
+Be aware to update properly the [job_runner] section according to your system environment.
+For Slurm environment you can use such configuration:
+```
+[job_runner]
+cmd_prefix=sbatch --job-name=3dpolys_le --time=5-00:00:00 --mem-per-cpu=6G --nodes=1 --ntasks-per-node=50 --cpus-per-task=1 {cmd_job_dependency}
+jobid_re=\d+$
+cmd_job_dependency=--dependency=afterany:{jobid}
+```
+
+To start the simulation job just run the following command:
+ `3dpolys_le_runner run -i my_sim_input.cfg -o ./my_sim_out`
