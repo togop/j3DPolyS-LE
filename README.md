@@ -1,6 +1,6 @@
 # 3DPolyS-LE
 
-3D Polymer Simulation with Loop Extrusion. Formerly dcc-extrusion project.
+3D Polymer Simulation of chromosome folding by modeled loop extrusion, boundary elements and binding sites.
 
 # Instalation
 
