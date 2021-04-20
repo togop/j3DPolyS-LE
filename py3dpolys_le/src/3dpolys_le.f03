@@ -571,6 +571,10 @@ program mainprogram
             if (rank == 0) then
                 call log%error('Cound not find ' // trim(boundary_file) // ' file!')
             end if
+            call MPI_FINALIZE(ierr)
+            if (ierr /= 0) error stop 'mpi finalize error'
+
+            call exit(1)
         end if
         close(10)
     end if
@@ -637,6 +641,10 @@ program mainprogram
             if (rank == 0) then
                 call log%error('Cound not find ' // trim(lef_binding_sites) // ' file!')
             end if
+            call MPI_FINALIZE(ierr)
+            if (ierr /= 0) error stop 'mpi finalize error'
+
+            call exit(1)
         end if
         close(10)
     end if

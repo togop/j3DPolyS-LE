@@ -68,8 +68,8 @@ module lib_conf
   integer,parameter :: dp = selected_real_kind(p=15,r=307)
 
   integer,parameter :: config_file_len=1000
-  integer,parameter :: config_line_len=100
-  character(len=6),parameter :: config_line_fmt='(A100)'
+  integer,parameter :: config_line_len=500
+  character(len=6),parameter :: config_line_fmt='(A500)'
 
   integer,private :: n_lines
   ! number of lines is the currently loaded config file
