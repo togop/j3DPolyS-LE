@@ -56,6 +56,6 @@ jobid_re=\d+$
 cmd_job_dependency=--dependency=afterany:{jobid}
 ```
 
-To start the simulation job just run the following command:
+To start a simulation job just run the following command:
 
  `3dpolys_le_runner run -i my_sim_input.cfg -o ./my_sim_out`
