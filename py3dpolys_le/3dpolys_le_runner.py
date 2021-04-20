@@ -511,7 +511,7 @@ class DccExtrusionRunner:
 
     def run_multi_decay_plot(self, dcc_args: DccExtrusionArgs, dep_jobid):
         s_cmp_chrs = f'--cmp_chrs {" ".join(dcc_args.cmp_chrs)}' if dcc_args.cmp_chrs is not None else ''
-        cmd = f"run_3dpolys_le_runner.sh multi_decay_plot -o {dcc_args.output_folder} -e {dcc_args.exp_cool}" \
+        cmd = f"3dpolys_le_runner multi_decay_plot -o {dcc_args.output_folder} -e {dcc_args.exp_cool}" \
               f" {s_cmp_chrs}"
         return self._job_runner.run_cmd(cmd, dep_jobid)
 
