@@ -6,12 +6,12 @@
 
 Required packages and libraries:
 
-- **git** client version 2.17.1;
+- **git** client version 2.17.1, only if you use git command to download the repository;
 - **gcc** compiler version 7.5.0 or higher;
 - **gfortran** compiler version 7.5.0 or higher;
 - **MPI** implementation like MPICH and libmpich-dev (Debian/Ubuntu) or openMPI;
 - **HDF5** libraries. Debian/Ubuntu: libhdf5-103 libhdf5-cpp-103 libhdf5-dev libhdf5-mpich-dev;
-- **GNU make** testen on version 3.81
+- **GNU make** version 3.81 or higher;
 - **CMake** version 3.13.0 or higher;
 - **Python** 3.7, all required packages are listed in the requirements.txt file and alternatively in the environment.yml file;
 - **Conda** version 4.8.2 or higher.
