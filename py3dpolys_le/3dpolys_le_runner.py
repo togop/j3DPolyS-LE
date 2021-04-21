@@ -142,6 +142,7 @@ p.add_argument("--bin_size", default=1, help="Chip-seq bin size used for plottin
 p.add_argument("--correlation", default='spearman', choices=['spearmanr', 'pearsonr'],
                help="Correlation method to use to compare Chip-seq profiles.")
 p.add_argument("-o", "--output_folder", default=".", help="Simulation output folder.")
+p.add_argument("-a", "--analysis_folder", default="", help="Analysis output folder: Hi-C, Chip-Seq in silico.")
 #p.add_argument("-jr", "--job_runner", default='slurm', choices=['slurm', 'shell', 'dummy'],
 #               help="Environment mode to run jobs.  Default: slurm")
 
@@ -620,7 +621,7 @@ def main():
                                 z_loop=args.z_loop, unidirectional=args.unidirectional, init_mode=args.init_mode,
                                 stats=args.stats, all_stats=args.all_stats, simultaneously=args.simultaneously,
                                 cmp_chrs=args.cmp_chrs,
-                                output_folder=args.output_folder)
+                                output_folder=args.output_folder, analyse=args.analysis_folder)
     dcc_run = DccExtrusionRunner(job_runner=job_runner)
     if args.run_command == 'new_stats':
         dcc_run.analysis_stats(dcc_args, new_stats=True, exp_cool=args.exp_cool)
