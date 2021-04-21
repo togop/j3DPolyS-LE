@@ -346,7 +346,6 @@ class DccExtrusionRunner:
 
             if run_sim_or_analysis:
                 # LOCAL: cmd = f"../../../../bin/py3dpolys_le -o:{out} --km:{km} --nlef:{nlef} " \
-                # TODO how to choose different batch configuration for: {'_analysis' if dcc_args.analyse else ''}
                 cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')
                 bin3dpolys_le = pkg_resources.resource_filename(__name__, 'bin/3dpolys_le')
                 cmd = f"{cmd_sh} mpirun {bin3dpolys_le} " \
@@ -354,7 +353,11 @@ class DccExtrusionRunner:
                       f"-b:{boundary} -lbs:{dcc_args.lef_binding_sites} " \
                       f"-bd:{dcc_args.boundary_direction} -bf:{dcc_args.boundary_factor} {bs_opt} " \
                       f"{z_loop} {u_opt} {init_mode} {a_opt} {r_opt} {input_cfg}"
-                jobid = self._job_runner.run_cmd(cmd, prev_jobid)
+                # TODO find better way to run 'analysis' profile
+                if dcc_args.analyse:
+                    jobid = self._job_runner.run_cmd(cmd, prev_jobid, profile='analysis')
+                else:
+                    jobid = self._job_runner.run_cmd(cmd, prev_jobid, profile='sim')
 
         if not dep_jobid and jobid:
             self._running_jobids.append(jobid)
@@ -382,7 +385,7 @@ class DccExtrusionRunner:
                   f"-b {boundary} -bd {dcc_args.boundary_direction} -bf {dcc_args.boundary_factor} {bs_opt} {r_opt_py} " \
                   f"-i {input_cfg} -f {stats_file} {s_cmp_chrs}"
                 #  f"-eis {dcc_args.exp_ins_score} " \
-            jobid = self._job_runner.run_cmd(cmd, stats_dep_jobid)  # need to wait for before continue with multi-decay
+            jobid = self._job_runner.run_cmd(cmd, stats_dep_jobid, profile='stats')  # need to wait for before continue with multi-decay
 
         return jobid
 
@@ -637,12 +640,6 @@ def main():
         dcc_run.multi_decay_exps_plot(args.exp_cools, args.output_folder, hic_chrs=args.hic_chrs, res=args.resolution,
                                       replace=args.replace)
     elif args.run_command == 'run':
-        #print("print 3dpolys_le input.dat")
-        #dat = pkg_resources.resource_filename(__name__, 'data/input.dat')
-        #polysim_le = pkg_resources.resource_filename(__name__, 'bin/3dpolys_le')
-        #print(open(dat, "r").read())
-        #print(f'CALL: {polysim_le} -h')
-        #os.system(f'{polysim_le} -h')
         dcc_run.run(dcc_args, radii=args.list_contact_radii, replace=args.replace)
 
 
