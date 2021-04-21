@@ -345,7 +345,8 @@ class DccExtrusionRunner:
                         run_sim_or_analysis = False
 
             if run_sim_or_analysis:
-                # LOCAL: cmd = f"../../../../bin/py3dpolys_le -o:{out} --km:{km} --nlef:{nlef} " \
+                # workaround for Slurm: sbatch expect shell script. For other could be unneeded
+                # TODO find better way to separate the Slurm problem
                 cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')
                 bin3dpolys_le = pkg_resources.resource_filename(__name__, 'bin/3dpolys_le')
                 cmd = f"{cmd_sh} mpirun {bin3dpolys_le} " \
