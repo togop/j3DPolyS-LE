@@ -4,6 +4,7 @@ import logging
 import re
 import subprocess
 import configparser
+import pkg_resources
 
 from abc import ABC, abstractmethod
 
@@ -59,11 +60,11 @@ class CfgJobRunner(JobRunner):
         if profile == 'sim':
             self.cmd_prefix_sim.replace('{cmd_job_dependency}', cmd_dep)
         elif profile == 'analysis':
-            cmd_start = self.cmd_prefix_analysis.replace('{cmd_job_dependency}', dep_jobid)
+            cmd_start = self.cmd_prefix_analysis.replace('{cmd_job_dependency}', cmd_dep)
         elif profile == 'stats':
-            cmd_start = self.cmd_prefix_stats.replace('{cmd_job_dependency}', dep_jobid)
+            cmd_start = self.cmd_prefix_stats.replace('{cmd_job_dependency}', cmd_dep)
         else:  # various plots
-            cmd_start = self.cmd_job_dependency.replace('{cmd_job_dependency}', dep_jobid)
+            cmd_start = self.cmd_job_dependency.replace('{cmd_job_dependency}', cmd_dep)
         return cmd_start
 
     def _get_jobid(self, jobout) -> str:
