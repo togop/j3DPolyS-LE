@@ -4,7 +4,7 @@ import logging
 import re
 import subprocess
 import configparser
-import pkg_resources
+import os.path
 
 from abc import ABC, abstractmethod
 
@@ -19,13 +19,24 @@ class JobRunner(ABC):
         full_cmd = f"{start_cmd} {cmd}"
 
         jobid = ''
-        status, jobout = subprocess.getstatusoutput(full_cmd)
-        logger.info(f" call: {full_cmd}\n\t {jobout}")
-        if status == 0:
-            jobid = self._get_jobid(jobout)
-            logger.info(f"JobID is: {jobid}")
+        if self._cmd_in_shell(profile):
+            status, jobout = subprocess.getstatusoutput(full_cmd)
+            logger.info(f" call: {full_cmd}\n\t {jobout}")
+            if status == 0:
+                jobid = self._get_jobid(jobout, profile)
+                logger.info(f"JobID is: {jobid}")
+            else:
+                logger.error(f"Error submitting Job: {full_cmd}")
+        elif self._cmd_in_stdout(profile):
+            print(full_cmd)
         else:
-            logger.error(f"Error submitting Job: {full_cmd}")
+            cmd_in_file = self._cmd_in_file(profile)
+            if cmd_in_file:
+                if not os.path.isfile(cmd_in_file):
+                    with open(cmd_in_file, 'w') as f:
+                        print('', file=f)
+                with open(cmd_in_file, 'a') as f:
+                    print(full_cmd, file=f)
         return jobid
 
     @abstractmethod
@@ -33,39 +44,64 @@ class JobRunner(ABC):
         pass
 
     @abstractmethod
-    def _get_jobid(self, jobout) -> str:
+    def _get_jobid(self, jobout, profile) -> str:
+        pass
+
+    @abstractmethod
+    def _cmd_in_shell(self, profile) -> bool:
+        pass
+
+    @abstractmethod
+    def _cmd_in_stdout(self, profile) -> bool:
+        pass
+
+    @abstractmethod
+    def _cmd_in_file(self, profile) -> str:
         pass
 
 
 class CfgJobRunner(JobRunner):
-    cmd_prefix: str
-    cmd_prefix_sim: str
-    cmd_prefix_analysis: str
-    cmd_prefix_stats: str
-    jobid_re: str
-    cmd_job_dependency: str
+    input_cfg: str
+    cmd_in_file: str
+    _config = configparser.ConfigParser()
 
-    def __init__(self, input_cfg):
-        config = configparser.ConfigParser()
-        config.read(input_cfg)
-        self.cmd_prefix = config.get('job_runner', 'cmd_prefix')
-        self.cmd_prefix_sim = config.get('job_runner', 'cmd_prefix_sim')
-        self.cmd_prefix_analysis = config.get('job_runner', 'cmd_prefix_analysis')
-        self.cmd_prefix_stats = config.get('job_runner', 'cmd_prefix_stats')
-        self.jobid_re = config.get('job_runner', 'jobid_re')
-        self.cmd_job_dependency = config.get('job_runner', 'cmd_job_dependency')
+    def __init__(self, input_cfg, cmd_in_file):
+        self.input_cfg = input_cfg
+        self.cmd_in_file = cmd_in_file
+        self._config.read(self.input_cfg)
 
     def _get_start_cmd(self, dep_jobid, profile) -> str:
-        cmd_dep = self.cmd_job_dependency.replace('{jobid}', dep_jobid) if dep_jobid else ''
-        if profile == 'sim':
-            cmd_start = self.cmd_prefix_sim.replace('{cmd_job_dependency}', cmd_dep)
-        elif profile == 'analysis':
-            cmd_start = self.cmd_prefix_analysis.replace('{cmd_job_dependency}', cmd_dep)
-        elif profile == 'stats':
-            cmd_start = self.cmd_prefix_stats.replace('{cmd_job_dependency}', cmd_dep)
-        else:  # various plots
-            cmd_start = self.cmd_job_dependency.replace('{cmd_job_dependency}', cmd_dep)
-        return cmd_start
+        cmd_job_dependency = self._get_property(profile, 'cmd_job_dependency')
+        cmd_dep = cmd_job_dependency.replace('{jobid}', dep_jobid) if dep_jobid else ''
+        cmd_prefix = self._get_property(profile, 'cmd_prefix')
+        return cmd_prefix.replace('{cmd_job_dependency}', cmd_dep)
 
-    def _get_jobid(self, jobout) -> str:
-        return re.search(self.jobid_re, jobout)[0]
+    def _get_jobid(self, jobout, profile) -> str:
+        jobid_re = self._get_property(profile, 'jobid_re')
+        return re.search(jobid_re, jobout)[0]
+
+    def _get_property(self, profile, name='jobid_re'):
+        value = ''
+        if profile:
+            try:
+                value = self._config.get('job_rer_' + profile, name)
+            except (configparser.NoOptionError, configparser.NoSectionError) as e:
+                value = ''
+        if not value:
+            value = self._config.get('job_runner', name)
+        return value
+
+    def _cmd_in_shell(self, profile) -> bool:
+        cmd_in = self._get_property(profile, 'cmd_in')
+        return cmd_in == 'shell'
+
+    def _cmd_in_stdout(self, profile) -> bool:
+        cmd_in = self._get_property(profile, 'cmd_in')
+        return cmd_in == 'stdout'
+
+    def _cmd_in_file(self, profile) -> str:
+        cmd_in = self._get_property(profile, 'cmd_in')
+        if cmd_in.startswith('file:'):
+            cmd_in_file = cmd_in.split(':')[1]
+            return cmd_in_file.replace('{cmd_in_file}', self.cmd_in_file)
+        return ''
