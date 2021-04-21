@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 class JobRunner(ABC):
 
-    def run_cmd(self, cmd, dep_jobid) -> str:
-        start_cmd = self._get_start_cmd(dep_jobid)
+    def run_cmd(self, cmd, dep_jobid, profile='') -> str:
+        start_cmd = self._get_start_cmd(dep_jobid, profile)
         full_cmd = f"{start_cmd} {cmd}"
 
         jobid = ''
@@ -28,7 +28,7 @@ class JobRunner(ABC):
         return jobid
 
     @abstractmethod
-    def _get_start_cmd(self, dep_jobid) -> str:
+    def _get_start_cmd(self, dep_jobid, profile) -> str:
         pass
 
     @abstractmethod
@@ -38,6 +38,9 @@ class JobRunner(ABC):
 
 class CfgJobRunner(JobRunner):
     cmd_prefix: str
+    cmd_prefix_sim: str
+    cmd_prefix_analysis: str
+    cmd_prefix_stats: str
     jobid_re: str
     cmd_job_dependency: str
 
@@ -45,11 +48,21 @@ class CfgJobRunner(JobRunner):
         config = configparser.ConfigParser()
         config.read(input_cfg)
         self.cmd_prefix = config.get('job_runner', 'cmd_prefix')
+        self.cmd_prefix_sim = config.get('job_runner', 'cmd_prefix_sim')
+        self.cmd_prefix_analysis = config.get('job_runner', 'cmd_prefix_analysis')
+        self.cmd_prefix_stats = config.get('job_runner', 'cmd_prefix_stats')
         self.jobid_re = config.get('job_runner', 'jobid_re')
         self.cmd_job_dependency = config.get('job_runner', 'cmd_job_dependency')
 
-    def _get_start_cmd(self, dep_jobid) -> str:
-        cmd_dep = self.cmd_job_dependency.replace('{jobid}', dep_jobid)
+    def _get_start_cmd(self, dep_jobid, profile) -> str:
+        if profile == 'sim':
+            cmd_dep = self.cmd_prefix_sim.replace('{jobid}', dep_jobid)
+        elif profile == 'analysis':
+            cmd_dep = self.cmd_prefix_analysis.replace('{jobid}', dep_jobid)
+        elif profile == 'stats':
+            cmd_dep = self.cmd_prefix_stats.replace('{jobid}', dep_jobid)
+        else:  # various plots
+            cmd_dep = self.cmd_job_dependency.replace('{jobid}', dep_jobid)
         return self.cmd_prefix.replace('{cmd_job_dependency}', cmd_dep)
 
     def _get_jobid(self, jobout) -> str:
