@@ -56,9 +56,9 @@ class CfgJobRunner(JobRunner):
         self.cmd_job_dependency = config.get('job_runner', 'cmd_job_dependency')
 
     def _get_start_cmd(self, dep_jobid, profile) -> str:
-        cmd_dep = self.cmd_job_dependency.replace('{jobid}', dep_jobid)
+        cmd_dep = self.cmd_job_dependency.replace('{jobid}', dep_jobid) if dep_jobid else ''
         if profile == 'sim':
-            self.cmd_prefix_sim.replace('{cmd_job_dependency}', cmd_dep)
+            cmd_start = self.cmd_prefix_sim.replace('{cmd_job_dependency}', cmd_dep)
         elif profile == 'analysis':
             cmd_start = self.cmd_prefix_analysis.replace('{cmd_job_dependency}', cmd_dep)
         elif profile == 'stats':
