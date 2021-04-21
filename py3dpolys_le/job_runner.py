@@ -55,15 +55,16 @@ class CfgJobRunner(JobRunner):
         self.cmd_job_dependency = config.get('job_runner', 'cmd_job_dependency')
 
     def _get_start_cmd(self, dep_jobid, profile) -> str:
+        cmd_dep = self.cmd_job_dependency.replace('{jobid}', dep_jobid)
         if profile == 'sim':
-            cmd_dep = self.cmd_prefix_sim.replace('{jobid}', dep_jobid)
+            self.cmd_prefix_sim.replace('{cmd_job_dependency}', cmd_dep)
         elif profile == 'analysis':
-            cmd_dep = self.cmd_prefix_analysis.replace('{jobid}', dep_jobid)
+            cmd_start = self.cmd_prefix_analysis.replace('{cmd_job_dependency}', dep_jobid)
         elif profile == 'stats':
-            cmd_dep = self.cmd_prefix_stats.replace('{jobid}', dep_jobid)
+            cmd_start = self.cmd_prefix_stats.replace('{cmd_job_dependency}', dep_jobid)
         else:  # various plots
-            cmd_dep = self.cmd_job_dependency.replace('{jobid}', dep_jobid)
-        return self.cmd_prefix.replace('{cmd_job_dependency}', cmd_dep)
+            cmd_start = self.cmd_job_dependency.replace('{cmd_job_dependency}', dep_jobid)
+        return cmd_start
 
     def _get_jobid(self, jobout) -> str:
         return re.search(self.jobid_re, jobout)[0]
