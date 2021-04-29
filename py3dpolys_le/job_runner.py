@@ -80,11 +80,11 @@ class CfgJobRunner(JobRunner):
         jobid_re = self._get_property(profile, 'jobid_re')
         return re.search(jobid_re, jobout)[0]
 
-    def _get_property(self, profile, name='jobid_re'):
+    def _get_property(self, profile, name):
         value = ''
         if profile:
             try:
-                value = self._config.get('job_rer_' + profile, name)
+                value = self._config.get('job_runner' + profile, name)
             except (configparser.NoOptionError, configparser.NoSectionError) as e:
                 value = ''
         if not value:
