@@ -479,13 +479,6 @@ class DccExtrusionRunner:
             self.sim_contact_radius_analysis(dcc_args, radii)
 
     def sim_contact_radius_analysis(self, dcc_args: DccExtrusionArgs, radii, dep_jobid=None):
-        # we proceed only for simulation folders,
-        # if dep_jobid != None means simulations was just started and dependency will take care of
-        if not dep_jobid and not is_simulation_output_folder(dcc_args.output_folder):
-            logger.error(f'Output folder {dcc_args.output_folder} not existing or simulation data files '
-                         f'({ha.CONFIG_OUT}, {ha.CONTACT_OUT}, {ha.DR_OUT}) are missing so skip it!')
-            return
-
         analysis_folders = []
         last_jobid = ''  # we'll need the last job to do the aggregation decay plot
         for rcp in radii:
