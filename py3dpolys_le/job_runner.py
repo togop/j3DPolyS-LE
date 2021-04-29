@@ -84,7 +84,7 @@ class CfgJobRunner(JobRunner):
         value = ''
         if profile:
             try:
-                value = self._config.get('job_runner' + profile, name)
+                value = self._config.get('job_runner_' + profile, name)
             except (configparser.NoOptionError, configparser.NoSectionError) as e:
                 value = ''
         if not value:
