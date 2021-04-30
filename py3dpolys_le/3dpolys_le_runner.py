@@ -140,7 +140,7 @@ p.add_argument("--bin_size", default=1, help="Chip-seq bin size used for plottin
 p.add_argument("--correlation", default='spearman', choices=['spearmanr', 'pearsonr'],
                help="Correlation method to use to compare Chip-seq profiles.")
 p.add_argument("-o", "--output_folder", default=".", help="Simulation output folder.")
-p.add_argument("--cmd_in_file", default="", help="File where to save all commands.")
+p.add_argument("--cmd_run_file", default="", help="File where to save all commands.")
 p.add_argument("-a", "--analysis_folder", default="", help="Analysis output folder: Hi-C, Chip-Seq in silico.")
 #p.add_argument("-jr", "--job_runner", default='slurm', choices=['slurm', 'shell', 'dummy'],
 #               help="Environment mode to run jobs.  Default: slurm")
@@ -606,7 +606,7 @@ def main():
                        f'with which HiCs will be compared!')
         ha.CHR_SYNONYMS = args.cmp_chrs
 
-    job_runner: JobRunner = CfgJobRunner(input_cfg=args.input_cfg, cmd_in_file=args.cmd_in_file)
+    job_runner: JobRunner = CfgJobRunner(input_cfg=args.input_cfg, cmd_run_file=args.cmd_run_file)
 
     dcc_args = DccExtrusionArgs(boundary=args.boundary, lef_binding_sites=args.lef_binding_sites,
                                 input_cfg=args.input_cfg, tads_boundary=args.tads_boundary,
