@@ -5,3 +5,4 @@ cmake-build-debug
 polys3d_le.egg-info/
 out/
 py3dpolys_le.egg-info/
+/py3dpolys_le/bin/3dpolys_le
