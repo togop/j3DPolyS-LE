@@ -22,11 +22,11 @@ from scipy import stats
 # Initialization
 logger = logging.getLogger(__name__)
 
-PUBLISHED = 'published'
+PUBLISHED = 'published' # TODO remove deprecated
 # used to set default paths
 # PUBLISHED_FOLDER = "/mnt/imaging.data/ttgitchev/published"  # todor gitchev's remote
 #PUBLISHED_FOLDER = "/mnt/imaging.data/gzala/published"  # gabriel zala's remote
-PUBLISHED_FOLDER = "../src/data/test"  # local test folder
+PUBLISHED_FOLDER = "../src/data/test"  # local test folder # TODO remove deprecated
 # PUBLISHED_FOLDER = "~/imaging_data_published"  # local data folder
 # PUBLISHED_FOLDER = "../../published"  # Local
 
@@ -38,7 +38,7 @@ RESOLUTION = 10000
 EXP_FACTORS = [1, 2, 4]  # , 8, 16]
 SIM_FACTORS = [5, 10, 20]  # , 40, 80]  #, 160, 320]
 
-HIC_COUNT_AMPLIFIER = 0  # 0: use original float64, if >1 use int32: 100: the best is when equal to Niter: number of trajectories
+HIC_COUNT_AMPLIFIER = 0  # TODO remove deprecated  # 0: use original float64, if >1 use int32: 100: the best is when equal to Niter: number of trajectories
 
 # CMAP = 'hot'
 CMAP = 'YlOrRd'
@@ -64,7 +64,7 @@ CHI2_RANGE_NUM = 100
 
 CHI2_USE_SEM = True
 
-FIG_FORMAT = 'svg'
+FIG_FORMAT = 'svg'  # TODO make FIG_FORMAT input parameter
 #FIG_FORMAT = 'png'
 
 # simulation output files
