@@ -38,6 +38,7 @@ setup(name='py3dpolys_le',
               'plot_hic = py3dpolys_le.plot_hic:main',
               '3dpolys_le_runner = py3dpolys_le.3dpolys_le_runner:main',
               '3dpolys_le_stats = py3dpolys_le.3dpolys_le_stats:main',
+              # 'hic_converters = py3dpolys_le.hic_converters:main',  # TODO add proper CLI and include
           ],
       },
       zip_safe=False)

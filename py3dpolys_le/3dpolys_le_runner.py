@@ -115,8 +115,8 @@ p.add_argument("-ec", "--exp_chip",
 p.add_argument("-res", "--resolution", default=ha.RESOLUTION, type=int,
                help="Resolution for distance-contact-decay plots.")
 p.add_argument("-i", "--input_cfg", default="./input.cfg", help="Input.cfg file used from a simulation.")
-p.add_argument("-l", "--nlef", default=200, help="Nlef value to use in a simulation.", type=int)
-p.add_argument("-m", "--km", default=2.7e-3, help="km value to use in a simulation.", type=float)
+p.add_argument("-l", "--nlef", help="Nlef value to use in a simulation.", type=int)
+p.add_argument("-m", "--km", help="km value to use in a simulation.", type=float)
 p.add_argument("-f", "--stats_file", default="./sim_stats.csv", help="Simulation statistics' repository file.")
 p.add_argument("--stats", action='store_true',
                help="In combination with a new_stats command to run statistical analysis (3dpolys_le_stats.py) only for "
@@ -201,7 +201,7 @@ class DccExtrusionArgs:
         self.exp_cool = exp_cool if exp_cool else self.get_property('exp_cool')
         self.exp_chip = exp_chip  # TODO probably remove
         # self.exp_ins_score = exp_ins_score
-        self.nlef = nlef if boundary_direction else int(self.get_property('Nlef'))
+        self.nlef = nlef if nlef else int(self.get_property('Nlef'))
         self.km = km if km else float(self.get_property('km'))
         self.radius_contact = radius_contact if km else float(self.get_property('km'))
         self.contact_probability = contact_probability  # TODO probably remove
@@ -218,7 +218,7 @@ class DccExtrusionArgs:
 
     def get_property(self, name):
         try:
-            value = self._config.get(MAIN_INPUT_CFG_SECTION, name)
+            value = self._config.get(MAIN_INPUT_CFG_SECTION, name) # .strip()
         except (configparser.NoOptionError, configparser.NoSectionError) as e:
             value = ''
         return value
