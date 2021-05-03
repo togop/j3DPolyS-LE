@@ -122,19 +122,18 @@ def matrix_to_mcool(matrix_file, chr, resolution, factors):
     return mcool_file
 
 
-if __name__ == "__main__":
+def hdf5_to_cool():
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("").setLevel(logging.INFO)
 
     p = argparse.ArgumentParser()
-    p.add_argument("-cf", "--cool_file", default=f"{hc.PUBLISHED_FOLDER}/wt_N2_Brejc2017_5000.cool",
-                   help="Experimental cool file to plot")
-    p.add_argument("-o", "--output_folder", default=".", help="output folder")
-    p.add_argument("-b", "--balanced", action='store_true', help="Balanced or not")
-    p.add_argument("-z", "--z_score", action='store_true', help="Z-score normalized otherwise original Hi-C")
-    p.add_argument("-chrs", "--chr_synonyms", nargs="+", default=['chrX', 'X', '6'],
-                   help="List of chromosome synonyms to look for")
-    p.add_argument("-c", "--cmap", default="hot_r ",
-                   help="Color map: cool, hot_r, gist_heat_r, afmhot_r, YlOrRd, Greys, gist_yarg, seismic")
-    p.add_argument("-f", "--file_extension", default="png", help="File format extension: png, tif")
+    p.add_argument("-i", "--input_file", help="input file name")
+    p.add_argument("-o", "--output_file", help="output file name")
+    p.add_argument("-chr", help="Chromosome name to be used for")
+    p.add_argument("-r", "--resolution", help="Chromosome name to be used for")
     args = p.parse_args(sys.argv[1:])
+    hic_to_cool(hic=args.input_file, chr=args.chr, resolution=args.resolution, cool_file=args.output_file)
+
+
+if __name__ == "__main__":
+    hdf5_to_cool()
