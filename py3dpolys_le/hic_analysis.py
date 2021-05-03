@@ -605,34 +605,6 @@ def get_hic_cool(hic_h5, out_prefix, res=EXP_RESOLUTION, count_ampl=HIC_COUNT_AM
     return hic_cool
 
 
-# deprecated(using HiExplorer): use instead plot_distance_contact_prob_decay(using Chi2-minimization)
-def plot_distance_contact_decay(hic_h5, exp_cool, res=EXP_RESOLUTION, count_ampl=HIC_COUNT_AMPLIFIER,
-                                replace=True, dummy_sim=False):
-    # plot also distance-contacts decoy plot
-    apml_suf = __ampl_suff(count_ampl)
-    out_prefix = f'{hic_h5}{apml_suf}.{res}'
-    hic_cool = get_hic_cool(hic_h5, out_prefix, res=EXP_RESOLUTION, dummy_sim=dummy_sim)
-    hic_decay_plot = f'{out_prefix}.decay.png'
-    hic_label = hic_cool.split('/')[-2] + '/' + hic_cool.split('/')[-1].rsplit('.', 3)[0] + apml_suf
-    if os.path.exists(hic_decay_plot):
-        if not replace:
-            logger.info(f'Distance-contact decay plot already existing: {hic_decay_plot}, so skip it')
-            return hic_decay_plot
-        else:
-            logger.warning(f'Replacing existing Distance-contact decay plot: {hic_decay_plot}')
-
-    cmd = f"hicPlotDistVsCounts -m {hic_cool} {exp_cool} -o {hic_decay_plot}" \
-          f" --labels '{hic_label}' '{os.path.basename(exp_cool)}' --maxdepth 20000000 --plotsize 10 4.2"
-    if dummy_sim:
-        cmd = f"echo {cmd}"
-    logger.info(f" call: {cmd}")
-    status, stout = subprocess.getstatusoutput(cmd)
-    logger.info(f"{stout}")
-
-    logger.info(f'Distance-contact decay plot: {hic_decay_plot}')
-    return hic_decay_plot
-
-
 def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, exp_cool=None, output_folder=None, res=RESOLUTION,
                                      confidence=0., replace=True, chi2_mode=CHI2_MODE_LOG):
 
@@ -730,7 +702,7 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, exp_cool=N
     #                                             norm=True, chi2_mode=chi2_mode)  # , plot=True)
     #        logger.info(f'REV COMPARE {hic} <- {cmp_hic}: {chi2_rev}, {alpha_rev}')
 
-            probs_adjust = np.array(probs) * alpha  # TODO find if this is really the correct alpha and correct it otherwise
+            probs_adjust = np.array(probs) * alpha
             line, = plt.plot(dists, probs_adjust, color=DECAY_PALETTE(chr_i * DECAY_PALETTE_SHIFT), alpha=DECAY_PLOT_ALPHA)
             lines.append(line)
             if confidence != 0:  # plot confident interval otherwise not
