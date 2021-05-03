@@ -359,6 +359,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
             if len(dist_range) < 1:
                 logger.warning(
                     f'Empty chi2-dist-range for tad with size chi2(mode:{chi2_mode}, resolution:{res}), TADi_size:{tadi_size}[{tad_start}-{tad_end}]')
+            tadi_norm_term = 0
             for dist in dist_range:
                 # dist = int(round(dist))  # optimization: do it here
                 (p_i, p_i_sdsem) = average_contact_prob(tadi_mat1, dist, plot, ax1)
@@ -371,6 +372,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
                     toti_PS += (p_i ** 2) / sigma_i_2
                     toti_FS += (f_i ** 2) / sigma_i_2
                     norm_term += 1
+                    tadi_norm_term += 1
                     logger.info(
                         f'chi2(dis:{dist}) : p_i: {p_i} * f_i: {f_i} = {p_i * f_i}, sigma_i^2= {sigma_i_2}, '
                         f'tot_FS={toti_FS}, tot_PFS={toti_PFS}, tot_PS={toti_PS}')
@@ -382,6 +384,8 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
             tot_FS += toti_FS  # / max_x if norm else toti_FS
 
         tadi_chi2_min = (toti_FS - (toti_PFS ** 2 / toti_PS)) / 2 if toti_PS > 0 else -1
+        if norm and tadi_norm_term:
+            tadi_chi2_min = tadi_chi2_min/tadi_norm_term
         tads_chi2_min_df = tads_chi2_min_df.append({tads_chi2_min_df.columns[0]: comp_chr,
                                                     tads_chi2_min_df.columns[1]: tad_start,
                                                     tads_chi2_min_df.columns[2]: tad_end,

@@ -40,9 +40,9 @@ def main():
                         "chromosome  anchor1  anchor2")
     p.add_argument("-e", "--exp_cool", default=f"{ha.PUBLISHED_FOLDER}/N2_5000b.cool",
                    help="Experimental cool file with which simulation data to be compared.")
-    p.add_argument("-l", "--nlef", default="1600", help="Nlef value used in a simulation.")  # TODO optional read it form input.dat
+    p.add_argument("-l", "--nlef", default="200", help="Nlef value used in a simulation.")  # TODO optional read it form input.dat
     p.add_argument("-m", "--km", default="2.7e-3", help="km value used in a simulation.")  # TODO optional read it form input.dat
-    p.add_argument("-i", "--input_dat", default="./input.dat", help="input.dat file used in a simulation.")
+    p.add_argument("-i", "--input_cfg", default="./input.cfg", help="input.cfg file used in a simulation.")
     p.add_argument("-r", "--radius_contact", default=0., help="Contact radius in lattice units (1=70nm) "
                                                               "used in the 'analyse' step to extract Hi-C matrixes.",
                    type=float)
@@ -81,7 +81,6 @@ def main():
     sim_hic_file = ha.get_last_hic(args.analyse)
 
     # need only normed for chi2_log and chi2_linear and for given tads-boundary sites and 1tad(the whole chromosome)
-    # TODO clean unneeded statistics and be average that chi2-min.bed file will be save under the same name
     (chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS, res=ha.RESOLUTION,
                                                       tads_boundary=tads_boundary, norm=True,
                                                       chi2_mode=ha.CHI2_MODE_LINEAR)  # , plot=True)
@@ -103,7 +102,7 @@ def main():
             stats_writer.writerow(
                 ['sim_hic_file', 'sim_out_folder', 'exp_cool', 'resolution',
                  'boundary', 'boundary_direction', 'boundary_factor', 'boundary_score',
-                 'tads', 'input.dat', 'nlef', 'km', 'radius_contact', 'chi2_log', 'alpha_log',
+                 'tads_boundary', 'input.cfg', 'nlef', 'km', 'radius_contact', 'chi2_log', 'alpha_log',
                  'chi2_lin', 'alpha_lin', 'chr'])
 
     with SoftFileLock(f'{args.stats_file}.lock'):
@@ -114,7 +113,7 @@ def main():
             stats_writer.writerow(
                 [sim_hic_file, args.output_folder, exp_cool, ha.RESOLUTION,
                  boundary, args.boundary_direction, args.boundary_factor, args.boundary_score,
-                 tads_boundary, args.input_dat, args.nlef, args.km, radius_p, chi2_log, alpha_log,
+                 tads_boundary, args.input_cfg, args.nlef, args.km, radius_p, chi2_log, alpha_log,
                  chi2_lin, alpha_lin, ha.CHR_SYNONYMS[-1]])
 
     # generate hic_*_hot_r.png plot files if not already done

@@ -30,7 +30,7 @@ subroutine print_version()
     character(1) :: path_separator, path_sep
     logical :: file_exists
     integer :: i, rc
-    character(1000) :: init__py_file = '__init__.py'
+    character(1000) :: init__py_file = '__version__.py'
 
     path_sep = path_separator()
 
