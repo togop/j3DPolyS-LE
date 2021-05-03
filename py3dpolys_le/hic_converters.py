@@ -132,6 +132,8 @@ def hdf5_to_cool():
     p.add_argument("-chr", help="Chromosome name to be used for")
     p.add_argument("-r", "--resolution", help="Chromosome name to be used for")
     args = p.parse_args(sys.argv[1:])
+
+    # TODO need to do it like in hic_analysis.py
     hic_to_cool(hic=args.input_file, chr=args.chr, resolution=args.resolution, cool_file=args.output_file)
 
 
