@@ -48,19 +48,42 @@ https://gitlab.com/togop/3DPolyS-LE/-/blob/develop/py3dpolys_le/data/ce/input.cf
 
 Be aware to update properly the _[job_runner]_ section according to your system environment.
 
-For Slurm environment you can use such a configuration:
+For Slurm environment you can use such a configuration (also could be found in the example input.cfg):
 
 ```
 [job_runner]
-cmd_prefix=sbatch --job-name=3dpolys_le --time=5-00:00:00 --mem-per-cpu=6G --nodes=1 --ntasks-per-node=50 --cpus-per-task=1 {cmd_job_dependency}
+cmd_run=shell
 jobid_re=\d+$
 cmd_job_dependency=--dependency=afterany:{jobid}
+cmd_prefix=sbatch --job-name=3dpolys_le --time=1-00:00:00 --mem-per-cpu=8G --nodes=1 --ntasks-per-node=1 --cpus-per-task=8 {cmd_job_dependency}
+
+[job_runner_sim]
+cmd_prefix=sbatch --job-name=sim_3dpolys_le --time=3-00:00:00 --mem-per-cpu=6G --nodes=1 --ntasks-per-node=50 --cpus-per-task=1 {cmd_job_dependency}
+
+[job_runner_analysis]
+cmd_prefix=sbatch --job-name=anl_3dpolys_le --time=1-00:00:00 --mem-per-cpu=16G --nodes=1 --ntasks-per-node=1 --cpus-per-task=4 {cmd_job_dependency}
+
+[job_runner_stats]
+cmd_prefix=sbatch --job-name=sts_3dpolys_le --time=1-00:00:00 --mem-per-cpu=16G --nodes=1 --ntasks-per-node=1 --cpus-per-task=4 {cmd_job_dependency}
 ```
 
 To start a simulation job just run the following command:
 
  `3dpolys_le_runner run -i my_sim_input.cfg -o ./my_sim_out`
 
+It will start a series of commands including simulation, analysis, and downstream statistical analysis (hic-chi2-min score) and plots (hic, contact-decay).
+
+It is also helpful to save to output of the main 'run' command as it will print out all executed commands and in case of some errors you can rerun only the failed one. One way to do that is to save the output in a file:
+
+`3dpolys_le_runner run -i my_sim_input.cfg -o ./my_sim_out &> 3dpolys_le_runner.log`
+
+
  To see all supported parameters run:
 
  `3dpolys_le_runner --help`
+
+Other available commands are:
+
+  `3dpolys_le_stats --help`
+  `plot_hic --help`
+
