@@ -69,7 +69,7 @@ end subroutine print_version
 
 subroutine print_help()
     call print_version()
-    print*, 'Usage: py3dpolys_le [options] [<3dpolys_le.cfg file>]'
+    print*, 'Usage: 3dpolys_le [options] [<3dpolys_le.cfg file>]'
     print*, 'Options:'
     print*, '   -h|--help   Display this information.'
     print*, '   --log:<log level> Sets the log output level: OFF, FATAL, ERROR, WARN, INFO, DEBUG, TRACE. Default: INFO'
