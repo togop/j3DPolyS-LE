@@ -10,7 +10,7 @@ debug:
 
 env:
 	# conda deactivate
-	conda env remove -n py3dpolys_le
+	# conda env remove -n py3dpolys_le
 	conda env create -f environment.yml
 	# conda create -n py3dpolys_le python=3.8
 	# conda activate py3dpolys_le
