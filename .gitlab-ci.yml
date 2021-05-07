@@ -1,0 +1,28 @@
+image:
+  togop/gcc_gfortran_mpi_hdf5_python:latest
+# how to test locally: https://medium.com/@umutuluer/how-to-test-gitlab-ci-locally-f9e6cef4f054
+before_script:
+  - make env
+  - conda activate py3dpolys_le
+  - make all
+  - conda init bash
+  #- source ~/.bashrc
+  - echo "conda activate py3dpolys_le" >> ~/.bashrc
+  - source ~/.bashrc
+  #- cd
+test:
+  script:
+    - pwd
+    #- cd bin
+    - ls -la
+    - 3dpolys_le_runner --help
+    - python --version
+    - echo 'Start tests ...'
+    - 3dpolys_le_runner run -o ./out_8860 -i ./test/test_shell_input.cfg
+    - ../test.sh ./out_8860/config.out
+    - ls -la ./out_8860
+    - ls -la ./out_8860/r2.84
+    - ../test.sh ./out_8860/r2.84/Chip.out
+    - ../test.sh ./out_8860/r2.84/xyzconfig.out
+    - ../test.sh ./out_8860/r2.84/hic_001.hdf5
+    - ../test.sh ./out_8860/r2.84/hic_002.hdf5

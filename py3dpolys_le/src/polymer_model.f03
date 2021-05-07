@@ -852,6 +852,7 @@ contains
         integer, intent(in) :: burnoutM
         real, intent(in) :: radius_contact
 
+        write(fout, '(a)') '[3dpolys_le]'
         write(fout, '(a)') '# polymer characteristics'
         write(fout, '(a)') 'Nchain=' // trim(str(self%Nchain))
         write(fout, '(a)') 'L=' // trim(str(self%L))
