@@ -73,7 +73,7 @@ To start a simulation job just run the following command:
 
 It will start a series of commands including simulation, analysis, and downstream statistical analysis (hic-chi2-min score) and plots (hic, contact-decay).
 
-It is also helpful to save to output of the main 'run' command as it will print out all executed commands and in case of some errors you can rerun only the failed one. One way to do that is to save the output in a file:
+It is also helpful to save the output of the main 'run' command as it will print out all executed commands and in case of some errors you can rerun the failed one. One way to do that is to save the output in a file:
 
 `3dpolys_le_runner run -i my_sim_input.cfg -o ./my_sim_out &> 3dpolys_le_runner.log`
 
@@ -85,5 +85,6 @@ It is also helpful to save to output of the main 'run' command as it will print 
 Other available commands are:
 
   `3dpolys_le_stats --help`
+
   `plot_hic --help`
 
