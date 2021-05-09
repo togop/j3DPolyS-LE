@@ -1,4 +1,4 @@
-character(len = 1) function path_separator()
+§character(len = 1) function path_separator()
     character(len = 10000) :: path
     call get_environment_variable('PATH', path)
     path_separator = path(1:1)
@@ -25,7 +25,7 @@ subroutine print_version()
     character(*), parameter :: VERSION = '2020.1.1'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = 'unknown'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2020.5.9'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -104,7 +104,8 @@ subroutine print_help()
     print*, 'parameters in a configuration file (3dpolys_le.cfg):'
     print*, 'Nchain     Polymer chain length in monomers of 2kb.'
     print*, 'L          Polymer compartment box size L (choose L so that Nchain/(4*L^3) ~ 0.5).'
-    print*, 'Niter      Number of iterations, aka number of independent trajectories as polymer replicas.'
+    print*, 'Niter      Number of iterations, aka number of independent trajectories as polymer replicas. &
+            & 1 min = 12000 interaction steps'
     print*, 'Nmeas      Number of measures >=3 (initial, burin-in, n*simulation steps, burn-out), aka number of snapshots.'
     print*, 'Ninter     Interval between measures, aka number of Monte Carlo steps (MCS) between two snapshots.'
     print*, 'kint       Bending energy of the polymer (do not change).'
@@ -165,7 +166,7 @@ program mainprogram
     real, dimension(:), allocatable :: binding_site_prob
     integer :: binding_sites_count = 0 ! deafault: there is no lef_binding_site file so the whole polymer is binding site
     integer :: binding_site_pos_i = 0
-    real :: boundary_factor = 0., boundary_score = 0.  ! impermeabale boundary
+    real :: boundary_factor = 0., boundary_score = 0.  ! not defined
     integer :: boundary_direction = -9 ! not defned direction
     integer, parameter :: resolution_factor = 2000
     type(PolymerModel) :: model

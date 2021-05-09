@@ -89,7 +89,8 @@ contains
 
         bittable_t = 4 * (self%L**3)
 
-        call log%debug('allocate self%Nchain: ' // trim(str(self%Nchain)) // ' bittable_t: ' // trim(str(bittable_t)))
+        call log%debug('allocate self%Nchain: ' // trim(str(self%Nchain)) // ' bittable_t: ' // trim(str(bittable_t)) &
+                // ' binding_sites_count: ' // trim(str(self%binding_sites_count)))
 
         ! call deallocate(self) ! make sure it's free
         allocate (self%config(2, self%Nchain))
@@ -813,8 +814,6 @@ contains
         !write in output files
 
         integer :: j
-
-        ! TODO output model parameters
 
         do j = 1, self%Nchain
             ! TODO maybe possible to write thw whole chain in one round
