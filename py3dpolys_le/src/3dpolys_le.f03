@@ -1,4 +1,4 @@
-§character(len = 1) function path_separator()
+character(len = 1) function path_separator()
     character(len = 10000) :: path
     call get_environment_variable('PATH', path)
     path_separator = path(1:1)
