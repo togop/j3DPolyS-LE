@@ -26,10 +26,10 @@ test:
     - python --version
     - echo 'Start tests ...'
     - 3dpolys_le_runner run -o ./out_8860 -i ./test/test_shell_input.cfg
-    - ../test.sh ./out_8860/config.out
+    - ./test/test.sh ./out_8860/config.out
     - ls -la ./out_8860
     - ls -la ./out_8860/r2.84
-    - ../test.sh ./out_8860/r2.84/Chip.out
-    - ../test.sh ./out_8860/r2.84/xyzconfig.out
-    - ../test.sh ./out_8860/r2.84/hic_001.hdf5
-    - ../test.sh ./out_8860/r2.84/hic_002.hdf5
+    - ./test/test.sh ./out_8860/r2.84/Chip.out
+    - ./test/test.sh ./out_8860/r2.84/xyzconfig.out
+    - ./test/test.sh ./out_8860/r2.84/hic_001.hdf5
+    - ./test/test.sh ./out_8860/r2.84/hic_002.hdf5
