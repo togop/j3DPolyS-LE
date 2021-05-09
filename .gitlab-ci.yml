@@ -7,6 +7,7 @@ image:
 
 before_script:
   - echo "PATH=$PATH:/root/miniconda3/bin/" >> ~/.bashrc
+  - source ~/.bashrc
   - conda init bash
   - source ~/.bashrc
   - make env
