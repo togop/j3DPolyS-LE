@@ -9,12 +9,13 @@ before_script:
   - echo "PATH=$PATH:/root/miniconda3/bin/" >> ~/.bashrc
   - source ~/.bashrc
   - make env
+  - conda init bash
   - conda activate py3dpolys_le
   - make all
-  - conda init bash
   - echo "conda activate py3dpolys_le" >> ~/.bashrc
+  #- cat ~/.bashrc
   - source ~/.bashrc
-  #- cd
+
 test:
   script:
     - pwd

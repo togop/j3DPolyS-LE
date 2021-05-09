@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def run(output_folder, cmap, file_ext):
     logger.info(f'Plotting HiC for {output_folder} with color map: {cmap} in file format: {file_ext} ...')
 
-    hic_files = glob.glob(os.path.join(output_folder, "hic*.hdf5"))
+    hic_files = sorted(glob.glob(os.path.join(output_folder, "hic*.hdf5")))
     for hic_file in hic_files:
         with h5py.File(hic_file, 'r') as f:
             print(f"plotting HiC: {hic_file} , Keys: {f.keys()}")
