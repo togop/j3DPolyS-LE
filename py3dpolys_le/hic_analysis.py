@@ -22,14 +22,6 @@ from scipy import stats
 # Initialization
 logger = logging.getLogger(__name__)
 
-PUBLISHED = 'published' # TODO remove deprecated
-# used to set default paths
-# PUBLISHED_FOLDER = "/mnt/imaging.data/ttgitchev/published"  # todor gitchev's remote
-#PUBLISHED_FOLDER = "/mnt/imaging.data/gzala/published"  # gabriel zala's remote
-PUBLISHED_FOLDER = "../src/data/test"  # local test folder # TODO remove deprecated
-# PUBLISHED_FOLDER = "~/imaging_data_published"  # local data folder
-# PUBLISHED_FOLDER = "../../published"  # Local
-
 SIM_RESOLUTION = 2000
 EXP_RESOLUTION = 10000
 
@@ -37,8 +29,6 @@ RESOLUTION = 10000
 
 EXP_FACTORS = [1, 2, 4]  # , 8, 16]
 SIM_FACTORS = [5, 10, 20]  # , 40, 80]  #, 160, 320]
-
-HIC_COUNT_AMPLIFIER = 0  # TODO remove deprecated  # 0: use original float64, if >1 use int32: 100: the best is when equal to Niter: number of trajectories
 
 # CMAP = 'hot'
 CMAP = 'YlOrRd'
@@ -163,11 +153,6 @@ def print_hdf5_structure(hdf5_file):
 
 # print_hdf5_structure('/Users/todor/UniBern/master_project/MC-HiC-guppy/target/frag_files/frg_20190501_HIC6_7_barcode08_pass_WS235.hdf5')
 
-def __ampl_suff(count_ampl):
-    apml_suf = '' if not count_ampl or count_ampl <= 1 else f'.ca{count_ampl}'
-    return apml_suf
-
-
 def remove_duplicates(list):
     final_list = []
     for el in list:
@@ -176,9 +161,8 @@ def remove_duplicates(list):
     return final_list
 
 
-def hic_to_cooler(hic_file, chr=SIM_CHR, resolution=SIM_RESOLUTION, count_ampl=HIC_COUNT_AMPLIFIER):
-    apml_suf = __ampl_suff(count_ampl)
-    cool_file = hic_file + f'{apml_suf}.{resolution}.cool'
+def hic_to_cooler(hic_file, chr=SIM_CHR, resolution=SIM_RESOLUTION):
+    cool_file = f'{hic_file}.{resolution}.cool'
     with h5py.File(hic_file, 'r') as f:
         # List all groups
         logger.info(f"Converting hic file {hic_file} to {cool_file} with Keys: {f.keys()} ...")
@@ -191,8 +175,6 @@ def hic_to_cooler(hic_file, chr=SIM_CHR, resolution=SIM_RESOLUTION, count_ampl=H
 
         hic = np.array(data)
 
-        if count_ampl > 1:  # convert to integer
-            hic = (hic * count_ampl).astype(int)
         # np.fill_diagonal(hic, 0)  # no need: should be done already
 
         logger.info(f"data.shape: ${hic.shape}")
@@ -233,7 +215,7 @@ def hic_to_cooler(hic_file, chr=SIM_CHR, resolution=SIM_RESOLUTION, count_ampl=H
                     # 'creation-date': datetime.date.today()
                     }
 
-        count_dtypes = {'count': 'float64'} if count_ampl <= 1 else None
+        count_dtypes = {'count': 'float64'}
         if not os.path.isfile(cool_file):
             cooler.create_cooler(cool_file, bins=bins, pixels=pixels_dic, dtypes=count_dtypes, ordered=True,
                                  metadata=metadata)
@@ -589,17 +571,14 @@ def get_hic_cooler_res(hic, chrs, res):  # , root_res=None, factors=None):
     return hic_cooler, hic_chrs
 
 
-def get_hic_cool(hic_h5, out_prefix, res=EXP_RESOLUTION, count_ampl=HIC_COUNT_AMPLIFIER, dummy_sim=False):
-    apml_suf = __ampl_suff(count_ampl)
+def get_hic_cool(hic_h5, out_prefix, res=EXP_RESOLUTION):
     hic_cool = f'{out_prefix}.cool'
-    org_hic_cool = f'{hic_h5}{apml_suf}.{SIM_RESOLUTION}.cool'
+    org_hic_cool = f'{hic_h5}.{SIM_RESOLUTION}.cool'
     if not os.path.exists(hic_cool):
         if not os.path.exists(org_hic_cool):
-            org_hic_cool = hic_to_cooler(hic_h5, chr=SIM_CHR, resolution=SIM_RESOLUTION, count_ampl=count_ampl)
+            org_hic_cool = hic_to_cooler(hic_h5, chr=SIM_CHR, resolution=SIM_RESOLUTION)
         factor = res // SIM_RESOLUTION
         cmd = f'cooler coarsen -k {factor} -o {hic_cool} {org_hic_cool}'
-        if dummy_sim:
-            cmd = f"echo {cmd}"
         status, stout = subprocess.getstatusoutput(cmd)
         logger.info(f" call: {cmd}\n\t {stout}")
     return hic_cool
@@ -613,26 +592,10 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, exp_cool=N
     # plot also distance-contacts decoy plot
     if output_folder is None:  # use the folder of the first: TODO backward compatibility, could be removed later
         output_folder = os.path.dirname(hic_list[0])
-    try:
-        # try to get nice name for published data using pattern or other not simulations (not starting with 'hic_')
-        # and for simulations use the parent folder as name
-        hic_names = [re.findall(EXP_BASE_NAME_PATTERN, os.path.basename(hic))[0]
-                     if os.path.basename(pathlib.Path(hic).parent.absolute()).startswith(PUBLISHED)
-                        or not os.path.basename(hic).startswith('hic_')
-                     else os.path.splitext(os.path.basename(pathlib.Path(hic).parent.absolute()))[0]
-                     for hic in hic_list]
-    except:
-        logger.warning(f'Failed extract nice hic names using regExpr patter:{BASE_NAME_PATTERN_STR},'
-                       f' so will take only the file names without extensions.')
-        hic_names = [os.path.splitext(os.path.basename(hic))[0] for hic in hic_list]
+    hic_names = [os.path.splitext(os.path.basename(hic))[0] for hic in hic_list]
     # we will use the simulation folder (../<radius_analyse>) of the first hic,
     # assuming they are all from the same simulation
-    try:
-        exp_base_name = re.findall(EXP_BASE_NAME_PATTERN, os.path.basename(exp_cool))[0]
-    except:
-        logger.warning(f'Failed extract nice hic names using regExpr patter:{BASE_NAME_PATTERN_STR},'
-                       f' so will take only the file names without extensions.')
-        exp_base_name = os.path.splitext(os.path.basename(exp_cool))[0]
+    exp_base_name = os.path.splitext(os.path.basename(exp_cool))[0]
     # exp_base_name = exp_base_name[0] if exp_base_name else ''
     # hic_sim_folder = os.path.basename(output_folder)
     hics = ''
