@@ -38,7 +38,7 @@ def main():
                    help="TADs boundary file in CSV format (same as boundary.csv) to be used for calculating chi2-min score. "
                         "Also supported Loops file in .bed.tsv format, with the following columns: "
                         "chromosome  anchor1  anchor2")
-    p.add_argument("-e", "--exp_cool", default=f"{ha.PUBLISHED_FOLDER}/N2_5000b.cool",
+    p.add_argument("-e", "--exp_cool",
                    help="Experimental cool file with which simulation data to be compared.")
     p.add_argument("-l", "--nlef", default="200", help="Nlef value used in a simulation.")  # TODO optional read it form input.dat
     p.add_argument("-m", "--km", default="2.7e-3", help="km value used in a simulation.")  # TODO optional read it form input.dat

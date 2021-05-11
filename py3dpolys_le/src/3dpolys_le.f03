@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2020.1.1'
+    character(*), parameter :: VERSION = '2021.5.12'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2020.5.9'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2021.5.12'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -80,7 +80,7 @@ subroutine print_help()
     print*, '   -a|--analyse:<analyse folder> Perform analyse step on an already done simulation&
             & and store results in a given folder.'
     print*, '   -b|--boundary:<boundary sites file> Boundary sites file in a csv format with the following columns:&
-            & name,midpoint,impermeability,score,b-position,strand. Default: no bondaries'
+            & name,midpoint,impermeability,score. Default: no bondaries'
     print*, '   -lbs|--lef_binding_sites:<loop extrusion binding sites file> LEFs binding sites file in a csv format&
             & with the following columns: name,position,length,probability. Default: if not given, the whole polymer'
     print*, '   -r|--radius_contact:<radius> contact radius in lattice unit (1=70nm) for extracting Hi-C matrixes, Default: 1.42'
