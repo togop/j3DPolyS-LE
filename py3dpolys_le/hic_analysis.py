@@ -84,12 +84,6 @@ chr_size = chr_x_size
 
 DEFAULT_CHIP_CORRELATION = 'spearmanr'
 
-BASE_NAME_PATTERN_STR = '_([\w]+_[a-zA-Z]+\d{4})_'
-EXP_BASE_NAME_PATTERN = re.compile(BASE_NAME_PATTERN_STR)
-
-NO_FILE_EXT_PATTERN_STR = '_([\w]+_[a-zA-Z]+\d{4})_'
-NO_FILE_EXT_PATTERN = re.compile(NO_FILE_EXT_PATTERN_STR)
-
 
 def get_last_hic(output_folder: str):
     hic_h5s = fnmatch.filter(os.listdir(output_folder), 'hic_*.hdf5')
