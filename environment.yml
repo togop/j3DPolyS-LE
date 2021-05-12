@@ -1,17 +1,17 @@
-name: 3dpolys-le
+name: py3dpolys_le
 channels:
   - bioconda
   - conda-forge
   - defaults
 dependencies:
-  - python==3.8
+  - python>=3.8
   - pip
   - numpy
   - pandas
   - matplotlib
   - scipy
-  - cython
   - filelock
   - h5py
-  - pyranges
+  - dask
   - cooler
+  - pyranges
