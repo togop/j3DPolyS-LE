@@ -1,0 +1,14 @@
+numpy
+cython
+pandas
+matplotlib
+scipy
+filelock
+h5py
+dask
+cooler
+pyranges
+# -r requirements.txt
+pytest
+pytest-flake8
+pytest-cov

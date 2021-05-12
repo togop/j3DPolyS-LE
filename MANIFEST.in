@@ -1,0 +1,3 @@
+include py3dpolys_le/bin/*
+include py3dpolys_le/data/*
+exclude py3dpolys_le/src/*.f03
