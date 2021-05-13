@@ -27,6 +27,9 @@ test:
     - echo 'Start tests ...'
     - 3dpolys_le_runner run -o ./out_8860 -i ./test/test_shell_input.cfg --cmd_run_file ./run_test_shell_input.sh
     - ./test/test_cmp.sh ./run_test_shell_input.sh ./test/expected/run_test_shell_input.sh
+    - ls -la
+    - cat ./run_test_shell_input.sh
+    - cat ./test/expected/run_test_shell_input.sh
     - ./run_test_shell_input.sh
     - ./test/test.sh ./out_8860/config.out
     - ./test/test.sh ./out_8860/contact-decay_wt_N2_Moushumi2020_HIC1_5000_6_vs_X__hic_002.h5_chi2_lin.10000.svg
