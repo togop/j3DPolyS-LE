@@ -344,7 +344,6 @@ class DccExtrusionRunner:
                       f"-b:{boundary} -lbs:{dcc_args.lef_binding_sites} " \
                       f"-bd:{dcc_args.boundary_direction} -bf:{dcc_args.boundary_factor} {bs_opt} " \
                       f"{z_loop} {u_opt} {init_mode} {a_opt} {r_opt} {input_cfg}"
-                # TODO find better way to run 'analysis' profile
                 if dcc_args.analyse:
                     jobid = self._job_runner.run_cmd(cmd, prev_jobid, profile='analysis')
                 else:
@@ -365,17 +364,17 @@ class DccExtrusionRunner:
         analyse_folder = dcc_args.analyse
 
         hic_mcool = fnmatch.filter(os.listdir(analyse_folder), 'hic_*.mcool') if os.path.exists(analyse_folder) else []
-        if analyse_folder and stats_dep_jobid or (
-                os.path.exists(os.path.join(analyse_folder, ha.CHIP_OUT)) & (
-                (len(hic_mcool) == 0) or dcc_args.all_stats or stats_only)):
+        if analyse_folder or (
+                os.path.exists(os.path.join(analyse_folder, ha.CHIP_OUT)) &
+                ((len(hic_mcool) == 0) or dcc_args.all_stats or stats_only)):
             s_cmp_chrs = f'--cmp_chrs {" ".join(dcc_args.cmp_chrs)}' if dcc_args.cmp_chrs is not None else ''
 
         # for LOCAL use something like : #
             cmd = f"3dpolys_le_stats " \
                   f"-o {dcc_args.output_folder} -a {analyse_folder} --km {km} --nlef {nlef} -e {exp_cool} " \
-                  f"-b {boundary} -bd {dcc_args.boundary_direction} -bf {dcc_args.boundary_factor} {bs_opt}" \
+                  f"-b {boundary} -bd {dcc_args.boundary_direction} -bf {dcc_args.boundary_factor} {bs_opt} " \
                   f"-t {dcc_args.tads_boundary} {r_opt_py} " \
-                  f"-i {input_cfg} -f {stats_file} {s_cmp_chrs}"
+                  f"-i {input_cfg} -f {stats_file} {s_cmp_chrs} "
                 #  f"-eis {dcc_args.exp_ins_score} " \
             jobid = self._job_runner.run_cmd(cmd, stats_dep_jobid, profile='stats')  # need to wait for before continue with multi-decay
 

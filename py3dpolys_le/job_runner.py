@@ -93,13 +93,15 @@ class CfgJobRunner(JobRunner):
 
     def _cmd_run_shell(self, profile) -> bool:
         cmd_run = self._get_property(profile, 'cmd_run')
-        return cmd_run == 'shell'
+        return cmd_run == 'shell' and not self.cmd_run_file
 
     def _cmd_run_stdout(self, profile) -> bool:
         cmd_run = self._get_property(profile, 'cmd_run')
-        return cmd_run == 'stdout'
+        return cmd_run == 'stdout'  and not self.cmd_run_file
 
     def _cmd_run_file(self, profile) -> str:
+        if self.cmd_run_file:
+            return self.cmd_run_file
         cmd_run = self._get_property(profile, 'cmd_run')
         if cmd_run.startswith('file:'):
             cmd_run_file = cmd_run.split(':')[1]
