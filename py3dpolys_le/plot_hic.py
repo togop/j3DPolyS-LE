@@ -14,8 +14,8 @@ import glob
 logger = logging.getLogger(__name__)
 
 
-def run(output_folder, cmap, file_ext):
-    logger.info(f'Plotting HiC for {output_folder} with color map: {cmap} in file format: {file_ext} ...')
+def run(output_folder, cmap, file_format):
+    logger.info(f'Plotting HiC for {output_folder} with color map: {cmap} in file format: {file_format} ...')
 
     hic_files = sorted(glob.glob(os.path.join(output_folder, "hic*.hdf5")))
     for hic_file in hic_files:
@@ -50,7 +50,7 @@ def run(output_folder, cmap, file_ext):
             # cbar_h.ax.tick_params(labelsize=11)
             # plt.show()
 
-            plot_file = os.path.join(output_folder, os.path.basename(hic_file).replace('.hdf5', f'_{cmap}.{file_ext}'))
+            plot_file = os.path.join(output_folder, os.path.basename(hic_file).replace('.hdf5', f'_{cmap}.{file_format}'))
 
             fig.savefig(plot_file, dpi=200)
             plt.close()
@@ -63,10 +63,10 @@ def main():
                    help="'Analysis' step output folder containing raw hic_*.hdf5 files.")
     p.add_argument("-c", "--cmap", default="hot_r",
                    help="Color map: cool, hot_r, gist_heat_r, afmhot_r, YlOrRd, Greys, gist_yarg")
-    p.add_argument("-f", "--file_extension", default="png", help="Image Ffile format extension: png, tif")
+    p.add_argument("-f", "--file_format", default="png", help="Image file format extension: png, tif, svg")
     args = p.parse_args(sys.argv[1:])
 
-    run(args.output_folder, args.cmap, args.file_extension)
+    run(args.output_folder, args.cmap, args.file_format)
 
 
 if __name__ == '__main__':

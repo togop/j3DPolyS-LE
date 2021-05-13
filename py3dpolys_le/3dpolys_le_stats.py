@@ -117,8 +117,11 @@ def main():
                  chi2_lin, alpha_lin, ha.CHR_SYNONYMS[-1]])
 
     # generate hic_*_hot_r.png plot files if not already done
-    if not os.path.exists(re.sub('.hdf5', '_hot_r.png', sim_hic_file)):
-        plot_hic.run(args.analyse, cmap="hot_r", file_ext="png")
+    hic_plot_file = re.sub('.hdf5', '_hot_r.png', sim_hic_file)
+    if not os.path.exists(hic_plot_file):
+        plot_hic.run(args.analyse, cmap="hot_r", file_format="png")
+    else:
+        logger.info(f'Hic plot file already created {hic_plot_file} so skip it')
 
 
 if __name__ == '__main__':
