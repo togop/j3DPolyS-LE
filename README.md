@@ -31,9 +31,24 @@ run the following commands:
 ```
 cd 3DPolyS-LE 
 
+# optional for Slurm environment
+module load Anaconda3
+# or manual installation of Miniconda
+
 # optional or as troubleshooting for problems with python environments
 make env
 conda activate py3dpolys_le
+# or
+source activate py3dpolys_le
+# optional or as troubleshooting for problems with curently system installed cmake 
+conda install cmake
+# or as troubleshooting in case of problems with the conda version  of cmake
+module load CMake
+
+# optional for Slurm environment
+# If you use this during installation you need to load them always you want to use the package after new login!  
+module load HDF5
+module load OpenMPI
 
 make all
 ```
