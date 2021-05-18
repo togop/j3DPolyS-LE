@@ -181,7 +181,7 @@ class DccExtrusionArgs:
         # self.exp_ins_score = exp_ins_score
         self.nlef = nlef if nlef else int(self.get_property('Nlef'))
         self.km = km if km else float(self.get_property('km'))
-        self.radius_contact = radius_contact if km else float(self.get_property('km'))
+        self.radius_contact = radius_contact if km else float(self.get_property('radius_contact'))
         self.contact_probability = contact_probability  # TODO probably remove
         self.boundary_direction = boundary_direction if boundary_direction else self.get_property('boundary_direction')
         self.boundary_factor = boundary_factor if boundary_factor else self.get_property('boundary_factor')
@@ -291,7 +291,6 @@ class DccExtrusionRunner:
         r_opt = f'-r:{r} {cp}' if r > 0 else ''
         r_opt_py = f'-r {r} {cp}' if r > 0 else ''
 
-        # TODO create simulation argument object: input.dat + other.params => maybe json object
         boundary = dcc_args.boundary
         input_cfg = dcc_args.input_cfg
         stats_file = dcc_args.stats_file
@@ -442,12 +441,6 @@ class DccExtrusionRunner:
 
                 # stats_only has higher priority and will be checked first
                 jobid = self.run(dcc_args_analysis, stats_only=new_stats)
-                # insulation_score_bw = ha.find_insulation_score(hic_h5)
-                # hic_decay_plot = ha.plot_distance_contact_decay(hic_h5, exp_cool)
-                # exp_cool_10k = re.sub(r'_5000.cool', '_10k.cool',
-                #                      exp_cool)  # TODO maybe find a better way to take *_10k.cool
-                # t = threading.Thread(target=ha.plot_distance_contact_decay, args=(hic_h5, exp_cool_10k))
-                # t.start()
 
                 # run multi-decay-plot once for the sim_output_folder
                 if new_stats and (dcc_args_analysis.output_folder not in done_sim_out_folders):
