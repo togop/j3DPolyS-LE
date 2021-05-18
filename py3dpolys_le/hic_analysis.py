@@ -442,7 +442,8 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
     hic_mat2 = hic2cooler.matrix(balance=False).fetch(exp_chr)  # TODO use balanced for experimental data
     # hic_mat2 = hic_mat2 / np.max(hic_mat2)
 
-    comp_filename = f'comp_{h1}_{h2}_res{res}'
+    tads_pref = os.path.splitext(os.path.basename(tads_boundary))[0] if tads_boundary is not None else '';
+    comp_filename = f'comp_{h1}_{h2}_res{res}_t{tads_pref}'
 
     chr_end = min(hic1_chr_size, hic2cooler.chromsizes[exp_chr])
     tads = None
