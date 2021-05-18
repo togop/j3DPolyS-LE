@@ -62,6 +62,7 @@ p.add_argument("run_command", help="Run batch command.",
 p.add_argument("-bd", "--boundary_direction", default=0, type=int,
                help="Impermeability direction applied to all boundaries: -1:opposite direction, 0:both, 1:same direction."
                     " Default: 0")
+# TODO add -bf and look for others missing; remove unneeded and confusing
 p.add_argument("-b", "--boundary", default="",
                help="Boundary sites file in CSV format used in a simulation.")
 p.add_argument("-lbs", "---lef_binding_sites", default="",
@@ -76,7 +77,7 @@ p.add_argument("--cmp_chrs", nargs='*', default=None,
 p.add_argument("-z", "--z_loop", action='store_true', help="Allow z_loop for LEFs move in a simulation.")
 p.add_argument("-u", "--unidirectional", action='store_true',
                help="Unidirectional mode for LEFs move otherwise bidirectional.")
-p.add_argument("-im", "--init_mode", default='z',
+p.add_argument("-im", "--init_mode", default='',
                help="Initial folding mode: h for helices like, z for zigzag like polymer state. "
                     "Default: z.")
 p.add_argument("-t", "--tads_boundary", default="",
@@ -106,6 +107,7 @@ p.add_argument("--stats", action='store_true',
 p.add_argument("--all_stats", action='store_true',
                help="In combination with a new_stats command to run statistical analysis (3dpolys_le_stats.py) for all "
                     "entries in a given sim_stats.csv file (--stats_file).")
+# TODO unify/clarify what to use better: only -r, or -lr
 p.add_argument("-r", "--radius_contact", default=0., type=float,
                help="Contact radius in lattice units (1=70nm) to run a single 'analyse' step "
                     "(py3dpolys_le program module) for extracting Hi-C matrixes.")
@@ -163,9 +165,9 @@ class DccExtrusionArgs:
                  stats_file="./py3dpolys_le_stats.csv",
                  exp_cool="",
                  exp_chip="",
-                 nlef=1500, km=2.7e-3, radius_contact=0, contact_probability=False,
-                 boundary_direction=0, boundary_factor=1., boundary_score=False, z_loop=False, unidirectional=False,
-                 init_mode='m',
+                 nlef=0, km=0, radius_contact=0, contact_probability=False,
+                 boundary_direction=None, boundary_factor=None, boundary_score=None, z_loop=None, unidirectional=None,
+                 init_mode='',
                  output_folder='', analyse='', cmp_chrs=None):  # , simultaneously=1
         # input arguments values overwriting configuration values (input.cfg)
         self.input_cfg = input_cfg
@@ -181,7 +183,7 @@ class DccExtrusionArgs:
         # self.exp_ins_score = exp_ins_score
         self.nlef = nlef if nlef else int(self.get_property('Nlef'))
         self.km = km if km else float(self.get_property('km'))
-        self.radius_contact = radius_contact if km else float(self.get_property('radius_contact'))
+        self.radius_contact = radius_contact if radius_contact else float(self.get_property('radius_contact'))
         self.contact_probability = contact_probability  # TODO probably remove
         self.boundary_direction = boundary_direction if boundary_direction else self.get_property('boundary_direction')
         self.boundary_factor = boundary_factor if boundary_factor else self.get_property('boundary_factor')

@@ -94,7 +94,7 @@ subroutine print_help()
     print*, '   -bd|--boundary_direction:<boundary_direction>: impermeability direction applied to all boundaries:&
             & -1:opposite direction, 0:both, 1:same direction. Default: 0'
     print*, '   -bs|--boundary_score : Apply each boundary matching score (column "score") to its boundary’s impermeability.'
-    print*, '   -im|--init_mode:<init_mosw>: Initial folding mode: h for helices-like, z for zigzag-like polymer state.'
+    print*, '   -im|--init_mode:<init_mode>: Initial folding mode: h for helices-like, z for zigzag-like polymer state.'
     print*, '   -z|--z_loop : Allow z_loop for LEFs move, where LEFs can traverse one another. Default: false'
     print*, '   -u|--unidirectional : Unidirectional mode for LEFs move otherwise bidirectional. Default: false=bidirectional'
     print*, '<3dpolys_le.cfg file>: path to the inpit.dat file. Default: ./3dpolys_le.cfg'

@@ -50,3 +50,10 @@ test:
     - 3dpolys_le_runner run -i ./test/test_no_tads_shell_input.cfg --cmd_run_file ./run_test_no_tads_shell_input.sh
     - ls -la
     - ./test/test_cmp.sh ./run_test_no_tads_shell_input.sh ./test/expected/run_test_no_tads_shell_input.sh
+    # test 3
+    - 3dpolys_le_runner run -o out/test3 --km 0.0017 --nlef 100 -bd 1 -z -u -im h -lr 3.55 7.1 -i ./test/test_tads_shell_input.cfg --cmd_run_file ./run_test_tads_shell_input.sh
+    - ./test/test_cmp.sh ./run_test_tads_shell_input.sh ./test/expected/run_test_tads_shell_input.sh
+    - ls -la .
+    - ls -la out/test3
+    - ls -la out/test3/r3.55
+    - ls -la out/test3/r7.10
