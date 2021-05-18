@@ -143,6 +143,7 @@ program mainprogram
 
     character(100) :: input_options
     character(1000) :: input_dat_file
+    character(1000) :: save_input_cfg_file
     character(1000) :: input_folder
     character(1000) :: output_folder = ''
     character(1000) :: boundary_file = ''
@@ -504,7 +505,6 @@ program mainprogram
             col3 = ''
             col4 = ''
             read(10, *) col1, col2, col3, col4
-            ! TODO add (trim(col1) == "name").and.
             if ((trim(col1) == 'name').and.(trim(col2)=='midpoint').and.(trim(col3)=='impermeability')) then
                 do
                     read(10, *, iostat = rc) boundary_site
@@ -747,7 +747,10 @@ program mainprogram
                     binding_sites_count = binding_sites_count)
 
             if (i == 1) then
-                open(20, file = trim(output_folder) // '3dpoys_le.cfg', action = 'write', status = 'new', iostat = rc)
+                save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')
+                call log%info('Save parameters in file: ' // save_input_cfg_file)
+
+                open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
                 call model%output_parameters(20, init_mode, boundary_file, lef_binding_sites, &
                         boundary_factor, boundary_score, boundary_direction, &
                         Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
