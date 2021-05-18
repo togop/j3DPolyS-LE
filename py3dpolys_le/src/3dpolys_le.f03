@@ -231,7 +231,9 @@ program mainprogram
     global_log_level = LOG_INFO  ! default
     if (command_argument_count() > 0) then
         CALL get_command_argument(ai, input_options)
-        do while (index(input_options, '-') > 0)
+        i = index(input_options, '-')
+        do while (i == 1)
+            ! call log%debug('argument i: ' // trim(str(i)))
             if (index(input_options, '--log:') > 0) then
                 i = index(input_options, ':')
                 global_log_level = str2loglevel(trim(input_options(i + 1:)))
@@ -320,7 +322,7 @@ program mainprogram
             elseif ((index(input_options, '--boundary_score') > 0).or.(index(input_options, '-bs') > 0)) then
                 use_boundary_score = .true.
                 if (rank == 0) then
-                    call log%info('At the end perform PCA analysis on HiC-maps')
+                    call log%info('Apply each boundary matching score (column "score") to its boundary’s impermeability')
                 end if
             elseif ((index(input_options, '--z_loop') > 0).or.(index(input_options, '-z') > 0)) then
                 z_loop = .true.
@@ -354,6 +356,7 @@ program mainprogram
             else
                 exit
             end if
+            i = index(input_options, '-')   ! next argument
         end do
         CALL get_command_argument(ai, input_dat_file)
     else
