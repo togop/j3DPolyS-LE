@@ -217,12 +217,11 @@ class DccExtrusionArgs:
         :rtype: str
         """
         bs_opt = '-bs' if bool(self.boundary_score) else ''
-        r_dir = self.default_analysis_subfolder()
         z_opt = '_z-loop' if self.z_loop else ''
         u_opt = '_unidir' if self.unidirectional else ''
         im_opt = f'_im-{self.init_mode}' if self.init_mode else ''
         return os.path.join('', f'out-Nlef{self.nlef}-km{self.km:7.5f}-bd{self.boundary_direction}'
-                                 f'-bf{self.boundary_factor}{bs_opt}{im_opt}{z_opt}{u_opt}', r_dir)
+                                 f'-bf{self.boundary_factor}{bs_opt}{im_opt}{z_opt}{u_opt}')
 
 
 def is_analysis_output_folder(folder: str):
@@ -368,11 +367,12 @@ class DccExtrusionRunner:
                 ((len(hic_mcool) == 0) or dcc_args.all_stats or stats_only)):
             s_cmp_chrs = f'--cmp_chrs {" ".join(dcc_args.cmp_chrs)}' if dcc_args.cmp_chrs is not None else ''
 
+            t_opt = f"-t {dcc_args.tads_boundary}" if dcc_args.tads_boundary else ""
         # for LOCAL use something like : #
             cmd = f"3dpolys_le_stats " \
                   f"-o {dcc_args.output_folder} -a {analyse_folder} --km {km} --nlef {nlef} -e {exp_cool} " \
                   f"-b {boundary} -bd {dcc_args.boundary_direction} -bf {dcc_args.boundary_factor} {bs_opt} " \
-                  f"-t {dcc_args.tads_boundary} {r_opt_py} " \
+                  f"{t_opt} {r_opt_py} " \
                   f"-i {input_cfg} -f {stats_file} {s_cmp_chrs} "
                 #  f"-eis {dcc_args.exp_ins_score} " \
             jobid = self._job_runner.run_cmd(cmd, stats_dep_jobid, profile='stats')  # need to wait for before continue with multi-decay

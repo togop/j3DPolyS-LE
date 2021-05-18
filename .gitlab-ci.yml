@@ -46,3 +46,7 @@ test:
     - ./test/test.sh ./out-8860/r2.84/hic_002_hot_r.png
     - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5.10000_decay_probs_lin.txt
     - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5.10000_decay_probs_log.txt
+    # test 2
+    - 3dpolys_le_runner run -i ./test/test_no_tads_shell_input.cfg --cmd_run_file ./run_test_no_tads_shell_input.sh
+    - ls -la
+    - ./test/test_cmp.sh ./run_test_no_tads_shell_input.sh ./test/expected/run_test_no_tads_shell_input.sh
