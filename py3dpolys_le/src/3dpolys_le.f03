@@ -737,6 +737,17 @@ program mainprogram
         call log%debug('L:' // trim(str(L)) // ', Nchain:' // trim(str(Nchain)) // ' Nchain:' // trim(str(Niter)) &
                 // ' Nmeas:' // trim(str(Nmeas)))
 
+        if (rank == 0) then
+            save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')
+            call log%info('Save parameters in file: ' // save_input_cfg_file)
+
+            open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
+            call model%output_parameters(20, init_mode, boundary_file, lef_binding_sites, &
+                    boundary_factor, boundary_score, boundary_direction, &
+                    Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
+            close(20)
+        end if
+
         do i = 1, rank_Niter
             trajectory_i = rank * rank_Niter + i
             !call crono%Tic()
@@ -745,17 +756,6 @@ program mainprogram
             model = PolymerModel(L = L, Nchain = Nchain, iku = iku, ikm = ikm, ikb = ikb, Nleffree = Nlef, &
                     kb = kb, ku = ku, km = km, Ea = Ea, z_loop = z_loop, unidirectional = unidirectional, &
                     binding_sites_count = binding_sites_count)
-
-            if (i == 1) then
-                save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')
-                call log%info('Save parameters in file: ' // save_input_cfg_file)
-
-                open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
-                call model%output_parameters(20, init_mode, boundary_file, lef_binding_sites, &
-                        boundary_factor, boundary_score, boundary_direction, &
-                        Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
-                close(20)
-            end if
 
             call model%init(boundary, binding_site_pos, binding_site_prob, init_mode)  ! TODO add binding_site_pos
 
