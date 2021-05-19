@@ -65,7 +65,7 @@ def main():
     logger.info(f'start with parameters: {args}')
 
     if args.cmp_chrs is not None:
-        logger.warning(f'Overwriting the default hic_analysis.CHR_SYNONYMS: { ",".join(args.cmp_chrs)} '
+        logger.info(f'Overwriting the default hic_analysis.CHR_SYNONYMS: { ",".join(args.cmp_chrs)} '
                        f'with which HiCs will be compared!')
         ha.CHR_SYNONYMS = args.cmp_chrs
 
