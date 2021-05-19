@@ -322,6 +322,7 @@ program mainprogram
                 end if
             elseif ((index(input_options, '--boundary_score') > 0).or.(index(input_options, '-bs') > 0)) then
                 use_boundary_score = .true.
+                boundary_score = 1  ! just to indicate it was set by CLI
                 if (rank == 0) then
                     call log%info('Apply each boundary matching score (column "score") to its boundary’s impermeability')
                 end if
@@ -427,7 +428,8 @@ program mainprogram
         call read_config('boundary_factor', boundary_factor)
     end if
     if (boundary_score == 0.) then
-        call read_config('boundary_score', boundary_score)
+        ! a bit confusing: using value of var 'boundary_score' used later for the real boundary_score to indicate
+        call read_config('boundary_score', use_boundary_score)
     end if
     if (boundary_direction < -1) then
         call read_config('boundary_direction', boundary_direction)
@@ -463,7 +465,11 @@ program mainprogram
         call log%info('boundary=' // trim(boundary_file))
         call log%info('lef_binding_sites=' // trim(lef_binding_sites))
         call log%info('boundary_factor=' // trim(strf(boundary_factor)))
-        call log%info('boundary_score=' // trim(strf(boundary_score)))
+        if (use_boundary_score) then
+            call log%info('boundary_score=true')
+        else
+            call log%info('boundary_score=false')
+        end if
         call log%info('boundary_direction=' // trim(str(boundary_direction)))
         if (z_loop) then
             call log%info('z_loop=true')
@@ -743,7 +749,7 @@ program mainprogram
 
             open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
             call model%output_parameters(20, init_mode, boundary_file, lef_binding_sites, &
-                    boundary_factor, boundary_score, boundary_direction, &
+                    boundary_factor, use_boundary_score, boundary_direction, &
                     Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
             close(20)
         end if

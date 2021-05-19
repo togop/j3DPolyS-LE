@@ -832,7 +832,7 @@ contains
     end subroutine
 
     subroutine output_parameters(self, fout, init_mode, boundary_file, lef_binding_sites, &
-            boundary_factor, boundary_score, boundary_direction, &
+            boundary_factor, use_boundary_score, boundary_direction, &
             Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
         implicit none
         class (PolymerModel), intent(inout) :: self
@@ -841,7 +841,7 @@ contains
         character(*), intent(in) :: boundary_file
         character(*), intent(in) :: lef_binding_sites
         real, intent(in) :: boundary_factor
-        real, intent(in) :: boundary_score
+        logical, intent(in) :: use_boundary_score
         integer, intent(in) :: boundary_direction
         integer, intent(in) :: Niter
         integer, intent(in) :: Ninter
@@ -875,7 +875,12 @@ contains
         write(fout, '(a)') 'boundary=' // trim(boundary_file)
         write(fout, '(a)') 'lef_binding_sites=' // trim(lef_binding_sites)
         write(fout, '(a)') 'boundary_factor=' // trim(strf(boundary_factor))
-        write(fout, '(a)') 'boundary_score=' // trim(strf(boundary_score))
+        if (use_boundary_score) then
+            ! TODO maybe rename boundary_score to use_boundary_score
+            write(fout, '(a)') 'boundary_score=true'
+        else
+            write(fout, '(a)') 'boundary_score=false'
+        end if
         write(fout, '(a)') 'boundary_direction=' // trim(str(boundary_direction))
         if (self%z_loop) then
             write(fout, '(a)') 'z_loop=true'
