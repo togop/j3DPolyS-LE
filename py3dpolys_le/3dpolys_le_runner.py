@@ -223,7 +223,7 @@ class DccExtrusionArgs:
         u_opt = '_unidir' if self.unidirectional else ''
         im_opt = f'_im-{self.init_mode}' if self.init_mode else ''
         return os.path.join('', f'out-Nlef{self.nlef}-km{self.km:7.5f}-bd{self.boundary_direction}'
-                                 f'-bf{self.boundary_factor}{bs_opt}{im_opt}{z_opt}{u_opt}')
+                                 f'-bf{self.boundary_factor:4.3f}{bs_opt}{im_opt}{z_opt}{u_opt}')
 
 
 def is_analysis_output_folder(folder: str):
