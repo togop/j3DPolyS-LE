@@ -11,6 +11,7 @@ from filelock import SoftFileLock
 
 from . import hic_analysis as ha
 from . import plot_hic
+from .job_runner import CfgJobRunner
 # from _version import __name__
 
 dummy_sim = False  # set to False; True = dummy simulation mode: echo commands only
@@ -59,8 +60,9 @@ def main():
     p.add_argument("--cmp_chrs", nargs='*', default=None,
                    help="Synonyms of the Hi-C chromosome with which simulation data to be compared. "
                         "Default: hic_analysis.py::CHR_SYNONYMS!")
-
     args = p.parse_args(sys.argv[1:])
+
+    cfg_job_runner = CfgJobRunner(input_cfg=args.input_cfg)
 
     logger.info(f'start with parameters: {args}')
 
@@ -117,9 +119,11 @@ def main():
                  chi2_lin, alpha_lin, ha.CHR_SYNONYMS[-1]])
 
     # generate hic_*_hot_r.png plot files if not already done
-    hic_plot_file = re.sub('.hdf5', '_hot_r.png', sim_hic_file)
+    plot_cmap = cfg_job_runner.get_property(profile='stats', name='plot_cmap')
+    plot_format = cfg_job_runner.get_property(profile='stats', name='plot_format')
+    hic_plot_file = re.sub('.hdf5', f'_{plot_cmap}.{plot_format}', sim_hic_file)
     if not os.path.exists(hic_plot_file):
-        plot_hic.run(args.analyse, cmap="hot_r", file_format="png")
+        plot_hic.run(args.analyse, resolution=ha.SIM_RESOLUTION, cmap=plot_cmap, plot_format=plot_format)
     else:
         logger.info(f'Hic plot file already created {hic_plot_file} so skip it')
 

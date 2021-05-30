@@ -18,7 +18,7 @@ from . import hic_analysis as ha
 from .job_runner import JobRunner, CfgJobRunner
 
 EXP_COOL_AS_STATS = '.'
-MAIN_INPUT_CFG_SECTION = '3dpolys_le'
+CFG_SECTION_3DPOLYS_LE = '3dpolys_le'
 
 # Initialization
 logger = logging.getLogger(__name__)
@@ -198,7 +198,7 @@ class DccExtrusionArgs:
 
     def get_property(self, name):
         try:
-            value = self._config.get(MAIN_INPUT_CFG_SECTION, name) # .strip()
+            value = self._config.get(CFG_SECTION_3DPOLYS_LE, name)  # .strip()
         except (configparser.NoOptionError, configparser.NoSectionError) as e:
             value = ''
         return value
@@ -380,7 +380,6 @@ class DccExtrusionRunner:
             jobid = self._job_runner.run_cmd(cmd, stats_dep_jobid, profile='stats')  # need to wait for before continue with multi-decay
 
         return jobid
-
 
     def analysis_stats(self, dcc_args: DccExtrusionArgs, new_stats=False, exp_cool=None):
         """ deprecated for new_stats=False, replaced by contact_radius_analysis()
@@ -578,8 +577,8 @@ class DccExtrusionRunner:
                 logger.error(f'Output simulation data file {chip_out_file} is missing so skip it!')
                 continue
 
-            ha.get_chip_correlation(chip_out_file, exp_chip, boundary, bin_size, correlation,
-                                    plot=True, replace=replace)
+            ha.plot_chip_seq(chip_out_file, exp_chip, boundary, bin_size, correlation,
+                             plot=True, replace=replace)
 
 
 def main():

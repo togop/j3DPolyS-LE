@@ -61,3 +61,7 @@ test:
     - ls -la out/test3
     - ls -la out/test3/r3.55
     - ls -la out/test3/r7.10
+    - ./test/test.sh out/test3/r3.55/hic_001_cool.svg
+    - ./test/test.sh out/test3/r3.55/hic_002_cool.svg
+    - ./test/test.sh out/test3/r7.10/hic_001_cool.svg
+    - ./test/test.sh out/test3/r7.10/hic_002_cool.svg

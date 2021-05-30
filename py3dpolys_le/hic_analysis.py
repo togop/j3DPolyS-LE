@@ -856,8 +856,8 @@ def read_boundary_pos(boundary_file, Nchain):
     return boundary_pos
 
 
-def get_chip_correlation(chip_out_file, exp_chip, boundary, bin_size=1, correlation=DEFAULT_CHIP_CORRELATION, plot=True,
-                         replace=True):
+def plot_chip_seq(chip_out_file, exp_chip, boundary, bin_size=1, correlation=DEFAULT_CHIP_CORRELATION, plot=True,
+                  replace=True):
     """
     Returns correlation coefficient and optionally produce a comparison plot
     :param chip_out_file: the original simulation chip.out file
@@ -876,24 +876,28 @@ def get_chip_correlation(chip_out_file, exp_chip, boundary, bin_size=1, correlat
     sim_chip_seq = chip_seq(chip_out, bin_size=bin_size)  # bin_size = 5 : 10kb = 5*2kb
     sim_chip_seq_normed = sim_chip_seq / sum(sim_chip_seq)
     # read BedGraph file format
-    exp_chip_pd = pd.read_csv(exp_chip, delim_whitespace=True, names=['chrom', 'start', 'end', 'value'],
-                              encoding='utf-8')
-    exp_chip_x_pd = exp_chip_pd[exp_chip_pd.chrom.isin(CHR_X_SYNONYMS)]
-    exp_chip_out = exp_chip_x_pd[['value']].values.transpose()
-    exp_chip_x = chip_seq(exp_chip_out, bin_size=bin_size)
-    # sum_x = sum(exp_chip_x['value'])
-    exp_chip_x_normed = exp_chip_x / sum(exp_chip_x)
+    if exp_chip:
+        exp_chip_pd = pd.read_csv(exp_chip, delim_whitespace=True, names=['chrom', 'start', 'end', 'value'],
+                                  encoding='utf-8')
+        exp_chip_x_pd = exp_chip_pd[exp_chip_pd.chrom.isin(CHR_X_SYNONYMS)]
+        exp_chip_out = exp_chip_x_pd[['value']].values.transpose()
+        exp_chip_x = chip_seq(exp_chip_out, bin_size=bin_size)
+        # sum_x = sum(exp_chip_x['value'])
+        exp_chip_x_normed = exp_chip_x / sum(exp_chip_x)
     boundary_pos = read_boundary_pos(boundary, Nchain=chip_out.shape[1])
     boundary_chip = chip_seq(boundary_pos, bin_size=bin_size)
     boundary_chip_normed = boundary_chip * len(np.where(boundary_chip > 0.)[0]) \
-        / (max(exp_chip_x) * sum(boundary_chip) * 100)
-    chip_l2 = np.linalg.norm(exp_chip_x_normed - sim_chip_seq_normed)
-    if correlation == 'spearmanr':
-        corr = stats.spearmanr(exp_chip_x_normed, sim_chip_seq_normed)
-        chip_correlation = (corr.correlation, corr.pvalue, chip_l2)
-    elif correlation == 'pearsonr':
-        corr = stats.pearsonr(exp_chip_x_normed, sim_chip_seq_normed)
-        chip_correlation = (corr[0], corr[1], chip_l2)
+        / (max(exp_chip_x) * sum(boundary_chip) * 100) if exp_chip else boundary_chip
+    if exp_chip:
+        chip_l2 = np.linalg.norm(exp_chip_x_normed - sim_chip_seq_normed)
+        if correlation == 'spearmanr':
+            corr = stats.spearmanr(exp_chip_x_normed, sim_chip_seq_normed)
+            chip_correlation = (corr.correlation, corr.pvalue, chip_l2)
+        elif correlation == 'pearsonr':
+            corr = stats.pearsonr(exp_chip_x_normed, sim_chip_seq_normed)
+            chip_correlation = (corr[0], corr[1], chip_l2)
+    else:
+        chip_correlation = 0
 
     if plot:
         size_kb = SIM_RESOLUTION * bin_size // 1000
@@ -905,12 +909,15 @@ def get_chip_correlation(chip_out_file, exp_chip, boundary, bin_size=1, correlat
             else:
                 logger.warning(f'Replacing existing Chip-seq plot: {plot_file_name}')
         fig = plt.figure()
-        exp_chip_line = plt.plot(exp_chip_x_normed, color='b', linewidth=1, alpha=DECAY_PLOT_ALPHA)
+        if exp_chip:
+            exp_chip_line = plt.plot(exp_chip_x_normed, color='b', linewidth=1, alpha=DECAY_PLOT_ALPHA)
+            chip_correlation_title = f'{correlation}: {chip_correlation[0]:8.5f}, p-val:{chip_correlation[1]:8.5f}, L2:{chip_correlation[2]:8.5f}'
+        else:
+            chip_correlation_title = ""
         sim_chip_line = plt.plot(sim_chip_seq_normed, color='r', linewidth=1, alpha=DECAY_PLOT_ALPHA)
         boundary_chip_line = plt.plot(boundary_chip_normed, color='black', linewidth=1, alpha=DECAY_PLOT_ALPHA)
         sim_folder = output_folder   # .split('/')[-2]
-        plt.title(f'ChIP-seq for simulation \n {sim_folder} snapshots: {measurements} \n'
-                  f'{correlation}: {chip_correlation[0]:8.5f}, p-val:{chip_correlation[1]:8.5f}, L2:{chip_correlation[2]:8.5f}')
+        plt.title(f'ChIP-seq for simulation \n {sim_folder} snapshots: {measurements} \n{chip_correlation_title}')
         plt.ylabel('average #bound LEFs')
         plt.xlabel(f'genomic position in {size_kb}kb')
         plt.legend(('experimental', 'simulation', 'boundary'))

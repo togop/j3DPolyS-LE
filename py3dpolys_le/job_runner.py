@@ -65,22 +65,22 @@ class CfgJobRunner(JobRunner):
     cmd_run_file: str
     _config = configparser.ConfigParser()
 
-    def __init__(self, input_cfg, cmd_run_file):
+    def __init__(self, input_cfg, cmd_run_file=None):
         self.input_cfg = input_cfg
         self.cmd_run_file = cmd_run_file
         self._config.read(self.input_cfg)
 
     def _get_start_cmd(self, dep_jobid, profile) -> str:
-        cmd_job_dependency = self._get_property(profile, 'cmd_job_dependency')
+        cmd_job_dependency = self.get_property(profile, 'cmd_job_dependency')
         cmd_dep = cmd_job_dependency.replace('{jobid}', dep_jobid) if dep_jobid else ''
-        cmd_prefix = self._get_property(profile, 'cmd_prefix')
+        cmd_prefix = self.get_property(profile, 'cmd_prefix')
         return cmd_prefix.replace('{cmd_job_dependency}', cmd_dep)
 
     def _get_jobid(self, jobout, profile) -> str:
-        jobid_re = self._get_property(profile, 'jobid_re')
+        jobid_re = self.get_property(profile, 'jobid_re')
         return re.search(jobid_re, jobout)[0]
 
-    def _get_property(self, profile, name):
+    def get_property(self, profile, name):
         value = ''
         if profile:
             try:
@@ -92,17 +92,17 @@ class CfgJobRunner(JobRunner):
         return value
 
     def _cmd_run_shell(self, profile) -> bool:
-        cmd_run = self._get_property(profile, 'cmd_run')
+        cmd_run = self.get_property(profile, 'cmd_run')
         return cmd_run == 'shell' and not self.cmd_run_file
 
     def _cmd_run_stdout(self, profile) -> bool:
-        cmd_run = self._get_property(profile, 'cmd_run')
+        cmd_run = self.get_property(profile, 'cmd_run')
         return cmd_run == 'stdout'  and not self.cmd_run_file
 
     def _cmd_run_file(self, profile) -> str:
         if self.cmd_run_file:
             return self.cmd_run_file
-        cmd_run = self._get_property(profile, 'cmd_run')
+        cmd_run = self.get_property(profile, 'cmd_run')
         if cmd_run.startswith('file:'):
             cmd_run_file = cmd_run.split(':')[1]
             return cmd_run_file.replace('{cmd_run_file}', self.cmd_run_file)
