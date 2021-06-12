@@ -22,7 +22,7 @@ setup(name='py3dpolys_le',
       # package_data={'bin': ['3dpolys_le'']},
       # package_data={'data': ['input.dat']},
       # package_dir={'py3dpolys_le': 'py3dpolys_le'},
-      # setup_requires=['cython', 'numpy'],
+      setup_requires=['sphinx', 'sphinx-argparse', 'sphinx-argparse-cli'],
       install_requires=[
           'numpy',
           'pandas',

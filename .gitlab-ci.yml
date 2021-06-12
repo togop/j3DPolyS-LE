@@ -45,10 +45,11 @@ test:
     - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5.10000_decay_probs_lin.txt
     - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5.10000_decay_probs_log.txt
     # test 2
-    - 3dpolys_le_runner run -i ./test/test_no_tads_shell_input.cfg --cmd_run_file ./run_test_no_tads_shell_input.sh
-    - ./test/test_cmp.sh ./run_test_no_tads_shell_input.sh ./test/expected/run_test_no_tads_shell_input.sh
-    - chmod +x ./run_test_no_tads_shell_input.sh
-    - ./run_test_no_tads_shell_input.sh
+    #- 3dpolys_le_runner run -i ./test/test_no_tads_shell_input.cfg --cmd_run_file ./run_test_no_tads_shell_input.sh
+    #- ./test/test_cmp.sh ./run_test_no_tads_shell_input.sh ./test/expected/run_test_no_tads_shell_input.sh
+    #- chmod +x ./run_test_no_tads_shell_input.sh
+    #- ./run_test_no_tads_shell_input.sh
+    - make test
     - ls -la
     - ls -la out-Nlef200-km0.0027-bd0-bf1-bs_im-z_z-loop
     - ls -la out-Nlef200-km0.0027-bd0-bf1-bs_im-z_z-loop/r2.84
@@ -65,3 +66,4 @@ test:
     - ./test/test.sh out/test3/r3.55/hic_002_cool.svg
     - ./test/test.sh out/test3/r7.10/hic_001_cool.svg
     - ./test/test.sh out/test3/r7.10/hic_002_cool.svg
+    - make test

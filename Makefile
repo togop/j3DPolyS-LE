@@ -1,4 +1,4 @@
-.PHONY: all build debug env install test
+.PHONY: all build debug env install test doc
 
 build:
 	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build -S .
@@ -21,7 +21,14 @@ install:
 	# conda config --add channels defaults
 	pip install -e .
 
+doc:
+	sphinx-build -b html source build
+
 test:
-	pytest
+	# under construction
+	pip install pytest
+	pip install pytest-cov
+	# pip install coverage
+	pytest --cov=py3dpolys_le test/
 
 all: build install

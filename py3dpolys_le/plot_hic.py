@@ -15,6 +15,16 @@ import glob
 logger = logging.getLogger(__name__)
 
 
+def cli_parser():
+    p = argparse.ArgumentParser()
+    p.add_argument("-o", "--output_folder", default=".",
+                   help="'Analysis' step output folder containing raw hic_*.hdf5 files.")
+    p.add_argument("-r", "--resolution", default=2000, help="Hi-C data resolution in bp.")
+    p.add_argument("-c", "--cmap", default="hot_r",
+                   help="Color map: cool, hot_r, gist_heat_r, afmhot_r, YlOrRd, Greys, gist_yarg")
+    p.add_argument("-f", "--plot_format", default="png", help="Image file format extension: png, tif, svg")
+    return p
+
 def run(output_folder, resolution, cmap, plot_format):
     logger.info(f'Plotting HiC for {output_folder} with color map: {cmap} in file format: {plot_format} ...')
 
@@ -63,14 +73,7 @@ def run(output_folder, resolution, cmap, plot_format):
 
 
 def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("-o", "--output_folder", default=".",
-                   help="'Analysis' step output folder containing raw hic_*.hdf5 files.")
-    p.add_argument("-r", "--resolution", default=2000, help="Hi-C data resolution in bp.")
-    p.add_argument("-c", "--cmap", default="hot_r",
-                   help="Color map: cool, hot_r, gist_heat_r, afmhot_r, YlOrRd, Greys, gist_yarg")
-    p.add_argument("-f", "--plot_format", default="png", help="Image file format extension: png, tif, svg")
-    args = p.parse_args(sys.argv[1:])
+    args = cli_parser().parse_args(sys.argv[1:])
 
     run(args.output_folder, args.resolution, args.cmap, args.plot_format)
 

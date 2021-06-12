@@ -14,8 +14,8 @@ import pandas as pd
 import sys
 import pkg_resources
 
-from . import hic_analysis as ha
-from .job_runner import JobRunner, CfgJobRunner
+from py3dpolys_le import hic_analysis as ha
+from py3dpolys_le.job_runner import JobRunner, CfgJobRunner
 
 EXP_COOL_AS_STATS = '.'
 CFG_SECTION_3DPOLYS_LE = '3dpolys_le'
@@ -23,115 +23,116 @@ CFG_SECTION_3DPOLYS_LE = '3dpolys_le'
 # Initialization
 logger = logging.getLogger(__name__)
 
-p = argparse.ArgumentParser(description=f'''Running 3dpolys_le_runner.
-Run one of the following batch commands:
 
-•	new_stats: Perform comparative statistical analysis on all entries, representing simulations,  in a given 
-sim_stats.tsv file (--stats_file) comparing simulations with the already used or a new given (--exp_cool) experimental 
-data. In combination with a –-replace parameter.
+def cli_parser():
+    p = argparse.ArgumentParser(description=f'''Running 3dpolys_le_runner.
+    Run one of the following batch commands:
+    
+    •	new_stats: Perform comparative statistical analysis on all entries, representing simulations,  in a given 
+    sim_stats.tsv file (--stats_file) comparing simulations with the already used or a new given (--exp_cool) experimental 
+    data. In combination with a –-replace parameter.
+    
+    •	decay_plots: Produce distance-contact-decay plots on all entries in a given comparative statistics file (--stats_file) 
+    and compare simulations with the already used or a new given (--exp_cool) experimental data. In combination with  
+    --resolution, –-replace and --threading parameters.
+    
+    •	chip_seq_plots: Produce ChIP-seq plots on all entries in a given sim_stats.tsv file (--stats_file) and compare 
+    simulations' ChIP-seq with the already used or a new given (--exp_chip) experimental data. In combination with  
+    –-replace and --threading parameters.
+    
+    •	contact_radius_analysis: Perform contact analysis step (Hi-C data extraction) for new given parameters on all 
+    entries in a given sim_stats.tsv file (--stats_file). In combination with --replace and --threading parameters.
+    
+    •	multi_decay_plot: Produce a multi distance-contact-decay plot for a single simulation’s output (--output_folder) 
+    including all its subfolders (for different contact-radius analysis) and compare them with a given (--exp_cool) 
+    experimental data. In combination with the –resolution and –-replace parameters.
+    
+    •	multi_decay_exps_plot: Produce multi distance-contact-decay plot for a given list of datasets (----exp_cools, 
+    experimental, and simulations) and compare one of their chromosomes (--cmp_chrs) with a chromosome (--hic_chrs) from the 
+    first dataset in the list. In combination with the –resolution and –-replace parameters.
+    
+    •	run: Run a single simulation including extracting Hi-C matrices (‘analyse’ step), collection all comparative 
+    statistics (sim_stats.tsv file), and distance-contact-decay plots for all measurements.
+    
+    ''', epilog='''DISCLAIMER: 
+    As almost not sufficient tests prove the correctness of all possible parameter combinations (no comprehensive test coverage), 
+    please check your output data and log files, and make sure all went as you have expected.
+    ''', formatter_class=argparse.RawDescriptionHelpFormatter)  # RawTextHelpFormatter
+    p.add_argument("run_command", help="Run batch command.",
+                   choices=['new_stats', 'decay_plots', 'chip_seq_plots', 'contact_radius_analysis',
+                            'multi_decay_plot', 'multi_decay_exps_plot', 'run'])
+    p.add_argument("-bd", "--boundary_direction", default=0, type=int,
+                   help="Impermeability direction applied to all boundaries: -1:opposite direction, 0:both, 1:same direction."
+                        " Default: 0")
+    # TODO add -bf and look for others missing; remove unneeded and confusing
+    p.add_argument("-b", "--boundary", default="",
+                   help="Boundary sites file in CSV format used in a simulation.")
+    p.add_argument("-lbs", "---lef_binding_sites", default="",
+                   help="<loop extrusion binding sites file> LEFs binding sites file in a csv format with the following "
+                        "columns: name,position,length,probability. Default: if not given, the whole polymer.")
+    p.add_argument("--hic_chrs", nargs='*', default=None,
+                   help="Synonyms of the chromosome from Hi-C matrixes to be compared. "
+                        "Default X, set by constant hic_analysis.py::CHR_SYNONYMS = CHR_X_SYNONYMS.")
+    p.add_argument("--cmp_chrs", nargs='*', default=None,
+                   help="Synonyms of the Hi-C chromosome with which simulation (or other data) to be compared. "
+                        "Overwrites the default constant hic_analysis.py::CHR_SYNONYMS!")
+    p.add_argument("-z", "--z_loop", action='store_true', help="Allow z_loop for LEFs move in a simulation.")
+    p.add_argument("-u", "--unidirectional", action='store_true',
+                   help="Unidirectional mode for LEFs move otherwise bidirectional.")
+    p.add_argument("-im", "--init_mode", default='',
+                   help="Initial folding mode: h for helices like, z for zigzag like polymer state. "
+                        "Default: z.")
+    p.add_argument("-t", "--tads_boundary", default="",
+                   help="TADs boundary file used to calculate the chi-2-min score in the same format as the "
+                        "boundary sites file used for simulation. Default: no boundaries equivalent to"
+                        "the whole chromosome seen as a single TAD.")
+    p.add_argument("-e", "--exp_cool", nargs='?',
+                   help=f"Experimental cooler (.cool) file with which a simulation data to be compared. "
+                        f"When used in combination with a new_stats command, if the value is '{EXP_COOL_AS_STATS}', "
+                        f"it will use values stored in a given sim_stats.tsv file (--stats_file).")
+    p.add_argument("-es", "--exp_cools", nargs='+',   # TODO maybe rename it as it is used for mixed list of datasets
+                   help=f"In combination with a 'multi_decay_exps_plot' command sets the list of experimental cooler files "
+                        f"(.cool) or simulation Hi-C HDF5 files, and calculates chi2-min scores to compare them all with "
+                        f"the first one in the list in a multi distance-contact-decay plot.")
+    p.add_argument("-ec", "--exp_chip",
+                   help=f"Experimental ChIP-seq file (in .bedGraph format) with which simulation’s ChIP-seq file "
+                        f"({ha.CHIP_OUT}) to be compared.")
+    p.add_argument("-res", "--resolution", default=ha.RESOLUTION, type=int,
+                   help="Resolution for distance-contact-decay plots.")
+    p.add_argument("-i", "--input_cfg", default="./input.cfg", help="Input.cfg file used from a simulation.")
+    p.add_argument("-l", "--nlef", help="Nlef value to use in a simulation.", type=int)
+    p.add_argument("-m", "--km", help="km value to use in a simulation.", type=float)
+    p.add_argument("-f", "--stats_file", default="./sim_stats.csv", help="Simulation statistics' repository file.")
+    p.add_argument("--stats", action='store_true',
+                   help="In combination with a new_stats command to run statistical analysis (3dpolys_le_stats.py) only for "
+                        "entries in a given sim_stats.csv file (--stats_file) missing statistics plots.")
+    p.add_argument("--all_stats", action='store_true',
+                   help="In combination with a new_stats command to run statistical analysis (3dpolys_le_stats.py) for all "
+                        "entries in a given sim_stats.csv file (--stats_file).")
+    # TODO unify/clarify what to use better: only -r, or -lr
+    p.add_argument("-r", "--radius_contact", default=0., type=float,
+                   help="Contact radius in lattice units (1=70nm) to run a single 'analyse' step "
+                        "(py3dpolys_le program module) for extracting Hi-C matrixes.")
+    p.add_argument("-lr", "--list_contact_radii", nargs='+', default=['2.84'],  # ['1.42', '2.13', '2.84', '3.55', '4.26'],  #, '5.0p'
+                   help="list of contact radii to be used by a 'contact_radius_analysis' batch command, "
+                        "a <p> at the end denote use of contact radius probability mode.")
+    p.add_argument("--replace", help="Replace of any existing output data files (from the previous run) otherwise skip the "
+                                     "simulation and continue with the next.", action='store_true')
+    p.add_argument("--threading", help="Use Python multi-threading. In combination with a decay_plots batch command.",
+                   action='store_true')
+    # p.add_argument("--simultaneously", default=1, help="Run simultaneously <n> simulation jobs.", type=int)
+    p.add_argument("-cp", "--contact_probability", action='store_true',
+                   help="Together with the monomer contact radius use contact radius probability: (1 - r^2 / max_r^2), "
+                        "where <max_r> is the value of the radius_contact parameter.")
+    p.add_argument("--bin_size", default=1, help="Chip-seq bin size used for plotting. Default: 1 = 2kb", type=int)
+    p.add_argument("--correlation", default='spearman', choices=['spearmanr', 'pearsonr'],
+                   help="Correlation method to use to compare Chip-seq profiles.")
+    p.add_argument("-o", "--output_folder", default="", help="Simulation output folder. If empty, it will be autogenerated.")
+    p.add_argument("--cmd_run_file", default="", help="File where to save all commands.")
+    p.add_argument("-a", "--analysis_folder", default="", help="Analysis output folder: Hi-C, Chip-Seq in silico.")
 
-•	decay_plots: Produce distance-contact-decay plots on all entries in a given comparative statistics file (--stats_file) 
-and compare simulations with the already used or a new given (--exp_cool) experimental data. In combination with  
---resolution, –-replace and --threading parameters.
-
-•	chip_seq_plots: Produce ChIP-seq plots on all entries in a given sim_stats.tsv file (--stats_file) and compare 
-simulations' ChIP-seq with the already used or a new given (--exp_chip) experimental data. In combination with  
-–-replace and --threading parameters.
-
-•	contact_radius_analysis: Perform contact analysis step (Hi-C data extraction) for new given parameters on all 
-entries in a given sim_stats.tsv file (--stats_file). In combination with --replace and --threading parameters.
-
-•	multi_decay_plot: Produce a multi distance-contact-decay plot for a single simulation’s output (--output_folder) 
-including all its subfolders (for different contact-radius analysis) and compare them with a given (--exp_cool) 
-experimental data. In combination with the –resolution and –-replace parameters.
-
-•	multi_decay_exps_plot: Produce multi distance-contact-decay plot for a given list of datasets (----exp_cools, 
-experimental, and simulations) and compare one of their chromosomes (--cmp_chrs) with a chromosome (--hic_chrs) from the 
-first dataset in the list. In combination with the –resolution and –-replace parameters.
-
-•	run: Run a single simulation including extracting Hi-C matrices (‘analyse’ step), collection all comparative 
-statistics (sim_stats.tsv file), and distance-contact-decay plots for all measurements.
-
-''', epilog='''DISCLAIMER: 
-As almost no tests prove the correctness of all possible parameter combinations (no comprehensive test coverage), 
-please check your output data and log files, and make sure all went as you have expected.
-''', formatter_class=argparse.RawDescriptionHelpFormatter)  # RawTextHelpFormatter
-p.add_argument("run_command", help="Run batch command.",
-               choices=['new_stats', 'decay_plots', 'chip_seq_plots', 'contact_radius_analysis',
-                        'multi_decay_plot', 'multi_decay_exps_plot', 'run'])
-p.add_argument("-bd", "--boundary_direction", default=0, type=int,
-               help="Impermeability direction applied to all boundaries: -1:opposite direction, 0:both, 1:same direction."
-                    " Default: 0")
-# TODO add -bf and look for others missing; remove unneeded and confusing
-p.add_argument("-b", "--boundary", default="",
-               help="Boundary sites file in CSV format used in a simulation.")
-p.add_argument("-lbs", "---lef_binding_sites", default="",
-               help="<loop extrusion binding sites file> LEFs binding sites file in a csv format with the following "
-                    "columns: name,position,length,probability. Default: if not given, the whole polymer.")
-p.add_argument("--hic_chrs", nargs='*', default=None,
-               help="Synonyms of the chromosome from Hi-C matrixes to be compared. "
-                    "Default X, set by constant hic_analysis.py::CHR_SYNONYMS = CHR_X_SYNONYMS.")
-p.add_argument("--cmp_chrs", nargs='*', default=None,
-               help="Synonyms of the Hi-C chromosome with which simulation (or other data) to be compared. "
-                    "Overwrites the default constant hic_analysis.py::CHR_SYNONYMS!")
-p.add_argument("-z", "--z_loop", action='store_true', help="Allow z_loop for LEFs move in a simulation.")
-p.add_argument("-u", "--unidirectional", action='store_true',
-               help="Unidirectional mode for LEFs move otherwise bidirectional.")
-p.add_argument("-im", "--init_mode", default='',
-               help="Initial folding mode: h for helices like, z for zigzag like polymer state. "
-                    "Default: z.")
-p.add_argument("-t", "--tads_boundary", default="",
-               help="TADs boundary file used to calculate the chi-2-min score in the same format as the "
-                    "boundary sites file used for simulation. Default: no boundaries equivalent to"
-                    "the whole chromosome seen as a single TAD.")
-p.add_argument("-e", "--exp_cool", nargs='?',
-               help=f"Experimental cooler (.cool) file with which a simulation data to be compared. "
-                    f"When used in combination with a new_stats command, if the value is '{EXP_COOL_AS_STATS}', "
-                    f"it will use values stored in a given sim_stats.tsv file (--stats_file).")
-p.add_argument("-es", "--exp_cools", nargs='+',   # TODO maybe rename it as it is used for mixed list of datasets
-               help=f"In combination with a 'multi_decay_exps_plot' command sets the list of experimental cooler files "
-                    f"(.cool) or simulation Hi-C HDF5 files, and calculates chi2-min scores to compare them all with "
-                    f"the first one in the list in a multi distance-contact-decay plot.")
-p.add_argument("-ec", "--exp_chip",
-               help=f"Experimental ChIP-seq file (in .bedGraph format) with which simulation’s ChIP-seq file "
-                    f"({ha.CHIP_OUT}) to be compared.")
-p.add_argument("-res", "--resolution", default=ha.RESOLUTION, type=int,
-               help="Resolution for distance-contact-decay plots.")
-p.add_argument("-i", "--input_cfg", default="./input.cfg", help="Input.cfg file used from a simulation.")
-p.add_argument("-l", "--nlef", help="Nlef value to use in a simulation.", type=int)
-p.add_argument("-m", "--km", help="km value to use in a simulation.", type=float)
-p.add_argument("-f", "--stats_file", default="./sim_stats.csv", help="Simulation statistics' repository file.")
-p.add_argument("--stats", action='store_true',
-               help="In combination with a new_stats command to run statistical analysis (3dpolys_le_stats.py) only for "
-                    "entries in a given sim_stats.csv file (--stats_file) missing statistics plots.")
-p.add_argument("--all_stats", action='store_true',
-               help="In combination with a new_stats command to run statistical analysis (3dpolys_le_stats.py) for all "
-                    "entries in a given sim_stats.csv file (--stats_file).")
-# TODO unify/clarify what to use better: only -r, or -lr
-p.add_argument("-r", "--radius_contact", default=0., type=float,
-               help="Contact radius in lattice units (1=70nm) to run a single 'analyse' step "
-                    "(py3dpolys_le program module) for extracting Hi-C matrixes.")
-p.add_argument("-lr", "--list_contact_radii", nargs='+', default=['2.84'],  # ['1.42', '2.13', '2.84', '3.55', '4.26'],  #, '5.0p'
-               help="list of contact radii to be used by a 'contact_radius_analysis' batch command, "
-                    "a <p> at the end denote use of contact radius probability mode.")
-p.add_argument("--replace", help="Replace of any existing output data files (from the previous run) otherwise skip the "
-                                 "simulation and continue with the next.", action='store_true')
-p.add_argument("--threading", help="Use Python multi-threading. In combination with a decay_plots batch command.",
-               action='store_true')
-# p.add_argument("--simultaneously", default=1, help="Run simultaneously <n> simulation jobs.", type=int)
-p.add_argument("-cp", "--contact_probability", action='store_true',
-               help="Together with the monomer contact radius use contact radius probability: (1 - r^2 / max_r^2), "
-                    "where <max_r> is the value of the radius_contact parameter.")
-p.add_argument("--bin_size", default=1, help="Chip-seq bin size used for plotting. Default: 1 = 2kb", type=int)
-p.add_argument("--correlation", default='spearman', choices=['spearmanr', 'pearsonr'],
-               help="Correlation method to use to compare Chip-seq profiles.")
-p.add_argument("-o", "--output_folder", default="", help="Simulation output folder. If empty, it will be autogenerated.")
-p.add_argument("--cmd_run_file", default="", help="File where to save all commands.")
-p.add_argument("-a", "--analysis_folder", default="", help="Analysis output folder: Hi-C, Chip-Seq in silico.")
-
-# p.add_argument("--no_overwrite", help="Overwrite old files", action='store_false')
-
-args = p.parse_args(sys.argv[1:])
+    # p.add_argument("--no_overwrite", help="Overwrite old files", action='store_false')
+    return p
 
 
 class DccExtrusionArgs:
@@ -582,6 +583,8 @@ class DccExtrusionRunner:
 
 
 def main():
+    args = cli_parser().parse_args(sys.argv[1:])
+
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("").setLevel(logging.INFO)
 

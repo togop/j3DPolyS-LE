@@ -9,21 +9,15 @@ import re
 import sys
 from filelock import SoftFileLock
 
-from . import hic_analysis as ha
-from . import plot_hic
-from .job_runner import CfgJobRunner
+from py3dpolys_le import hic_analysis as ha
+from py3dpolys_le import plot_hic
+from py3dpolys_le.job_runner import CfgJobRunner
 # from _version import __name__
 
 dummy_sim = False  # set to False; True = dummy simulation mode: echo commands only
 
 
-def main():
-
-    # Initialization
-    logging.basicConfig(level=logging.DEBUG)
-    logging.getLogger("").setLevel(logging.INFO)
-    logger = logging.getLogger('3dpolys_le_stats')
-
+def cli_parser():
     p = argparse.ArgumentParser()
     p.add_argument("-o", "--output_folder", default=".",
                    help=f"Simulation's output folder containing "
@@ -60,7 +54,17 @@ def main():
     p.add_argument("--cmp_chrs", nargs='*', default=None,
                    help="Synonyms of the Hi-C chromosome with which simulation data to be compared. "
                         "Default: hic_analysis.py::CHR_SYNONYMS!")
-    args = p.parse_args(sys.argv[1:])
+    return p
+
+
+def main():
+
+    # Initialization
+    logging.basicConfig(level=logging.DEBUG)
+    logging.getLogger("").setLevel(logging.INFO)
+    logger = logging.getLogger('3dpolys_le_stats')
+
+    args = cli_parser().parse_args(sys.argv[1:])
 
     cfg_job_runner = CfgJobRunner(input_cfg=args.input_cfg)
 
