@@ -22,7 +22,7 @@ install:
 	pip install -e .
 
 doc:
-	sphinx-build -b html source build
+	sphinx-build -b html doc build_doc
 
 test:
 	# under construction
