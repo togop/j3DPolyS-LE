@@ -31,11 +31,12 @@ build:
     - conda activate py3dpolys_le
     - make all
     - echo "conda activate py3dpolys_le" >> ~/.bashrc
-    #- cat ~/.bashrc
+    - cat ~/.bashrc
     #- source ~/.bashrc
 
 test:
   stage: test
+  needs: [build]
   script:
     - conda activate py3dpolys_le
     - pwd
@@ -85,9 +86,11 @@ test:
     - ./test/test.sh out/test3/r3.55/hic_002_cool.svg
     - ./test/test.sh out/test3/r7.10/hic_001_cool.svg
     - ./test/test.sh out/test3/r7.10/hic_002_cool.svg
-    - make test
 
 deploy:
   stage: deploy
-  script:
-    - echo 'Here comes build and deploy of Singularity image...'
+  needs: [test]
+  trigger:
+    include: .singularity-ci.yml
+    strategy: depend
+  resource_group: production
