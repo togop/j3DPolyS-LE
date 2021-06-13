@@ -156,17 +156,7 @@ def write_hic_array_to_cool(hic, chr, resolution, cool_file, verbose=False):
     # problem with showing .cool file in higlass but with .mcool it works
 
 
-def normalize_invivo_array(hic_array, verbose=False):
-
-    import py3dpolys_le.hic_analysis as ha
-    # get alpha_lin
-    sim_hic_file = "/media/cubix/D86E-6C50/simulations/boundary/boundary_mnl_bid/hic_003.hdf5"
-    cmp_hic_file = "/media/cubix/D86E-6C50/hi-c/published/N2_hicpro_moushumi_20201002_5000.hdf"
-    (chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=['6', 'chrX', 'X'],
-                                                      res=ha.RESOLUTION,
-                                                      tads_boundary=None, norm=True,
-                                                      chi2_mode=ha.CHI2_MODE_LINEAR)  # , plot=True)
-    print(alpha_lin)
+def normalize_invivo_array(hic_array, alpha=1.0, verbose=False):
 
     if verbose:
         print("\nstart normalizing invivo hic array with proprieties:")
@@ -187,7 +177,7 @@ def normalize_invivo_array(hic_array, verbose=False):
         print("divide array by factor", val_max)
     #hic_array = np.divide(hic_array, val_max)
 
-    hic_array = np.divide(hic_array, alpha_lin * 10)
+    hic_array = np.divide(hic_array, alpha * 10)
 
     # log transform matrix
     if verbose:
