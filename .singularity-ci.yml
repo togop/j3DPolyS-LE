@@ -1,0 +1,22 @@
+image:
+  name: quay.io/singularity/singularity:v3.7.3
+  entrypoint: [""]
+
+stages:
+  - build
+  - deploy
+
+# Build Singularity container
+singularity-image:
+  stage: build
+  script:
+    - singularity build py3dpolys_le.sif Singularity
+  artifacts:
+    paths:
+      - py3dpolys_le.sif
+
+# Push the image on the registry
+deploy:
+  stage: deploy
+  script:
+    - singularity push --docker-username "${CI_REGISTRY_USER}" --docker-password "${CI_REGISTRY_PASSWORD}" app.sif oras://"$CI_REGISTRY_IMAGE"/"$CI_PROJECT_NAME":"$CI_COMMIT_TAG"
