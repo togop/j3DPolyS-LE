@@ -26,6 +26,7 @@ build:
     - echo "PATH=$PATH:/root/miniconda3/bin/" >> ~/.bashrc
     - source ~/.bashrc
     - conda init bash
+    - source ~/.bashrc
     - make env
     - conda activate py3dpolys_le
     - make all
