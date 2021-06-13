@@ -25,7 +25,6 @@ before_script:
 
 test:
   stage: test
-  needs: [build]
   script:
     - pwd
     - ls -la
