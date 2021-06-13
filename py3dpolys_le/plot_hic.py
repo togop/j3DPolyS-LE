@@ -25,6 +25,7 @@ def cli_parser():
     p.add_argument("-f", "--plot_format", default="png", help="Image file format extension: png, tif, svg")
     return p
 
+
 def run(output_folder, resolution, cmap, plot_format):
     logger.info(f'Plotting HiC for {output_folder} with color map: {cmap} in file format: {plot_format} ...')
 
