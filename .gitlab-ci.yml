@@ -1,6 +1,6 @@
 #  gitlab-runner register
 # https://gitlab.com/
-# locally run it with:  gitlab-runner exec shell test
+# locally run it with:  gitlab-runner exec docker test
 # how to test locally: https://medium.com/@umutuluer/how-to-test-gitlab-ci-locally-f9e6cef4f054
 
 stages:

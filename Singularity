@@ -9,6 +9,7 @@ Containing py3DPolyS_LE package
     ./Makefile
     ./MANIFEST.in
     ./CMakeLists.txt
+    ${SYLABS_TOKEN} ~/.singularity/sylabs-token
 
 %runscript
 # Install py3dpolys_le package
