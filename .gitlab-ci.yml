@@ -55,10 +55,6 @@ test:
     #- ./test/test_cmp.sh ./run_test_no_tads_shell_input.sh ./test/expected/run_test_no_tads_shell_input.sh
     #- chmod +x ./run_test_no_tads_shell_input.sh
     #- ./run_test_no_tads_shell_input.sh
-    - make test
-    - ls -la
-    - ls -la out-Nlef200-km0.0027-bd0-bf1-bs_im-z_z-loop
-    - ls -la out-Nlef200-km0.0027-bd0-bf1-bs_im-z_z-loop/r2.84
     # test 3
     - 3dpolys_le_runner run -o out/test3 --km 0.0017 --nlef 100 -bd 1 -z -u -im h -lr 3.55 7.1 -i ./test/test_tads_shell_input.cfg --cmd_run_file ./run_test_tads_shell_input.sh
     - ./test/test_cmp.sh ./run_test_tads_shell_input.sh ./test/expected/run_test_tads_shell_input.sh
@@ -72,6 +68,9 @@ test:
     - ./test/test.sh out/test3/r3.55/hic_002_cool.svg
     - ./test/test.sh out/test3/r7.10/hic_001_cool.svg
     - ./test/test.sh out/test3/r7.10/hic_002_cool.svg
+    - make test
+    - ls -la out-Nlef200-km0.0027-bd0-bf1-bs_im-z_z-loop
+    - ls -la out-Nlef200-km0.0027-bd0-bf1-bs_im-z_z-loop/r2.84
 
 singularity:
   stage: production
