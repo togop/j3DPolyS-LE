@@ -1,5 +1,5 @@
 Bootstrap: docker
-From: togop/gcc_gfortran_mpi_hdf5_python-docker:latest
+From: togop/gcc_gfortran_mpi_hdf5_python:latest
 
 %help
 
