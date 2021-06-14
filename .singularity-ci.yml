@@ -19,6 +19,8 @@ singularity-image:
 deploy:
   stage: deploy
   script:
+    - mkdir ~/.singularity
+    - echo "${SYLABS_TOKEN}"
     - echo "${SYLABS_TOKEN_VAR}" > ~/.singularity/sylabs-token
     #- cat "${SYLABS_TOKEN}" > ~/.singularity/sylabs-token
     #- cat ~/.singularity/sylabs-token
