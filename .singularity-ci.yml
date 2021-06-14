@@ -21,9 +21,8 @@ deploy:
   script:
     - mkdir ~/.singularity
     - echo "$SYLABS_TOKEN"
-    - echo "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2MjYyNTM1MjIsImlhdCI6MTYyMzY2MTUyMiwiaXNzIjoiaHR0cHM6Ly9hdXRoLnN5bGFicy5pby90b2tlbiIsImp0aSI6IjYwYzcxYmQyYjUxMGM3OTM1YTY0NGExNyIsInN1YiI6IjYwNjgzNWY3ZTUwMjkzNDIxNzAzYzMxMyJ9.Kw3yLbN9PMIKhlQbehMpGYCYl0ctOVGTEZYmMsRNI--1CewILvC-O2frwUO6ORTa6Xn5ktZAKRa8YBIfpzoutvr6rNRkVJg2RaPO_XZEQ-TZvgY8AxNU3Q72sOCRNv9c5blxFW4HfoFw-pOajGQyBLOI2rotLlZyvpXW7q51dU7vkBL5MZ876tMv32If5kGY7qFr8maueLHxAIuqlkE2jW8dvVJk4QOBjUEYHS8S8mCOHAMaK7npzdlGboHZAvSY6A5k43hKnPTj4MVZssj042nnFqGHI-FE8-bqT2c12onR0rRXaj_EIcTmFtYgTq_LHZ5F-DwqpnsZ-ipPP0GORQ" > ~/.singularity/sylabs-token
     #- echo "$SYLABS_TOKEN_VAR" > ~/.singularity/sylabs-token
-    #- cat "$SYLABS_TOKEN" > ~/.singularity/sylabs-token
+    - cat "$SYLABS_TOKEN" > ~/.singularity/sylabs-token
     #- cat ~/.singularity/sylabs-token
     #- singularity push --docker-username "${CI_REGISTRY_USER}" --docker-password "${CI_REGISTRY_PASSWORD}" py3dpolys_le.sif oras://"$CI_REGISTRY_IMAGE"/"$CI_PROJECT_NAME":"$CI_COMMIT_TAG"
     - singularity push py3dpolys_le.sif library://todor/default/py3dpolys_le:latest
