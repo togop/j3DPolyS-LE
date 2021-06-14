@@ -19,4 +19,5 @@ singularity-image:
 deploy:
   stage: deploy
   script:
-    - singularity push --docker-username "${CI_REGISTRY_USER}" --docker-password "${CI_REGISTRY_PASSWORD}" py3dpolys_le.sif oras://"$CI_REGISTRY_IMAGE"/"$CI_PROJECT_NAME":"$CI_COMMIT_TAG"
+    #- singularity push --docker-username "${CI_REGISTRY_USER}" --docker-password "${CI_REGISTRY_PASSWORD}" py3dpolys_le.sif oras://"$CI_REGISTRY_IMAGE"/"$CI_PROJECT_NAME":"$CI_COMMIT_TAG"
+    - singularity push py3dpolys_le.sif library://todor/default/py3dpolys_le:latest
