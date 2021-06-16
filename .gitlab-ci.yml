@@ -15,7 +15,7 @@ before_script:
     - echo "$SYLABS_TOKEN"
     #- echo "$SYLABS_TOKEN_VAR"
     #- cat "$SYLABS_TOKEN"
-    - echo "PATH=$PATH:/root/miniconda3/bin/" >> ~/.bashrc
+    - echo "PATH=$PATH:/opt/miniconda3/bin/" >> ~/.bashrc
     - source ~/.bashrc
     - conda init bash
     - source ~/.bashrc

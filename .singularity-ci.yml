@@ -25,5 +25,5 @@ deploy:
     - cat "$SYLABS_TOKEN" > ~/.singularity/sylabs-token
     #- cat ~/.singularity/sylabs-token
     #- singularity push --docker-username "${CI_REGISTRY_USER}" --docker-password "${CI_REGISTRY_PASSWORD}" py3dpolys_le.sif oras://"$CI_REGISTRY_IMAGE"/"$CI_PROJECT_NAME":"$CI_COMMIT_TAG"
-    - singularity remote login SylabsCloud --tokenfile ~/.singularity/sylabs-token
-    - singularity push py3dpolys_le.sif library://todor/default/py3dpolys_le:latest
+    - singularity remote login SylabsCloud < ~/.singularity/sylabs-token
+    - singularity push -U py3dpolys_le.sif library://todor/default/py3dpolys_le:latest

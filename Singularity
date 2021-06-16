@@ -12,7 +12,7 @@ Containing py3DPolyS_LE package
 
 %runscript
 # Install py3dpolys_le package
-    echo "PATH=$PATH:/root/miniconda3/bin/" >> ~/.bashrc
+    echo "PATH=$PATH:/opt/miniconda3/bin/" >> ~/.bashrc
     source ~/.bashrc
     conda init bash
     source ~/.bashrc
