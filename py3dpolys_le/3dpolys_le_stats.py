@@ -75,8 +75,6 @@ def main():
                        f'with which HiCs will be compared!')
         ha.CHR_SYNONYMS = args.cmp_chrs
 
-    resolutions = [int(i * ha.EXP_RESOLUTION) for i in ha.EXP_FACTORS]
-
     exp_cool = args.exp_cool
     boundary = args.boundary
     tads_boundary = args.tads_boundary

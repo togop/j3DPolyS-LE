@@ -1,3 +1,5 @@
+import bisect
+import copy
 import csv
 import fnmatch
 import logging
@@ -14,6 +16,7 @@ import numpy as np
 import pandas as pd
 import pyranges as pr
 from matplotlib import pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from scipy import stats
 
 # from matplotlib import cm
@@ -27,8 +30,7 @@ EXP_RESOLUTION = 10000
 
 RESOLUTION = 10000
 
-EXP_FACTORS = [1, 2, 4]  # , 8, 16]
-SIM_FACTORS = [5, 10, 20]  # , 40, 80]  #, 160, 320]
+RES_FACTORS = [1, 2, 4]  # , 8, 16]
 
 # CMAP = 'hot'
 CMAP = 'YlOrRd'
@@ -53,6 +55,7 @@ CHI2_RANGE_END = 2000
 CHI2_RANGE_NUM = 100
 
 CHI2_USE_SEM = True
+CHI2_USE_BALANCED = False   # True still cause problems
 
 FIG_FORMAT = 'svg'  # TODO make FIG_FORMAT input parameter
 #FIG_FORMAT = 'png'
@@ -230,21 +233,6 @@ def save_chromosome_sizes(chr_lst, chr_size, file_name):
             # chromsizes_file.write(str(chr_name)+"   "+str(chr_size[chr_ind])+"\n")
 
 
-def extract_chromosome_hic(hic_mcool, chr):
-    # hic = cooler.create(hic_mcool)
-    print_hdf5_structure(hic_mcool)
-
-    hic10k = cooler.Cooler(hic_mcool + '::/resolutions/10000')
-
-    hic_mat = hic10k.matrix(balance=False).fetch(f'{chr}')  # [1:chr_size, 0:chr_size]
-
-    plt.imshow(np.log10(hic_mat), cmap=CMAP, interpolation='nearest')
-    #plt.show()
-
-    pixs = hic10k.pixels()
-    logger.debug('end')
-
-
 def average_contact_prob(prob_mat, dist, plot=False, ax=plt):
     count = 0
     probs = []
@@ -287,7 +275,7 @@ def get_chi2_dist_range(chi2_mode, res, max=None):
 
 
 def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, plot, norm=True,
-                      chi2_mode=CHI2_MODE_LINEAR):
+                      chi2_mode=CHI2_MODE_LINEAR, hic_balance=CHI2_USE_BALANCED):
     h1_title = 'simulation HiC'  # hic1cooler.info
     h2_title = 'experimental HiC'  # hic1cooler.info
 
@@ -311,16 +299,21 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
             logger.info(f'skip TAD:{tad_start}-{tad_end}, size:{tadi_size}')
         else:
             logger.info(f'calculate TAD:{tad_start}-{tad_end}, size:{tadi_size}')
-
-            tadi_mat2 = (cmp_hic_cooler.matrix(balance=False).fetch((comp_chr, tad_start, tad_end)))
+            balanced = hic_balance & (cmp_hic_cooler.bins()['weights'] is not None)
+            tadi_mat2 = (cmp_hic_cooler.matrix(balance=balanced).fetch((comp_chr, tad_start, tad_end)))
+            if balanced:
+                tadi_mat2 = np.nan_to_num(tadi_mat2)
             tadi_mat1_start = tad_start // res
             tadi_mat1_end = tad_end // res + 1
             tadi_mat1 = hic1_mat[tadi_mat1_start:tadi_mat1_end, tadi_mat1_start:tadi_mat1_end]
 
             if plot:
                 fig, (ax1, ax2) = plt.subplots(1, 2)
-                ax1.imshow(np.log10(tadi_mat1), cmap=CMAP, interpolation='nearest')
-                ax2.imshow(np.log10(tadi_mat2), cmap=CMAP, interpolation='nearest')
+                try:
+                    ax1.imshow(np.log10(tadi_mat1), cmap=CMAP, interpolation='nearest')
+                    ax2.imshow(np.log10(tadi_mat2), cmap=CMAP, interpolation='nearest')
+                except:
+                    logger.warning(f'Problem to plot TAD: {tad_start}-{tad_end}')
             else:
                 (ax1, ax2) = (0, 0)
 
@@ -337,7 +330,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
                     f'Empty chi2-dist-range for tad with size chi2(mode:{chi2_mode}, resolution:{res}), TADi_size:{tadi_size}[{tad_start}-{tad_end}]')
             tadi_norm_term = 0
             for dist in dist_range:
-                # dist = int(round(dist))  # optimization: do it here
+
                 (p_i, p_i_sdsem) = average_contact_prob(tadi_mat1, dist, plot, ax1)
                 (f_i, f_i_p_i_sdsem) = average_contact_prob(tadi_mat2, dist)
                 if plot:
@@ -377,7 +370,9 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
             ax1.set_title(f'{h1_title}: \n p_i: {p_i}, \n tot_PS={tot_PS}')
             ax2.set_title(f'{h2_title}: \n p_i: {f_i}, \n tot_FS={tot_FS}')
             #plt.show()
-            fig_filename = f'data/plots/{comp_filename}_{chi2_mode}_tad_{tad_start}-{tad_end}.png'
+            if not os.path.exists('plots/'):
+                os.mkdir('plots/')
+            fig_filename = f'plots/{comp_filename}_{chi2_mode}_tad_{tad_start}-{tad_end}.png'
             logger.info(f'Save figure in file: {fig_filename}')
             fig.savefig(fig_filename)
             plt.close()
@@ -398,7 +393,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
 
 
 def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, res=RESOLUTION, tads_boundary=None,
-                           plot=False, norm=True, chi2_mode=CHI2_MODE_LOG):
+                           plot=False, norm=True, chi2_mode=CHI2_MODE_LOG, hic_balance=CHI2_USE_BALANCED):
     """
         Compare a simulation HiC with the first HiC from a list of experimental HiCs.
         The list experimental HiCs is used to calculate the standard deviation of the average contact probability
@@ -412,22 +407,26 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
     :param plot: to plot or not to plot
     :param norm: Experimental! to normalize or not to normalize single TAD by their height (used log-lines for the statistics)
     :param chi2_mode: Chi2-min mode: linear or log
+    :param hic_balance: to use ICE balanced Hi-C matrix if available, otherwise not
     """
     if hic_chrs is None:
         hic_chrs = chrs
 
     if os.path.exists(hic_file) and hic_file.endswith('.hdf5') and DECAY_USE_HDF5:
-        hic_mat1 = get_hic(hic_file, resolution=res)
+        hic_mat1 = get_hic(hic_file, resolution=res, balance=hic_balance)
         hic1_chr = hic_chrs[0]
         hic1_chr_size = hic_mat1.shape[0]*res
     else:
         hic1cooler, hic1_chrs = get_hic_cooler_res(hic_file, hic_chrs, res)
         # we can compare only one chromosome: we assume we have a list of chromosome synonyms
         hic1_chr = hic1_chrs[0]
-        hic_mat1 = hic1cooler.matrix(balance=False).fetch(hic1_chr)
+        balanced = hic_balance & (hic1cooler.bins()['weights'] is not None)
+        hic_mat1 = hic1cooler.matrix(balance=balanced).fetch(hic1_chr)
+        if balanced:
+            hic_mat1 = np.nan_to_num(hic_mat1)
         hic1_chr_size = hic1cooler.chromsizes[hic1_chr]
 
-    cmp_hic_mcool = get_exp_sim_mcool(cmp_hic, chrs)  # maybe not needed, root_res=EXP_RESOLUTION, factors=EXP_FACTORS)
+    cmp_hic_mcool = get_exp_sim_mcool(cmp_hic, chrs, res)
 
     hic2 = cmp_hic
     hic2cooler = cooler.Cooler(f'{cmp_hic_mcool}::/resolutions/{res}')
@@ -438,12 +437,13 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
     h2 = hic2[hic2.rfind('/') + 1:]
 
     # to evaluate in debug: cooler.Cooler(f'{hic_file}.{SIM_RESOLUTION}.cool').matrix(balance=False).fetch('6')
-    # hic_mat1 = hic_mat1 / np.max(hic_mat1)   # need to rethink this normalization
-    hic_mat2 = hic2cooler.matrix(balance=False).fetch(exp_chr)  # TODO use balanced for experimental data
-    # hic_mat2 = hic_mat2 / np.max(hic_mat2)
+    balanced = hic_balance & (hic2cooler.bins()['weights'] is not None)
+    hic_mat2 = hic2cooler.matrix(balance=balanced).fetch(exp_chr)  # TODO use balanced for experimental data
+    if balanced:
+        hic_mat2 = np.nan_to_num(hic_mat2)
 
-    tads_pref = os.path.splitext(os.path.basename(tads_boundary))[0] if tads_boundary is not None else '';
-    comp_filename = f'comp_{h1}_{h2}_res{res}_t{tads_pref}'
+    tads_pref = ('_t'+os.path.splitext(os.path.basename(tads_boundary))[0]) if tads_boundary is not None else ''
+    comp_filename = f'comp_{h1}_{h2}_res{res}{tads_pref}{"_balanced" if balanced else ""}'
 
     chr_end = min(hic1_chr_size, hic2cooler.chromsizes[exp_chr])
     tads = None
@@ -477,20 +477,42 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
         tads[0, 0] = 1
         tads[0, 1] = chr_end
 
-    (chi2_min, alpha_min) = chi2_minimization(hic_mat1, hic2cooler, chrs, res, tads, comp_filename, plot, norm,
-                                              chi2_mode)
+    (chi2_min, alpha_min) = chi2_minimization(hic_mat1, hic2cooler, chrs, res, tads, comp_filename, plot=plot,
+                                              norm=norm, chi2_mode=chi2_mode, hic_balance=hic_balance)
 
     if plot:
-        fig, (ax1, ax2) = plt.subplots(1, 2)
-        fig.suptitle(f'HIC compare chromosome {hic1_chr}/{exp_chr} alpha_min:{alpha_min}')
+        hic_mat1_log = np.log10(hic_mat1 * alpha_min)
+        hic_mat2_log = np.log10(hic_mat2)
+        # split
+        # fig, (ax1, ax2) = plt.subplots(1, 2)
+        # fig.suptitle(f'HIC compare chromosome {hic1_chr}/{exp_chr} alpha_min:{alpha_min}')
+        #
+        # res_kb = res//1000
+        # ax1.get_xaxis().set_major_formatter(FuncFormatter(lambda x, p: int(x*res_kb)))
+        # ax1.get_yaxis().set_major_formatter(FuncFormatter(lambda y, p: int(y*res_kb)))
+        #
+        # ax1.imshow(hic_mat1_log, cmap=CMAP, interpolation='nearest')  # / hic_mat1.sum()
+        # ax1.set_title(h1)
+        # #ax1.clim(-2.75, 0)
+        #
+        # ax2.imshow(hic_mat2_log, cmap=CMAP, interpolation='nearest')  # / hic_mat2.sum()
+        # ax2.set_title(h2)
+        #
+        # ax2.autoscale(False)
 
-        ax1.imshow(np.log10(hic_mat1 * alpha_min), cmap=CMAP, interpolation='nearest')  # / hic_mat1.sum()
-        ax1.set_title(h1)
+        # merged
+        fig = plt.figure()
 
-        ax2.imshow(np.log10(hic_mat2), cmap=CMAP, interpolation='nearest')  # / hic_mat2.sum()
-        ax2.set_title(h2)
+        hic_merged = merge_hics(hic_mat2_log, hic_mat1_log)
 
-        ax2.autoscale(False)
+        res_kb = res//1000
+        plt.gca().get_xaxis().set_major_formatter(FuncFormatter(lambda x, p: int(x*res_kb)))
+        plt.gca().get_yaxis().set_major_formatter(FuncFormatter(lambda y, p: int(y*res_kb)))
+
+        plt.imshow(hic_merged, cmap=CMAP, interpolation='nearest')
+        plt.title(f'HIC compare chromosome {hic1_chr}/{exp_chr} alpha_min:{alpha_min}')
+
+        # plt.clim(-2.75, 0)
 
         tads = np.zeros(1, dtype=int)
         if tads_boundary is not None:
@@ -510,35 +532,47 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
             tad_end = tads[i + 1]
             # ax2.plot([tad_start, tad_start+tad_end], "b-")
             logger.info(f'plot TAD{i} {tad_start}-{tad_end}')
-            ax1.plot([tad_start, tad_end, tad_end, tad_start, tad_start],
-                     [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--')
-            ax2.plot([tad_start, tad_end, tad_end, tad_start, tad_start],
+            # split
+            # ax1.plot([tad_start, tad_end, tad_end, tad_start, tad_start],
+            #          [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--')
+            # ax2.plot([tad_start, tad_end, tad_end, tad_start, tad_start],
+            #          [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--')
+            # merged
+            plt.plot([tad_start, tad_end, tad_end, tad_start, tad_start],
                      [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--')
 
-        #plt.show()
-        fig_filename = f'data/plots/{comp_filename}_{chi2_mode}.png'
+        # plt.show()
+        fig_filename = f'plots/{comp_filename}_{chi2_mode}.png'
         logger.info(f'Save figure in file: {fig_filename}')
         fig.savefig(fig_filename, dpi=1000)
+        plt.close()
 
     logger.info(f'chi2_minimization score for {h1} and {h2} (resolution: {res}): {chi2_min},{alpha_min} on TADs: {tads_boundary}')
     return chi2_min, alpha_min
 
 
-def get_exp_sim_mcool(hic, chrs, root_res=None, factors=None):
+def get_exp_sim_mcool(hic, chrs, res=RESOLUTION):
     exp_sim_cool = hic if hic.endswith('.cool') else f'{hic}.cool'
     if os.path.exists(exp_sim_cool) and not os.path.exists(f'{hic}.hdf5'):  # experiment
-        if not root_res:
-            root_res = EXP_RESOLUTION
-            factors = EXP_FACTORS
+        hic_cooler = cooler.Cooler(f'{exp_sim_cool}::/')
+        root_res = hic_cooler.binsize
+        factors = copy.deepcopy(RES_FACTORS)
+        bisect.insort(factors, res//root_res)
         resolutions = [int(i * root_res) for i in factors]
         exp_sim_mcool = re.sub(r'.cool', f'.{resolutions[0]}.mcool', exp_sim_cool)
-        if not os.path.isfile(exp_sim_mcool):
+        try:
+            res_cool = cooler.Cooler(f'{exp_sim_mcool}::/resolutions/{res}') if os.path.isfile(exp_sim_mcool) else None
+        except:
+            logger.info(f'Missing resolution {res} in {exp_sim_mcool} so it will be generated again')
+            res_cool = None
+        if not os.path.isfile(exp_sim_mcool) or not res_cool:
             exp_sim_mcool = balance_mcool(exp_sim_cool, resolutions, exp_sim_mcool)
     else:  # simulation !!!
-        if not root_res:
-            root_res = SIM_RESOLUTION
-            factors = SIM_FACTORS
-        exp_sim_mcool = f'{hic}.{RESOLUTION}.mcool'
+        root_res = SIM_RESOLUTION
+        factors = RES_FACTORS
+        bisect.insort(factors, res//root_res)
+        resolutions = [int(i * root_res) for i in factors]
+        exp_sim_mcool = f'{hic}.{resolutions[0]}.mcool'
         if not os.path.exists(exp_sim_mcool):
             logger.info(f'Generating cooler files for {hic}')
             exp_sim_mcool = hic_to_mcool(hic, chrs[0], root_res, factors)
@@ -736,7 +770,7 @@ def get_decay_distribution_hdf5(hic_h5, resolution, confidence=0., min_dist=1, m
     return get_decay_distribution(hic, confidence=confidence, min_dist=min_dist, max_dist=max_dist), hic.shape[0]
 
 
-def get_hic(hic_h5, resolution=SIM_RESOLUTION):
+def get_hic(hic_h5, resolution=SIM_RESOLUTION, balance=CHI2_USE_BALANCED):
     if not DECAY_USE_HDF5_COOL:
         # directly from .hdf5
         with h5py.File(hic_h5, 'r') as f:
@@ -758,8 +792,12 @@ def get_hic(hic_h5, resolution=SIM_RESOLUTION):
         logger.info(f'Extracting hic from {cool_file}...')
         hic_cooler = cooler.Cooler(f'{cool_file}::/')
         hic_chr = list(set(hic_cooler.chromnames) & set(SIM_CHR_SYNONYMS))[0]
-        hic = hic_cooler.matrix(balance=False).fetch(hic_chr)
+        balanced = balance & (hic_cooler.bins()['weights'] is not None)
+        hic = hic_cooler.matrix(balance=balanced).fetch(hic_chr)
+        if balanced:
+            hic = np.nan_to_num(hic)  # nan -> 0
         hic = hic_coarsen(hic, hic_h5, resolution)
+        np.fill_diagonal(hic, 0)
     return hic
 
 
@@ -925,3 +963,12 @@ def plot_chip_seq(chip_out_file, exp_chip, boundary, bin_size=1, correlation=DEF
         plt.close()
 
     return chip_correlation
+
+
+def merge_hics(hic_mat_upper, hic_mat_lower):
+    for index_row in range(len(hic_mat_upper)):
+        hic_mat_upper[index_row][:index_row] = hic_mat_lower[index_row][:index_row]
+
+    np.fill_diagonal(hic_mat_upper, 0)
+
+    return hic_mat_upper

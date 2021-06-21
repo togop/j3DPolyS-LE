@@ -182,12 +182,16 @@ class DccExtrusionArgs:
         self.exp_cool = exp_cool if exp_cool else self.get_property('exp_cool')
         self.exp_chip = exp_chip  # TODO probably remove
         # self.exp_ins_score = exp_ins_score
-        self.nlef = nlef if nlef else int(self.get_property('Nlef'))
-        self.km = km if km else float(self.get_property('km'))
-        self.radius_contact = radius_contact if radius_contact else float(self.get_property('radius_contact'))
+        if self.get_property('Nlef'):
+            self.nlef = nlef if nlef else int(self.get_property('Nlef'))
+        if self.get_property('km'):
+            self.km = km if km else float(self.get_property('km'))
+        if self.get_property('radius_contact'):
+            self.radius_contact = radius_contact if radius_contact else float(self.get_property('radius_contact'))
         self.contact_probability = contact_probability  # TODO probably remove
         self.boundary_direction = boundary_direction if boundary_direction else self.get_property('boundary_direction')
-        self.boundary_factor = boundary_factor if boundary_factor else float(self.get_property('boundary_factor'))
+        if self.get_property('boundary_factor'):
+            self.boundary_factor = boundary_factor if boundary_factor else float(self.get_property('boundary_factor'))
         self.boundary_score = boundary_score if boundary_score else self.get_property('boundary_score')
         self.z_loop = z_loop if z_loop else self.get_property('z_loop').lower() in ['true', '1', 't', 'y', 'yes']
         self.unidirectional = unidirectional if unidirectional else self.get_property('unidirectional').lower() in ['true', '1', 't', 'y', 'yes']
