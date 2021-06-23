@@ -670,6 +670,7 @@ contains
         class (PolymerModel), intent(inout) :: self
 
         integer :: n, id, j, d
+        real :: kbp
         real*8 :: randomnumber
 
         !choose randomly a monomer
@@ -693,7 +694,7 @@ contains
                 kbp = self%kb
             end if
             do j = 1, self%ikb
-                if (randomnumber()>=self%kbp) return
+                if (randomnumber()>=kbp) return
             end do
             d = int(2 * randomnumber()) + 1
             if (d==1) then
