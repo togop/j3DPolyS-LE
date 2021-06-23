@@ -686,7 +686,12 @@ contains
         id = self%contact(1, n)
         if (id==0) then !if the bin is not occupied by a leg, try to randomly insert a LEF to NN sites
             ! TODO check with Daniel
-            kbp = self%kb * (self%binding_site_prob(n))**(1/self%ikb)
+            if (self%binding_sites_count > 0) then
+                ! we have binding sites
+                kbp = self%kb * (self%binding_site_prob(n))**(1/self%ikb)
+            else
+                kbp = self%kb
+            end if
             do j = 1, self%ikb
                 if (randomnumber()>=self%kbp) return
             end do
