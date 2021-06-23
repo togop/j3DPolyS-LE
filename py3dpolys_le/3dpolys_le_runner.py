@@ -102,6 +102,10 @@ def cli_parser():
     p.add_argument("-i", "--input_cfg", default="./input.cfg", help="Input.cfg file used from a simulation.")
     p.add_argument("-l", "--nlef", help="Nlef value to use in a simulation.", type=int)
     p.add_argument("-m", "--km", help="km value to use in a simulation.", type=float)
+    # 0.00054, 0.00162, 0.0027, 0.00378, 0.00486, 0.00648
+    # 10,      30,      50,     70,      90,      120 kb/min
+    # 5.4e-4 = 10kb/min = 167bp/s
+
     p.add_argument("-f", "--stats_file", default="./sim_stats.csv", help="Simulation statistics' repository file.")
     p.add_argument("--stats", action='store_true',
                    help="In combination with a new_stats command to run statistical analysis (3dpolys_le_stats.py) only for "

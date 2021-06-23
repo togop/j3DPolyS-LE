@@ -676,7 +676,6 @@ contains
         if (self%binding_sites_count > 0) then
             ! we have binding sites
             n = int(self%binding_sites_count * randomnumber()) + 1
-            ! TODO check with Daniel how to use  self%binding_site_prob(n)
             n = self%binding_site_pos(n)
             ! call log%debug('Loading LEF at site: binding_site_pos(' // trim(str(n)))
         else
@@ -686,8 +685,10 @@ contains
 
         id = self%contact(1, n)
         if (id==0) then !if the bin is not occupied by a leg, try to randomly insert a LEF to NN sites
+            ! TODO check with Daniel
+            kbp = self%kb * (self%binding_site_prob(n))**(1/self%ikb)
             do j = 1, self%ikb
-                if (randomnumber()>=self%kb) return
+                if (randomnumber()>=self%kbp) return
             end do
             d = int(2 * randomnumber()) + 1
             if (d==1) then
