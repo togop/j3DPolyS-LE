@@ -32,7 +32,7 @@ Containing py3DPolyS_LE package
     ./py3dpolys_le/src/analyse.f03
     ./py3dpolys_le/src/kinds.f03
     ./py3dpolys_le/src/lattice_data.f03
-    ./py3dpolys_le/src/lib_conf.f03
+    ./py3dpolys_le/src/lib_conf.f90
     ./py3dpolys_le/src/logging.f03
     ./py3dpolys_le/src/polymer_model.f03
     ./py3dpolys_le/src/randomnumber.f03
