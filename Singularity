@@ -35,17 +35,14 @@ Containing py3DPolyS_LE package
     PATH=/opt/miniconda3/bin:$PATH
     export PATH=$PATH
     echo 'export PATH=$PATH' >> $SINGULARITY_ENVIRONMENT
-    #echo "PATH=$PATH:/opt/miniconda3/bin/" >> ~/.bashrc
-    #source ~/.bashrc
-    #conda init bash
-    #source ~/.bashrc
     make env
-    conda activate py3dpolys_le
+    source /opt/miniconda3/bin/activate py3dpolys_le
     make all
-    echo "conda activate py3dpolys_le" >> $SINGULARITY_ENVIRONMENT
+    echo "source /opt/miniconda3/bin/activate py3dpolys_le" >> $SINGULARITY_ENVIRONMENT
+    #echo "conda activate py3dpolys_le" >> $SINGULARITY_ENVIRONMENT
 
 %startscript
-    /opt/miniconda3/bin/conda activate py3dpolys_le
+    source /opt/miniconda3/bin/activate py3dpolys_le
 
 %runscript
     echo "Container py3DPolyS_LE was created $NOW"
