@@ -10,7 +10,21 @@ From: togop/gcc_gfortran_mpi_hdf5_python:latest
 Containing py3DPolyS_LE package
 
 %files
-    ./test/data/wt_N2_Moushumi2020_HIC1_5000.cool /data
+    ./CMakeLists.txt
+    ./environment.yml
+    ./Makefile
+    ./MANIFEST.in
+    ./mpi.cmake
+    ./README.md
+    ./requirements_dev.txt
+    ./setup.py
+    ./setup.py
+    ./py3dpolys_le/*.py
+    ./py3dpolys_le/src/*.f03
+    ./py3dpolys_le/bin/cmd.sh
+    ./py3dpolys_le/data/sample_3dpolys_le.cfg
+    ./py3dpolys_le/data/ce/*.*
+    ./test/data/wt_N2_Moushumi2020_HIC1_5000.cool
 
 %environment
      SINGULARITYENV_APPEND_PATH=/opt/miniconda3/bin:
