@@ -1,4 +1,4 @@
-.PHONY: all build debug env install test doc
+.PHONY: all build debug env install test doc sif
 
 build:
 	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build -S .
@@ -14,6 +14,9 @@ env:
 	conda env create -f environment.yml
 	# conda create -n py3dpolys_le python=3.8
 	# conda activate py3dpolys_le
+
+sif:
+	singularity build --force py3DPolyS-LE.sif Singularity
 
 install:
 	# conda config --add channels bioconda
