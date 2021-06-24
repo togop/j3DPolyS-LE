@@ -56,6 +56,7 @@ Containing py3DPolyS_LE package
     make env
     . /opt/miniconda3/bin/activate py3dpolys_le
     conda install cmake
+    pip install Cython
     make all
     echo ". /opt/miniconda3/bin/activate py3dpolys_le" >> $SINGULARITY_ENVIRONMENT
     #echo "conda activate py3dpolys_le" >> $SINGULARITY_ENVIRONMENT
