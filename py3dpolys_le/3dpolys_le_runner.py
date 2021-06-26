@@ -67,9 +67,9 @@ def cli_parser():
     # TODO add -bf and look for others missing; remove unneeded and confusing
     p.add_argument("-b", "--boundary", default="",
                    help="Boundary sites file in CSV format used in a simulation.")
-    p.add_argument("-lbs", "---lef_binding_sites", default="",
-                   help="<loop extrusion binding sites file> LEFs binding sites file in a csv format with the following "
-                        "columns: name,position,length,probability. Default: if not given, the whole polymer.")
+    p.add_argument("-lls", "---lef_loading_sites", default="",
+                   help="<loop extrusion loading sites file> LEFs loading sites file in a csv format with the following "
+                        "columns: name,position,length,factor. Default: if not given, the whole polymer.")
     p.add_argument("--hic_chrs", nargs='*', default=None,
                    help="Synonyms of the chromosome from Hi-C matrixes to be compared. "
                         "Default X, set by constant hic_analysis.py::CHR_SYNONYMS = CHR_X_SYNONYMS.")
@@ -144,7 +144,7 @@ class DccExtrusionArgs:
     output_folder: str
     analyse: str
     boundary: str
-    lef_binding_sites: str
+    lef_loading_sites: str
     tads_boundary: str
     stats_file: str
     exp_cool: str
@@ -165,7 +165,7 @@ class DccExtrusionArgs:
     cmp_chrs: list
     _config = configparser.ConfigParser()
 
-    def __init__(self, stats=False, all_stats=False, boundary="", lef_binding_sites="", input_cfg="./input.cfg",
+    def __init__(self, stats=False, all_stats=False, boundary="", lef_loading_sites="", input_cfg="./input.cfg",
                  tads_boundary="",
                  stats_file="./py3dpolys_le_stats.csv",
                  exp_cool="",
@@ -180,7 +180,7 @@ class DccExtrusionArgs:
         self.output_folder = output_folder
         self.analyse = analyse
         self.boundary = boundary if boundary else self.get_property('boundary')
-        self.lef_binding_sites = lef_binding_sites
+        self.lef_loading_sites = lef_loading_sites
         self.tads_boundary = tads_boundary if tads_boundary else self.get_property('tads_boundary')
         self.stats_file = stats_file
         self.exp_cool = exp_cool if exp_cool else self.get_property('exp_cool')
@@ -350,7 +350,7 @@ class DccExtrusionRunner:
                 bin3dpolys_le = pkg_resources.resource_filename(__name__, 'bin/3dpolys_le')
                 cmd = f"{cmd_sh} mpirun {bin3dpolys_le} " \
                       f"-o:{dcc_args.output_folder} --km:{km} --nlef:{nlef} " \
-                      f"-b:{boundary} -lbs:{dcc_args.lef_binding_sites} " \
+                      f"-b:{boundary} -lls:{dcc_args.lef_loading_sites} " \
                       f"-bd:{dcc_args.boundary_direction} -bf:{dcc_args.boundary_factor} {bs_opt} " \
                       f"{z_loop} {u_opt} {init_mode} {a_opt} {r_opt} {input_cfg}"
                 if dcc_args.analyse:
@@ -604,7 +604,7 @@ def main():
 
     job_runner: JobRunner = CfgJobRunner(input_cfg=args.input_cfg, cmd_run_file=args.cmd_run_file)
 
-    dcc_args = DccExtrusionArgs(boundary=args.boundary, lef_binding_sites=args.lef_binding_sites,
+    dcc_args = DccExtrusionArgs(boundary=args.boundary, lef_loading_sites=args.lef_loading_sites,
                                 input_cfg=args.input_cfg, tads_boundary=args.tads_boundary,
                                 stats_file=args.stats_file, exp_cool=args.exp_cool, nlef=args.nlef, km=args.km,
                                 radius_contact=args.radius_contact, contact_probability=args.contact_probability,
