@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2021.6.26'
+    character(*), parameter :: VERSION = '2021.6.28'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2021.6.26'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2021.6.28'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -165,7 +165,7 @@ program mainprogram
     real, dimension(:, :), allocatable :: boundary  ! (strand -/+, permeability)
     real, dimension(:), allocatable :: loading_sites_factor
     integer :: loading_sites_count = 0 ! deafault: there is no lef_loading_site file so the whole polymer is loading site
-    real :: basal_loading_factor = 1.
+    real :: basal_loading_factor = -1. ! not defined
     real :: boundary_factor = 0., boundary_score = 0.  ! not defined
     integer :: boundary_direction = -9 ! not defned direction
     integer, parameter :: resolution_factor = 2000
@@ -395,7 +395,14 @@ program mainprogram
         call log%info('Output folder: ' // trim(output_folder))
     end if
 
-    call load_config_file(input_dat_file)
+    call load_config_file(input_dat_file, iostat=ierr)
+    if (ierr /= 0) then
+        if (rank == 0) then
+            call log%error('Could not find or open input configuration file: ' // trim(input_dat_file))
+            call print_help()
+        end if
+        call exit(1)
+    end if
     call read_config('Nchain',    Nchain)
     call read_config('L',    L)
     call read_config('Niter',    Niter)
@@ -422,6 +429,9 @@ program mainprogram
     end if
     if (lef_loading_sites == '') then
         call read_config('lef_loading_sites', lef_loading_sites, default='')
+    end if
+    if (basal_loading_factor == -1) then
+        call read_config('basal_loading_factor', basal_loading_factor, default=1.)
     end if
     if (boundary_factor == 0.) then
         call read_config('boundary_factor', boundary_factor)
@@ -463,7 +473,8 @@ program mainprogram
         call log%info('init_mode=' // trim(init_mode))
         call log%info('boundary=' // trim(boundary_file))
         call log%info('lef_loading_sites=' // trim(lef_loading_sites))
-        call log%info('boundary_factor=' // trim(strf(boundary_factor))) ! TODO remove redundant param: see boundary_site%score
+        call log%info('basal_loading_factor=' // trim(strf(basal_loading_factor)))
+x        call log%info('boundary_factor=' // trim(strf(boundary_factor))) ! TODO remove redundant param: see boundary_site%score
         if (use_boundary_score) then
             call log%info('boundary_score=true')
         else
@@ -721,7 +732,7 @@ program mainprogram
 
             open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
             call model%output_parameters(20, init_mode, boundary_file, lef_loading_sites, &
-                    boundary_factor, use_boundary_score, boundary_direction, &
+                    basal_loading_factor, boundary_factor, use_boundary_score, boundary_direction, &
                     Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
             close(20)
         end if

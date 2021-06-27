@@ -16,8 +16,10 @@ Containing py3DPolyS_LE package
     ./Makefile
     ./MANIFEST.in
     ./mpi.cmake
+    ./pyproject.toml
     ./README.md
     ./requirements_dev.txt
+    ./setup.py
     ./setup.py
     ./py3dpolys_le/3dpolys_le_runner.py
     ./py3dpolys_le/3dpolys_le_stats.py
@@ -53,17 +55,22 @@ Containing py3DPolyS_LE package
     PATH=/opt/miniconda3/bin:$PATH
     export PATH=$PATH
     echo 'export PATH=$PATH' >> $SINGULARITY_ENVIRONMENT
-    make env
-    . /opt/miniconda3/bin/activate py3dpolys_le
+    #make env
+    #. /opt/miniconda3/bin/activate py3dpolys_le
+    conda update -q conda
+    conda config --add channels bioconda
+    conda config --add channels conda-forge
+    conda config --add channels defaults
+    conda install -y -q --file requirements_dev.txt python=3.8
     conda install cmake
     pip install Cython
     make build
     pip install -e /
-    echo ". /opt/miniconda3/bin/activate py3dpolys_le" >> $SINGULARITY_ENVIRONMENT
-    #echo "conda activate py3dpolys_le" >> $SINGULARITY_ENVIRONMENT
+    # echo ". /opt/miniconda3/bin/activate py3dpolys_le" >> $SINGULARITY_ENVIRONMENT
+    # echo "conda activate py3dpolys_le" >> $SINGULARITY_ENVIRONMENT
 
 %startscript
-    . /opt/miniconda3/bin/activate py3dpolys_le
+    # . /opt/miniconda3/bin/activate py3dpolys_le
 
 %runscript
     echo "Container py3DPolyS_LE was created $NOW"
