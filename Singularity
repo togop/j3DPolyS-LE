@@ -52,7 +52,7 @@ Containing py3DPolyS_LE package
     # Install py3dpolys_le package
     PATH=/opt/miniconda3/bin:$PATH
     export PATH=$PATH
-    echo 'export PATH=$PATH' >> $SINGULARITY_ENVIRONMENT
+    echo 'export PATH=/opt/miniconda3/bin:$PATH' >> $SINGULARITY_ENVIRONMENT
     #make env
     #. /opt/miniconda3/bin/activate py3dpolys_le
     conda update -q conda
@@ -61,7 +61,7 @@ Containing py3DPolyS_LE package
     conda config --add channels defaults
     conda install -y -q --file requirements_dev.txt python=3.8
     conda install cmake
-    pip install Cython
+    # pip install Cython
     make build
     pip install -e /
     # echo ". /opt/miniconda3/bin/activate py3dpolys_le" >> $SINGULARITY_ENVIRONMENT
