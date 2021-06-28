@@ -20,7 +20,6 @@ Containing py3DPolyS_LE package
     ./README.md
     ./requirements_dev.txt
     ./setup.py
-    ./setup.py
     ./py3dpolys_le/3dpolys_le_runner.py
     ./py3dpolys_le/3dpolys_le_stats.py
     ./py3dpolys_le/__init__.py
@@ -40,7 +39,6 @@ Containing py3DPolyS_LE package
     ./py3dpolys_le/src/randomnumber.f03
     ./py3dpolys_le/src/timers.f03
     ./py3dpolys_le/bin/cmd.sh
-    ./py3dpolys_le/data/sample_3dpolys_le.cfg
     ./py3dpolys_le/data/ce/dcc_mex-sites_boundaries.csv
     ./py3dpolys_le/data/ce/dcc_rex-sites_Crane2015_bindings.csv
     ./py3dpolys_le/data/ce/input.cfg
