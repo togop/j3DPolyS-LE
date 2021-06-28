@@ -474,7 +474,7 @@ program mainprogram
         call log%info('boundary=' // trim(boundary_file))
         call log%info('lef_loading_sites=' // trim(lef_loading_sites))
         call log%info('basal_loading_factor=' // trim(strf(basal_loading_factor)))
-x        call log%info('boundary_factor=' // trim(strf(boundary_factor))) ! TODO remove redundant param: see boundary_site%score
+        call log%info('boundary_factor=' // trim(strf(boundary_factor))) ! TODO remove redundant param: see boundary_site%score
         if (use_boundary_score) then
             call log%info('boundary_score=true')
         else
