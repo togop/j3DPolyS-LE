@@ -3,46 +3,11 @@ From: togop/gcc_gfortran_mpi_hdf5_python:latest
 
 %labels
     Author todor.gitchev@izb.unibe.ch
-    Version v2021.6.24
+    Version v2021.6.28
 
 %help
 
-Containing py3DPolyS_LE package
-
-%files
-    # maybe better (but it needs to be public) : git clone
-    ./CMakeLists.txt
-    ./environment.yml
-    ./Makefile
-    ./MANIFEST.in
-    ./mpi.cmake
-    ./pyproject.toml
-    ./README.md
-    ./requirements_dev.txt
-    ./setup.py
-    ./py3dpolys_le/3dpolys_le_runner.py
-    ./py3dpolys_le/3dpolys_le_stats.py
-    ./py3dpolys_le/__init__.py
-    ./py3dpolys_le/_logging.py
-    ./py3dpolys_le/_version.py
-    ./py3dpolys_le/hic_analysis.py
-    ./py3dpolys_le/hic_converters.py
-    ./py3dpolys_le/job_runner.py
-    ./py3dpolys_le/plot_hic.py
-    ./py3dpolys_le/src/3dpolys_le.f03
-    ./py3dpolys_le/src/analyse.f03
-    ./py3dpolys_le/src/kinds.f03
-    ./py3dpolys_le/src/lattice_data.f03
-    ./py3dpolys_le/src/lib_conf.f90
-    ./py3dpolys_le/src/logging.f03
-    ./py3dpolys_le/src/polymer_model.f03
-    ./py3dpolys_le/src/randomnumber.f03
-    ./py3dpolys_le/src/timers.f03
-    ./py3dpolys_le/bin/cmd.sh
-    ./py3dpolys_le/data/ce/dcc_mex-sites_boundaries.csv
-    ./py3dpolys_le/data/ce/dcc_rex-sites_Crane2015_bindings.csv
-    ./py3dpolys_le/data/ce/input.cfg
-    ./test/data/wt_N2_Moushumi2020_HIC1_5000.cool
+3D Polymer Simulation of chromosome folding by modeled loop extrusion
 
 %environment
      SINGULARITYENV_APPEND_PATH=/opt/miniconda3/bin:
@@ -53,22 +18,19 @@ Containing py3DPolyS_LE package
     PATH=/opt/miniconda3/bin:$PATH
     export PATH=$PATH
     echo 'export PATH=/opt/miniconda3/bin:$PATH' >> $SINGULARITY_ENVIRONMENT
-    #make env
-    #. /opt/miniconda3/bin/activate py3dpolys_le
     conda update -q conda
     conda config --add channels bioconda
     conda config --add channels conda-forge
     conda config --add channels defaults
-    conda install -y -q --file requirements_dev.txt python=3.8
+    # conda install -y -q --file requirements_dev.txt python=3.8
+    conda install -y -q numpy cython pandas matplotlib scipy filelock h5py dask cooler pyranges python=3.8
     conda install cmake
     # pip install Cython
+    apt-get update && apt-get install -y git
+    git clone https://togop:nq3QN9UvMwdmCPnHkCB9@gitlab.com/togop/3DPolyS-LE.git -b develop
+    cd 3DPolyS-LE
     make build
-    pip install -e /
-    # echo ". /opt/miniconda3/bin/activate py3dpolys_le" >> $SINGULARITY_ENVIRONMENT
-    # echo "conda activate py3dpolys_le" >> $SINGULARITY_ENVIRONMENT
-
-%startscript
-    # . /opt/miniconda3/bin/activate py3dpolys_le
+    pip install -e /3DPolyS-LE
 
 %runscript
     echo "Container py3DPolyS_LE was created $NOW"

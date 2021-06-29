@@ -104,10 +104,10 @@ subroutine print_help()
     print*, 'parameters in a configuration file (3dpolys_le.cfg):'
     print*, 'Nchain     Polymer chain length in monomers of 2kb.'
     print*, 'L          Polymer compartment box size L (choose L so that Nchain/(4*L^3) ~ 0.5).'
-    print*, 'Niter      Number of iterations, aka number of independent trajectories as polymer replicas. &
-            & 1 min = 12000 interaction steps'
+    print*, 'Niter      Number of iterations, aka number of independent trajectories as polymer replicas.'
     print*, 'Nmeas      Number of measures >=3 (initial, burin-in, n*simulation steps, burn-out), aka number of snapshots.'
-    print*, 'Ninter     Interval between measures, aka number of Monte Carlo steps (MCS) between two snapshots.'
+    print*, 'Ninter     Interval between measures, aka number of Monte Carlo steps (MCS) between two snapshots. &
+            & 1 min = 12000 interaction steps'
     print*, 'kint       Bending energy of the polymer (do not change).'
     print*, 'kb         LEFs binding rate (do not change).'
     print*, 'ku         LEFs half-unbinding rate (do not change).'
