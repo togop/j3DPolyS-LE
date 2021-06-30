@@ -348,10 +348,15 @@ class DccExtrusionRunner:
                 # TODO find better way to separate the Slurm problem
                 cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')
                 bin3dpolys_le = pkg_resources.resource_filename(__name__, 'bin/3dpolys_le')
+                # not nice but maybe can be improved later
+                boundary_opt_f = f'-b:{boundary}' if boundary else ''   # fortran
+                lef_loading_sites_opt_f = f'-lls:{dcc_args.lef_loading_sites}' if dcc_args.lef_loading_sites else ''
+                boundary_direction_opt_f = f'-bd:{dcc_args.boundary_direction}' if dcc_args.boundary_direction else ''
+                boundary_factor_opt_f = f'-bf:{dcc_args.boundary_factor}' if dcc_args.boundary_factor else ''
                 cmd = f"{cmd_sh} mpirun {bin3dpolys_le} " \
                       f"-o:{dcc_args.output_folder} --km:{km} --nlef:{nlef} " \
-                      f"-b:{boundary} -lls:{dcc_args.lef_loading_sites} " \
-                      f"-bd:{dcc_args.boundary_direction} -bf:{dcc_args.boundary_factor} {bs_opt} " \
+                      f"{boundary_opt_f} {lef_loading_sites_opt_f} " \
+                      f"{boundary_direction_opt_f} {boundary_factor_opt_f} {bs_opt} " \
                       f"{z_loop} {u_opt} {init_mode} {a_opt} {r_opt} {input_cfg}"
                 if dcc_args.analyse:
                     jobid = self._job_runner.run_cmd(cmd, prev_jobid, profile='analysis')
@@ -379,10 +384,13 @@ class DccExtrusionRunner:
             s_cmp_chrs = f'--cmp_chrs {" ".join(dcc_args.cmp_chrs)}' if dcc_args.cmp_chrs is not None else ''
 
             t_opt = f"-t {dcc_args.tads_boundary}" if dcc_args.tads_boundary else ""
+            boundary_opt_py = f'-b {boundary}' if boundary else ''  # python
+            boundary_direction_opt_py = f'-bd {dcc_args.boundary_direction}' if dcc_args.boundary_direction else ''
+            boundary_factor_opt_py = f'-bf {dcc_args.boundary_factor}' if dcc_args.boundary_factor else ''
         # for LOCAL use something like : #
             cmd = f"3dpolys_le_stats " \
                   f"-o {dcc_args.output_folder} -a {analyse_folder} --km {km} --nlef {nlef} -e {exp_cool} " \
-                  f"-b {boundary} -bd {dcc_args.boundary_direction} -bf {dcc_args.boundary_factor} {bs_opt} " \
+                  f"{boundary_opt_py} {boundary_direction_opt_py} {boundary_factor_opt_py} {bs_opt} " \
                   f"{t_opt} {r_opt_py} " \
                   f"-i {input_cfg} -f {stats_file} {s_cmp_chrs} "
                 #  f"-eis {dcc_args.exp_ins_score} " \
