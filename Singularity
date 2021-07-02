@@ -6,8 +6,11 @@ From: togop/gcc_gfortran_mpi_hdf5_python:latest
     Version v2021.6.28
 
 %help
-
-3D Polymer Simulation of chromosome folding by modeled loop extrusion
+    3D Polymer Simulation of chromosome folding by modeled loop extrusion
+    Available commands:
+        3dpolys_le_runner
+        3dpolys_le_stats
+        plot_hic
 
 %environment
      SINGULARITYENV_APPEND_PATH=/opt/miniconda3/bin:
