@@ -15,7 +15,7 @@ import sys
 import pkg_resources
 
 from py3dpolys_le import hic_analysis as ha
-from py3dpolys_le.job_runner import JobRunner, CfgJobRunner
+from py3dpolys_le.job_runner import CfgJobRunner
 
 EXP_COOL_AS_STATS = '.'
 CFG_SECTION_3DPOLYS_LE = '3dpolys_le'
@@ -168,7 +168,7 @@ class DccExtrusionArgs:
                  stats_file="./py3dpolys_le_stats.csv",
                  exp_cool="",
                  exp_chip="",
-                 nlef=0, km=0, radius_contact=0, contact_probability=False,
+                 nlef=0, km=0, radius_contact=0, contact_probability=None,
                  boundary_direction=None, z_loop=None, unidirectional=None,
                  init_mode='',
                  output_folder='', analyse='', cmp_chrs=None):  # , simultaneously=1
@@ -184,14 +184,11 @@ class DccExtrusionArgs:
         self.exp_cool = exp_cool if exp_cool else self.get_property('exp_cool')
         self.exp_chip = exp_chip  # TODO probably remove
         # self.exp_ins_score = exp_ins_score
-        if self.get_property('Nlef'):
-            self.nlef = nlef if nlef else int(self.get_property('Nlef'))
-        if self.get_property('km'):
-            self.km = km if km else float(self.get_property('km'))
-        if self.get_property('radius_contact'):
-            self.radius_contact = radius_contact if radius_contact else float(self.get_property('radius_contact'))
-        self.contact_probability = contact_probability  # TODO probably remove
-        self.boundary_direction = boundary_direction if boundary_direction else self.get_property('boundary_direction')
+        self.nlef = nlef if nlef else int(self.get_property('Nlef'))
+        self.km = km if km else float(self.get_property('km'))
+        self.radius_contact = radius_contact if radius_contact else float(self.get_property('radius_contact'))
+        self.contact_probability = contact_probability if contact_probability else self.get_property('contact_probability', False)  # TODO probably remove
+        self.boundary_direction = boundary_direction if boundary_direction else int(self.get_property('boundary_direction'))
         self.z_loop = z_loop if z_loop else self.get_property('z_loop').lower() in ['true', '1', 't', 'y', 'yes']
         self.unidirectional = unidirectional if unidirectional else self.get_property('unidirectional').lower() in ['true', '1', 't', 'y', 'yes']
         self.init_mode = init_mode if init_mode else self.get_property('init_mode')
@@ -200,11 +197,11 @@ class DccExtrusionArgs:
         self.cmp_chrs = cmp_chrs if cmp_chrs else re.split('\\s*;\\s*|\\s*,\\s*|\\s+', self.get_property('cmp_chrs'))
         # self.simultaneously = simultaneously
 
-    def get_property(self, name):
+    def get_property(self, name, default=''):
         try:
             value = self._config.get(CFG_SECTION_3DPOLYS_LE, name)  # .strip()
         except (configparser.NoOptionError, configparser.NoSectionError) as e:
-            value = ''
+            value = default
         return value
 
     def default_analysis_subfolder(self) -> str:
@@ -254,9 +251,9 @@ def str2bool(b):
 
 class DccExtrusionRunner:
     _running_jobids = []
-    _job_runner: JobRunner
+    _job_runner: CfgJobRunner
 
-    def __init__(self, job_runner: JobRunner):
+    def __init__(self, job_runner: CfgJobRunner):
         self._job_runner = job_runner
 
     @staticmethod
@@ -338,12 +335,13 @@ class DccExtrusionRunner:
                 # workaround for Slurm: sbatch expect shell script. For other could be unneeded
                 # TODO find better way to separate the Slurm problem
                 cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')
+                container_prefix = self._job_runner.get_property(profile='', name='container_prefix')
                 bin3dpolys_le = pkg_resources.resource_filename(__name__, 'bin/3dpolys_le')
                 # not nice but maybe can be improved later
                 boundary_opt_f = f'-b:{boundary}' if boundary else ''   # fortran
                 lef_loading_sites_opt_f = f'-lls:{dcc_args.lef_loading_sites}' if dcc_args.lef_loading_sites else ''
                 boundary_direction_opt_f = f'-bd:{dcc_args.boundary_direction}' if dcc_args.boundary_direction else ''
-                cmd = f"{cmd_sh} mpirun {bin3dpolys_le} " \
+                cmd = f"{cmd_sh} {container_prefix} mpirun {bin3dpolys_le} " \
                       f"-o:{dcc_args.output_folder} --km:{km} --nlef:{nlef} " \
                       f"{boundary_opt_f} {lef_loading_sites_opt_f} " \
                       f"{boundary_direction_opt_f} " \
@@ -377,7 +375,9 @@ class DccExtrusionRunner:
             boundary_opt_py = f'-b {boundary}' if boundary else ''  # python
             boundary_direction_opt_py = f'-bd {dcc_args.boundary_direction}' if dcc_args.boundary_direction else ''
         # for LOCAL use something like : #
-            cmd = f"3dpolys_le_stats " \
+            cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')
+            container_prefix = self._job_runner.get_property(profile='', name='container_prefix')
+            cmd = f"{cmd_sh} {container_prefix} 3dpolys_le_stats " \
                   f"-o {dcc_args.output_folder} -a {analyse_folder} --km {km} --nlef {nlef} -e {exp_cool} " \
                   f"{boundary_opt_py} {boundary_direction_opt_py} " \
                   f"{t_opt} {r_opt_py} " \
@@ -494,7 +494,9 @@ class DccExtrusionRunner:
 
     def run_multi_decay_plot(self, dcc_args: DccExtrusionArgs, dep_jobid):
         s_cmp_chrs = f'--cmp_chrs {" ".join(dcc_args.cmp_chrs)}' if dcc_args.cmp_chrs is not None else ''
-        cmd = f"3dpolys_le_runner multi_decay_plot -o {dcc_args.output_folder} -i {dcc_args.input_cfg} -e {dcc_args.exp_cool}" \
+        cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')
+        container_prefix = self._job_runner.get_property(profile='', name='container_prefix')
+        cmd = f"{cmd_sh} {container_prefix} 3dpolys_le_runner multi_decay_plot -o {dcc_args.output_folder} -i {dcc_args.input_cfg} -e {dcc_args.exp_cool}" \
               f" {s_cmp_chrs}"
         return self._job_runner.run_cmd(cmd, dep_jobid)
 
@@ -532,7 +534,7 @@ class DccExtrusionRunner:
     @staticmethod
     def decay_plots(dcc_args: DccExtrusionArgs, res=ha.RESOLUTION, replace=False, use_threading=False):
         sim_stats_pd = DccExtrusionRunner.read_stats_file(dcc_args.stats_file)
-        arg_exp_cool = args.exp_cool
+        arg_exp_cool = dcc_args.exp_cool
         for index, sim in sim_stats_pd.iterrows():
             logger.info(
                 f"{index}, hic:{sim['sim_hic_file']}, nlef:{sim['nlef']}, km:{sim['km']}, r:{sim['radius_contact']}")
@@ -595,7 +597,7 @@ def main():
                        f'with which HiCs will be compared!')
         ha.CHR_SYNONYMS = args.cmp_chrs
 
-    job_runner: JobRunner = CfgJobRunner(input_cfg=args.input_cfg, cmd_run_file=args.cmd_run_file)
+    job_runner = CfgJobRunner(input_cfg=args.input_cfg, cmd_run_file=args.cmd_run_file)
 
     dcc_args = DccExtrusionArgs(boundary=args.boundary, lef_loading_sites=args.lef_loading_sites,
                                 input_cfg=args.input_cfg, tads_boundary=args.tads_boundary,
