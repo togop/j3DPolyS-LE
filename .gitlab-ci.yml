@@ -72,8 +72,8 @@ test:
     - ./test/test.sh out/test3/r7.10/hic_001_cool.svg
     - ./test/test.sh out/test3/r7.10/hic_002_cool.svg
     - make test
-    - ls -la out-Nlef200-km0.0027-bd0-bf1-bs_im-z_z-loop
-    - ls -la out-Nlef200-km0.0027-bd0-bf1-bs_im-z_z-loop/r2.84
+    - ls -la out-Nlef200-km0.0027-bd0_im-z_z-loop
+    - ls -la out-Nlef200-km0.0027-bd0_im-z_z-loop/r2.84
 
 singularity:
   stage: production
