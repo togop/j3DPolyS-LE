@@ -26,9 +26,6 @@ def cli_parser():
     p.add_argument("-b", "--boundary", default=None, help="Boundary file in TSV format.")
     p.add_argument("-bd", "--boundary_direction", default=0, help="Impermeability direction applied to all boundaries: "
                                                                   "-1: opposite direction, 0: both, 1: same direction.")
-    p.add_argument("-bf", "--boundary_factor", default=1., help="Impermeability factor applied to all boundaries.")
-    p.add_argument("-bs", "--boundary_score", help="Whether individual boundary scores were applied in a simulation.",
-                   action='store_true')
     p.add_argument("-t", "--tads_boundary", default=None,
                    help="TADs boundary file in CSV format (same as boundary.csv) to be used for calculating chi2-min score. "
                         "Also supported Loops file in .bed.tsv format, with the following columns: "
@@ -105,7 +102,7 @@ def main():
             # !!! it is important the first column to be unique as this will be used by panda as index !!!
             stats_writer.writerow(
                 ['sim_hic_file', 'sim_out_folder', 'exp_cool', 'resolution',
-                 'boundary', 'boundary_direction', 'boundary_factor', 'boundary_score',
+                 'boundary', 'boundary_direction',
                  'tads_boundary', 'input.cfg', 'nlef', 'km', 'radius_contact', 'chi2_log', 'alpha_log',
                  'chi2_lin', 'alpha_lin', 'chr'])
 
@@ -116,9 +113,8 @@ def main():
             radius_p = f'{args.radius_contact}{cp}' if args.radius_contact > 0 else ''
             stats_writer.writerow(
                 [sim_hic_file, args.output_folder, exp_cool, ha.RESOLUTION,
-                 boundary, args.boundary_direction, args.boundary_factor, args.boundary_score,
-                 tads_boundary, args.input_cfg, args.nlef, args.km, radius_p, chi2_log, alpha_log,
-                 chi2_lin, alpha_lin, ha.CHR_SYNONYMS[-1]])
+                 boundary, args.boundary_direction, tads_boundary, args.input_cfg, args.nlef, args.km, radius_p,
+                 chi2_log, alpha_log, chi2_lin, alpha_lin, ha.CHR_SYNONYMS[-1]])
 
     # generate hic_*_hot_r.png plot files if not already done
     plot_cmap = cfg_job_runner.get_property(profile='stats', name='plot_cmap')

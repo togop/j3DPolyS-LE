@@ -154,8 +154,6 @@ class DccExtrusionArgs:
     radius_contact: float
     contact_probability: bool
     boundary_direction: int
-    boundary_factor: float
-    boundary_score: bool
     z_loop: bool
     unidirectional: bool
     init_mode: str
@@ -171,7 +169,7 @@ class DccExtrusionArgs:
                  exp_cool="",
                  exp_chip="",
                  nlef=0, km=0, radius_contact=0, contact_probability=False,
-                 boundary_direction=None, boundary_factor=None, boundary_score=None, z_loop=None, unidirectional=None,
+                 boundary_direction=None, z_loop=None, unidirectional=None,
                  init_mode='',
                  output_folder='', analyse='', cmp_chrs=None):  # , simultaneously=1
         # input arguments values overwriting configuration values (input.cfg)
@@ -194,9 +192,6 @@ class DccExtrusionArgs:
             self.radius_contact = radius_contact if radius_contact else float(self.get_property('radius_contact'))
         self.contact_probability = contact_probability  # TODO probably remove
         self.boundary_direction = boundary_direction if boundary_direction else self.get_property('boundary_direction')
-        if self.get_property('boundary_factor'):
-            self.boundary_factor = boundary_factor if boundary_factor else float(self.get_property('boundary_factor'))
-        self.boundary_score = boundary_score if boundary_score else self.get_property('boundary_score')
         self.z_loop = z_loop if z_loop else self.get_property('z_loop').lower() in ['true', '1', 't', 'y', 'yes']
         self.unidirectional = unidirectional if unidirectional else self.get_property('unidirectional').lower() in ['true', '1', 't', 'y', 'yes']
         self.init_mode = init_mode if init_mode else self.get_property('init_mode')
@@ -227,12 +222,10 @@ class DccExtrusionArgs:
         :return: default output folder
         :rtype: str
         """
-        bs_opt = '-bs' if bool(self.boundary_score) else ''
         z_opt = '_z-loop' if self.z_loop else ''
         u_opt = '_unidir' if self.unidirectional else ''
         im_opt = f'_im-{self.init_mode}' if self.init_mode else ''
-        return os.path.join('', f'out-Nlef{self.nlef}-km{self.km:g}-bd{self.boundary_direction}'
-                                 f'-bf{self.boundary_factor:g}{bs_opt}{im_opt}{z_opt}{u_opt}')
+        return os.path.join('', f'out-Nlef{self.nlef}-km{self.km:g}-bd{self.boundary_direction}{im_opt}{z_opt}{u_opt}')
 
 
 def is_analysis_output_folder(folder: str):
@@ -270,8 +263,7 @@ class DccExtrusionRunner:
     def read_stats_file(stats_file):
         # read float as string to avoid rounding errors if decide to save it back
         return pd.read_csv(stats_file, delimiter=',', encoding='utf-8', header=0,
-                           dtype={'boundary_direction': np.str, 'boundary_score': np.str,
-                                  'km': np.str, 'radius_contact': np.str,
+                           dtype={'boundary_direction': np.str, 'km': np.str, 'radius_contact': np.str,
                                   'chi2_log': np.str, 'alpha_log': np.str, 'chi2_lin': np.str, 'alpha_lin': np.str})
         # , engine='python')
 
@@ -291,7 +283,6 @@ class DccExtrusionRunner:
         :return: the job id if worker job was run
         '''
         prev_jobid = dep_jobid if dep_jobid else self._running_jobids[-1] if len(self._running_jobids) > 0 else ""
-        bs_opt = '-bs' if bool(dcc_args.boundary_score) else ''
         cp = '-cp' if dcc_args.contact_probability else ''
         z_loop = '-z' if dcc_args.z_loop else ''
         u_opt = '-u' if dcc_args.unidirectional else ''
@@ -352,11 +343,10 @@ class DccExtrusionRunner:
                 boundary_opt_f = f'-b:{boundary}' if boundary else ''   # fortran
                 lef_loading_sites_opt_f = f'-lls:{dcc_args.lef_loading_sites}' if dcc_args.lef_loading_sites else ''
                 boundary_direction_opt_f = f'-bd:{dcc_args.boundary_direction}' if dcc_args.boundary_direction else ''
-                boundary_factor_opt_f = f'-bf:{dcc_args.boundary_factor}' if dcc_args.boundary_factor else ''
                 cmd = f"{cmd_sh} mpirun {bin3dpolys_le} " \
                       f"-o:{dcc_args.output_folder} --km:{km} --nlef:{nlef} " \
                       f"{boundary_opt_f} {lef_loading_sites_opt_f} " \
-                      f"{boundary_direction_opt_f} {boundary_factor_opt_f} {bs_opt} " \
+                      f"{boundary_direction_opt_f} {bs_opt} " \
                       f"{z_loop} {u_opt} {init_mode} {a_opt} {r_opt} {input_cfg}"
                 if dcc_args.analyse:
                     jobid = self._job_runner.run_cmd(cmd, prev_jobid, profile='analysis')
@@ -386,11 +376,10 @@ class DccExtrusionRunner:
             t_opt = f"-t {dcc_args.tads_boundary}" if dcc_args.tads_boundary else ""
             boundary_opt_py = f'-b {boundary}' if boundary else ''  # python
             boundary_direction_opt_py = f'-bd {dcc_args.boundary_direction}' if dcc_args.boundary_direction else ''
-            boundary_factor_opt_py = f'-bf {dcc_args.boundary_factor}' if dcc_args.boundary_factor else ''
         # for LOCAL use something like : #
             cmd = f"3dpolys_le_stats " \
                   f"-o {dcc_args.output_folder} -a {analyse_folder} --km {km} --nlef {nlef} -e {exp_cool} " \
-                  f"{boundary_opt_py} {boundary_direction_opt_py} {boundary_factor_opt_py} {bs_opt} " \
+                  f"{boundary_opt_py} {boundary_direction_opt_py} " \
                   f"{t_opt} {r_opt_py} " \
                   f"-i {input_cfg} -f {stats_file} {s_cmp_chrs} "
                 #  f"-eis {dcc_args.exp_ins_score} " \
@@ -435,10 +424,6 @@ class DccExtrusionRunner:
                 dcc_args_analysis.boundary = sim['boundary']
                 dcc_args_analysis.boundary_direction = sim['boundary_direction'] if columns.__contains__(
                     'boundary_direction') else 0
-                dcc_args_analysis.boundary_factor = sim['boundary_factor'] if columns.__contains__(
-                    'boundary_factor') else 1.
-                dcc_args_analysis.boundary_score = str2bool(sim['boundary_score']) if columns.__contains__(
-                    'boundary_score') else False
                 dcc_args_analysis.tads_boundary = sim['tads_boundary']
                 dcc_args_analysis.input_cfg = sim['input.cfg']
                 dcc_args_analysis.nlef = sim['nlef']

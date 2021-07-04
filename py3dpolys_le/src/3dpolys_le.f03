@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2021.6.28'
+    character(*), parameter :: VERSION = '2021.7.4'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2021.6.28'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2021.7.4'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -89,11 +89,8 @@ subroutine print_help()
             & Default: false - uniform distributed.'
     print*, '   -l|-nlef:<Nlef_val>: Nlef value, overwriting the one from the inpiut.dat'
     print*, '   -m|--km:<km_val>: km value, overwriting the one from the inpiut.dat'
-    print*, '   -bf|--boundary_factor:<boundary_factor>: impermeability factor applied to all boundaries. Default: 1 -&
-            & no permeability'
     print*, '   -bd|--boundary_direction:<boundary_direction>: impermeability direction applied to all boundaries:&
             & -1:opposite direction, 0:both, 1:same direction. Default: 0'
-    print*, '   -bs|--boundary_score : Apply each boundary matching score (column "score") to its boundary’s impermeability.'
     print*, '   -im|--init_mode:<init_mode>: Initial folding mode: h for helices-like, z for zigzag-like polymer state.'
     print*, '   -z|--z_loop : Allow z_loop for LEFs move, where LEFs can traverse one another. Default: false'
     print*, '   -u|--unidirectional : Unidirectional mode for LEFs move otherwise bidirectional. Default: false=bidirectional'
@@ -166,7 +163,6 @@ program mainprogram
     real, dimension(:), allocatable :: loading_sites_factor
     integer :: loading_sites_count = 0 ! deafault: there is no lef_loading_site file so the whole polymer is loading site
     real :: basal_loading_factor = -1. ! not defined
-    real :: boundary_factor = 0., boundary_score = 0.  ! not defined
     integer :: boundary_direction = -9 ! not defned direction
     integer, parameter :: resolution_factor = 2000
     type(PolymerModel) :: model
@@ -185,7 +181,6 @@ program mainprogram
     character(len = 20) :: col1, col2, col3, col4
     type(Logger) :: log = Logger(source = '3dpolys_le', level = LOG_INFO)
     integer :: hic3d_factor = 0
-    logical :: use_boundary_score = .false.
     logical :: z_loop = .false.
     logical :: unidirectional = .false.
     logical :: file_exists
@@ -305,25 +300,12 @@ program mainprogram
                 if (rank == 0) then
                     call log%info('input ' // trim(input_options(:i)) // trim(strf(km)))
                 end if
-            elseif ((index(input_options, '--boundary_factor:') > 0).or.(index(input_options, '-bf:') > 0)) then
-                i = index(input_options, ':')
-                opt_s = trim(input_options(i + 1:))
-                READ(opt_s, *) boundary_factor
-                if (rank == 0) then
-                    call log%info('input ' // trim(input_options(:i)) // trim(strf(boundary_factor)))
-                end if
             elseif ((index(input_options, '--boundary_direction:') > 0).or.(index(input_options, '-bd:') > 0)) then
                 i = index(input_options, ':')
                 opt_s = trim(input_options(i + 1:))
                 READ(opt_s, *) boundary_direction
                 if (rank == 0) then
                     call log%info('input ' // trim(input_options(:i)) // trim(str(boundary_direction)))
-                end if
-            elseif ((index(input_options, '--boundary_score') > 0).or.(index(input_options, '-bs') > 0)) then
-                use_boundary_score = .true.
-                boundary_score = 1  ! just to indicate it was set by CLI
-                if (rank == 0) then
-                    call log%info('Apply each boundary matching score (column "score") to its boundary’s impermeability')
                 end if
             elseif ((index(input_options, '--z_loop') > 0).or.(index(input_options, '-z') > 0)) then
                 z_loop = .true.
@@ -433,13 +415,6 @@ program mainprogram
     if (basal_loading_factor == -1) then
         call read_config('basal_loading_factor', basal_loading_factor, default=1.)
     end if
-    if (boundary_factor == 0.) then
-        call read_config('boundary_factor', boundary_factor)
-    end if
-    if (boundary_score == 0.) then
-        ! a bit confusing: using value of var 'boundary_score' used later for the real boundary_score to indicate
-        call read_config('boundary_score', use_boundary_score)
-    end if
     if (boundary_direction < -1) then
         call read_config('boundary_direction', boundary_direction)
     end if
@@ -474,12 +449,6 @@ program mainprogram
         call log%info('boundary=' // trim(boundary_file))
         call log%info('lef_loading_sites=' // trim(lef_loading_sites))
         call log%info('basal_loading_factor=' // trim(strf(basal_loading_factor)))
-        call log%info('boundary_factor=' // trim(strf(boundary_factor))) ! TODO remove redundant param: see boundary_site%score
-        if (use_boundary_score) then
-            call log%info('boundary_score=true')
-        else
-            call log%info('boundary_score=false')
-        end if
         call log%info('boundary_direction=' // trim(str(boundary_direction)))
         if (z_loop) then
             call log%info('z_loop=true')
@@ -502,8 +471,7 @@ program mainprogram
         open(10, file = trim(boundary_file), action = 'read', iostat = rc)
         if (rc == 0) then
             if (rank == 0) then
-                call log%info('Load boundaries file ' // trim(boundary_file) // ' with boundary_foctor ' // &
-                        trim(strf(boundary_factor)) // ' ...')
+                call log%info('Load boundaries file ' // trim(boundary_file) // ' ...')
             end if
             col1 = ''
             col2 = ''
@@ -540,18 +508,8 @@ program mainprogram
                             end if
                         end if
 
-                        ! call log%info('boundary_score col4: ' // trim(col4))
-                        if (use_boundary_score.and.(col4=='score')) then
-                            boundary_score = boundary_site%score / 10. ! TODO maybe rename it to %factor and remove / 10
-                        else
-                            boundary_score = 1.
-                        end if
                         ! print*, 'old impermeability_prev: ' // trim(strf(impermeability_prev))
-                        impermeability_prev = 1 - (1 - impermeability_prev) * &
-                                (1 - abs(boundary_site%impermeability * boundary_factor * boundary_score))
-                        ! print*, 'new impermeability_prev: ' // trim(strf(impermeability_prev)) // &
-                        !         ' by boundary_factor:' // trim(strf(boundary_factor)) // &
-                        !        ' and boundary_score:' // trim(strf(boundary_score))
+                        impermeability_prev = 1 - (1 - impermeability_prev) * (1 - abs(boundary_site%impermeability))
                         if (strand /= 0) then
                             boundary(strand, i) = impermeability_prev
                         else
@@ -732,7 +690,7 @@ program mainprogram
 
             open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
             call model%output_parameters(20, init_mode, boundary_file, lef_loading_sites, &
-                    basal_loading_factor, boundary_factor, use_boundary_score, boundary_direction, &
+                    basal_loading_factor, boundary_direction, &
                     Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
             close(20)
         end if
