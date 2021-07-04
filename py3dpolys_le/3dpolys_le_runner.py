@@ -346,7 +346,7 @@ class DccExtrusionRunner:
                 cmd = f"{cmd_sh} mpirun {bin3dpolys_le} " \
                       f"-o:{dcc_args.output_folder} --km:{km} --nlef:{nlef} " \
                       f"{boundary_opt_f} {lef_loading_sites_opt_f} " \
-                      f"{boundary_direction_opt_f} {bs_opt} " \
+                      f"{boundary_direction_opt_f} " \
                       f"{z_loop} {u_opt} {init_mode} {a_opt} {r_opt} {input_cfg}"
                 if dcc_args.analyse:
                     jobid = self._job_runner.run_cmd(cmd, prev_jobid, profile='analysis')
