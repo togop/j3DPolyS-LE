@@ -42,7 +42,19 @@ def test_shell_container():
     shel_script = "./run_test_shell_container_input.sh"
     assert is_file_created(shel_script), f"Shell script {shel_script} file is not created"
     expected_shel_script = "./test/expected/run_test_shell_container_input.sh"
-    assert filecmp.cmp(shel_script, expected_shel_script), f"Shell script {shel_script} is not as expected: "
+    if not filecmp.cmp(shel_script, expected_shel_script):
+        f = open(expected_shel_script, 'r')
+        content = f.read()
+        logger.info('Expected:')
+        logger.info(content)
+        f.close()
+
+        f = open(shel_script, 'r')
+        content = f.read()
+        logger.info('Got:')
+        logger.info(content)
+        f.close()
+        assert False, f"Shell script {shel_script} is not as expected: "
 
 
 if __name__ == '__main__':
