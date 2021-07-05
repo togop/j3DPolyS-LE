@@ -26,7 +26,7 @@ def is_file_created(file_path, timeout=300):  # max 15min
 def test_no_tads_shell():
     cmd = "3dpolys_le_runner run -i ./test/test_no_tads_shell_input.cfg " \
           "--cmd_run_file ./run_test_no_tads_shell_input.sh"
-    logger.info(f"call: {cmd}")
+    print(f"call: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
     shel_script = "./run_test_no_tads_shell_input.sh"
     assert is_file_created(shel_script), f"Shell script {shel_script} file is not created"
@@ -37,7 +37,7 @@ def test_no_tads_shell():
 def test_shell_container():
     cmd = "3dpolys_le_runner run -i ./test/test_shell_container_input.cfg " \
           "--cmd_run_file ./run_test_shell_container_input.sh"
-    logger.info(f"call: {cmd}")
+    print(f"call: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
     shel_script = "./run_test_shell_container_input.sh"
     assert is_file_created(shel_script), f"Shell script {shel_script} file is not created"
@@ -45,14 +45,14 @@ def test_shell_container():
     if not filecmp.cmp(shel_script, expected_shel_script):
         f = open(expected_shel_script, 'r')
         content = f.read()
-        logger.info('Expected:')
-        logger.info(content)
+        print('Expected:\n')
+        print(content)
         f.close()
 
         f = open(shel_script, 'r')
         content = f.read()
-        logger.info('Got:')
-        logger.info(content)
+        print('Got:\n')
+        print(content)
         f.close()
         assert False, f"Shell script {shel_script} is not as expected: "
 
@@ -61,6 +61,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("").setLevel(logging.INFO)
 
-    test_no_tads_shell()
+    # test_no_tads_shell()
     test_shell_container()
 
