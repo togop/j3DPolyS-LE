@@ -35,7 +35,7 @@ def test_no_tads_shell():
 
 
 def test_shell_container():
-    cmd = "3dpolys_le_runner run -i ./test/test_shell_container_input.cfg " \
+    cmd = "3dpolys_le_runner run -i ./test/test_shell_container_input.cfg -o out_test_shell_container " \
           "--cmd_run_file ./run_test_shell_container_input.sh"
     print(f"call: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
