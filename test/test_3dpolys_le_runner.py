@@ -35,14 +35,17 @@ def test_no_tads_shell():
 
 
 def test_shell_container():
+    shel_script = "./run_test_shell_container_input.sh"
+    if os.path.exists(shel_script):
+        os.remove(shel_script)
     cmd = "3dpolys_le_runner run -i ./test/test_shell_container_input.cfg -o out_test_shell_container " \
-          "--cmd_run_file ./run_test_shell_container_input.sh"
+          f"--cmd_run_file {shel_script}"
     print(f"call: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
-    shel_script = "./run_test_shell_container_input.sh"
     assert is_file_created(shel_script), f"Shell script {shel_script} file is not created"
     expected_shel_script = "./test/expected/run_test_shell_container_input.sh"
-    if not filecmp.cmp(shel_script, expected_shel_script):
+    status, stout = subprocess.getstatusoutput(f'./test/test_cmp.sh {expected_shel_script} {shel_script}')
+    if status != 0:  # stout.strip().index('TEST OK:') < 0:  # not filecmp.cmp(shel_script, expected_shel_script):
         f = open(expected_shel_script, 'r')
         content = f.read()
         print('Expected:\n')
@@ -61,6 +64,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("").setLevel(logging.INFO)
 
-    # test_no_tads_shell()
     test_shell_container()
+    #test_no_tads_shell()
 

@@ -34,6 +34,11 @@ test:
     - 3dpolys_le_runner --help
     - python --version
     - echo 'Start tests ...'
+    # pytest
+    - make test
+    - ls -la out-Nlef200-km0.0027-bd0_im-z_z-loop
+    - ls -la out-Nlef200-km0.0027-bd0_im-z_z-loop/r2.84
+    # shell test
     - 3dpolys_le_runner run -o ./out-8860 -i ./test/test_shell_input.cfg --cmd_run_file ./run_test_shell_input.sh
     - ls -la
     - ./test/test_cmp.sh ./run_test_shell_input.sh ./test/expected/run_test_shell_input.sh
@@ -71,9 +76,6 @@ test:
     - ./test/test.sh out/test3/r3.55/hic_002_cool.svg
     - ./test/test.sh out/test3/r7.10/hic_001_cool.svg
     - ./test/test.sh out/test3/r7.10/hic_002_cool.svg
-    - make test
-    - ls -la out-Nlef200-km0.0027-bd0_im-z_z-loop
-    - ls -la out-Nlef200-km0.0027-bd0_im-z_z-loop/r2.84
 
 singularity:
   stage: production
