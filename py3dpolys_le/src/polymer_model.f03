@@ -848,10 +848,10 @@ contains
         write(fout, '(a)') 'burnout=' // trim(str(burnout))
         write(fout, '(a)') 'burnoutM=' // trim(str(burnoutM))
 
-        write(fout, '(a)') '# Loop-Extrusion factors'
-        write(fout, '(a)') 'kb=' // trim(strf(self%kb))
-        write(fout, '(a)') 'ku=' // trim(strf(self%ku))
-        write(fout, '(a)') 'km=' // trim(strf(self%km))
+        write(fout, '(a)') '# Loop-Extrusion factors: _k? = k?**(1. / real(ik?)) > 0.001'
+        write(fout, '(a)') '_kb=' // trim(strf(self%kb))
+        write(fout, '(a)') '_ku=' // trim(strf(self%ku))
+        write(fout, '(a)') '_km=' // trim(strf(self%km))
         write(fout, '(a)') 'Nlef=' // trim(str(self%Nleffree))
 
         write(fout, '(a)') 'boundary=' // trim(boundary_file)
