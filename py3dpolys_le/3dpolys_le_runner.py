@@ -187,10 +187,10 @@ class DccExtrusionArgs:
         self.nlef = nlef if nlef else int(self.get_property('Nlef'))
         self.km = km if km else float(self.get_property('km'))
         self.radius_contact = radius_contact if radius_contact else float(self.get_property('radius_contact'))
-        self.contact_probability = contact_probability if contact_probability else self.get_property('contact_probability', False)  # TODO probably remove
-        self.boundary_direction = boundary_direction if boundary_direction else int(self.get_property('boundary_direction'))
+        self.contact_probability = contact_probability if contact_probability is not None else self.get_property('contact_probability', False)  # TODO probably remove
+        self.boundary_direction = boundary_direction if boundary_direction is not None else int(self.get_property('boundary_direction'))
         self.z_loop = z_loop if z_loop else self.get_property('z_loop').lower() in ['true', '1', 't', 'y', 'yes']
-        self.unidirectional = unidirectional if unidirectional else self.get_property('unidirectional').lower() in ['true', '1', 't', 'y', 'yes']
+        self.unidirectional = unidirectional if unidirectional is not None else self.get_property('unidirectional').lower() in ['true', '1', 't', 'y', 'yes']
         self.init_mode = init_mode if init_mode else self.get_property('init_mode')
         self.stats = stats
         self.all_stats = all_stats
@@ -340,7 +340,7 @@ class DccExtrusionRunner:
                 # not nice but maybe can be improved later
                 boundary_opt_f = f'-b:{boundary}' if boundary else ''   # fortran
                 lef_loading_sites_opt_f = f'-lls:{dcc_args.lef_loading_sites}' if dcc_args.lef_loading_sites else ''
-                boundary_direction_opt_f = f'-bd:{dcc_args.boundary_direction}' if dcc_args.boundary_direction else ''
+                boundary_direction_opt_f = f'-bd:{dcc_args.boundary_direction}' if dcc_args.boundary_direction is not None else ''
                 cmd = f"{cmd_sh} {container_prefix} mpirun {bin3dpolys_le} " \
                       f"-o:{dcc_args.output_folder} --km:{km} --nlef:{nlef} " \
                       f"{boundary_opt_f} {lef_loading_sites_opt_f} " \
@@ -373,7 +373,7 @@ class DccExtrusionRunner:
 
             t_opt = f"-t {dcc_args.tads_boundary}" if dcc_args.tads_boundary else ""
             boundary_opt_py = f'-b {boundary}' if boundary else ''  # python
-            boundary_direction_opt_py = f'-bd {dcc_args.boundary_direction}' if dcc_args.boundary_direction else ''
+            boundary_direction_opt_py = f'-bd {dcc_args.boundary_direction}' if dcc_args.boundary_direction is not None else ''
         # for LOCAL use something like : #
             cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')
             container_prefix = self._job_runner.get_property(profile='', name='container_prefix')

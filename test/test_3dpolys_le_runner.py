@@ -24,11 +24,13 @@ def is_file_created(file_path, timeout=300):  # max 15min
 
 
 def test_no_tads_shell():
-    cmd = "3dpolys_le_runner run -i ./test/test_no_tads_shell_input.cfg " \
-          "--cmd_run_file ./run_test_no_tads_shell_input.sh"
+    shel_script = "./run_test_no_tads_shell_input.sh"
+    if os.path.exists(shel_script):
+        os.remove(shel_script)
+    cmd = f"3dpolys_le_runner run -i ./test/test_no_tads_shell_input.cfg " \
+          f"--cmd_run_file {shel_script}"
     print(f"call: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
-    shel_script = "./run_test_no_tads_shell_input.sh"
     assert is_file_created(shel_script), f"Shell script {shel_script} file is not created"
     subprocess.run(f"chmod +x {shel_script}", shell=True, check=True)
     subprocess.run(shel_script, shell=True, check=True)
@@ -64,6 +66,6 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("").setLevel(logging.INFO)
 
+    test_no_tads_shell()
     test_shell_container()
-    #test_no_tads_shell()
 
