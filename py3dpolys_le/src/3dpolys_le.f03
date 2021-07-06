@@ -152,7 +152,7 @@ program mainprogram
 
     integer :: L, Nchain, Niter, Nmeas, Ninter, iku, ikm, ikb, Nlef = 0, burnin = 0, burnout = 0, burnoutM = 0
     !integer :: simburnin = 0, burn_Nmeas = 0
-    real :: kint, kb, ku, km = 0., Ea
+    real :: kint, kb, ku, km = 0., Ea, kb_factor
 
     integer :: i, time
     !real :: pt
@@ -572,6 +572,7 @@ program mainprogram
                 !.and.(trim(col4)=='factor')) then
 
                 loading_sites_count = 0
+                kb_factor = 0
                 do
                     read(10, *, iostat = rc) loading_site
                     if (rc /= 0) exit
@@ -579,14 +580,21 @@ program mainprogram
                             (loading_site%position/resolution_factor + loading_site%length)
                         loading_sites_count = loading_sites_count + 1
                         loading_sites_factor(i) = loading_site%factor
+                        kb_factor = kb_factor + loading_site%factor
                         if (rank == 0) then
                             call log%info('Added  LEFs loading site: loading_sites_factor(' // trim(str(i)) &
                                     // ')= ' // trim(strf(loading_site%factor)))
                         end if
                     end do
                 end do
+                ! correct kb
+                kb_factor = real(Nchain) / (kb_factor + real(Nchain-loading_sites_count)*basal_loading_factor)
+                ! should be same == real(Nchain) / SUM(loading_sites_factor)
+                kb = kb * kb_factor
                 if (rank == 0) then
                     call log%info('Added ' // trim(str(loading_sites_count)) // ' LEFs binding sites.')
+                    call log%info('Loading kb_factor= ' // trim(strf(kb_factor)))
+                    call log%info('New kb= ' // trim(strf(kb)))
                 end if
             else
                 if (rank == 0) then
