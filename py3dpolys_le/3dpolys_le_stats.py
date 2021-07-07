@@ -86,7 +86,8 @@ def main():
                                                       tads_boundary=tads_boundary, norm=True,
                                                       chi2_mode=ha.CHI2_MODE_LINEAR)  # , plot=True)
     (chi2_log, alpha_log) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS, res=ha.RESOLUTION,
-                                                      tads_boundary=tads_boundary, norm=True, chi2_mode=ha.CHI2_MODE_LOG)
+                                                      tads_boundary=tads_boundary, norm=True, chi2_mode=ha.CHI2_MODE_LOG,
+                                                      plot=True)
 
     # import matplotlib.pyplot as plt
     # plt.plot(exp_score, sim_score, '.')  # juts to visualize with what the correlation coefficient has to deal with
