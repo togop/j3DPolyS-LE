@@ -9,19 +9,12 @@ debug:
 	cmake --build cmake-build-debug --target 3dpolys_le -- -j 6
 
 env:
-	# conda deactivate
-	# conda env remove -n py3dpolys_le
 	conda env create -f environment.yml
-	# conda create -n py3dpolys_le python=3.8
-	# conda activate py3dpolys_le
 
 sif:
 	singularity build --force py3DPolyS-LE.sif Singularity
 
 install:
-	# conda config --add channels bioconda
-	# conda config --add channels conda-forge
-	# conda config --add channels defaults
 	pip install -e .
 
 doc:
@@ -31,7 +24,6 @@ test:
 	# under construction
 	conda install pytest
 	conda install pytest-cov
-	# pip install coverage
 	pytest --cov=py3dpolys_le test/
 
 all: build install
