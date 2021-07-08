@@ -299,7 +299,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
             logger.info(f'skip TAD:{tad_start}-{tad_end}, size:{tadi_size}')
         else:
             logger.info(f'calculate TAD:{tad_start}-{tad_end}, size:{tadi_size}')
-            balanced = hic_balance & (cmp_hic_cooler.bins()['weights'] is not None)
+            balanced = (cmp_hic_cooler.bins()['weights'] is not None) if hic_balance else hic_balance
             tadi_mat2 = (cmp_hic_cooler.matrix(balance=balanced).fetch((comp_chr, tad_start, tad_end)))
             if balanced:
                 tadi_mat2 = np.nan_to_num(tadi_mat2)
@@ -420,7 +420,7 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
         hic1cooler, hic1_chrs = get_hic_cooler_res(hic_file, hic_chrs, res)
         # we can compare only one chromosome: we assume we have a list of chromosome synonyms
         hic1_chr = hic1_chrs[0]
-        balanced = hic_balance & (hic1cooler.bins()['weights'] is not None)
+        balanced = (hic1cooler.bins()['weights'] is not None) if hic_balance else hic_balance
         hic_mat1 = hic1cooler.matrix(balance=balanced).fetch(hic1_chr)
         if balanced:
             hic_mat1 = np.nan_to_num(hic_mat1)
@@ -437,7 +437,7 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
     h2 = hic2[hic2.rfind('/') + 1:]
 
     # to evaluate in debug: cooler.Cooler(f'{hic_file}.{SIM_RESOLUTION}.cool').matrix(balance=False).fetch('6')
-    balanced = hic_balance & (hic2cooler.bins()['weights'] is not None)
+    balanced = (hic2cooler.bins()['weights'] is not None) if hic_balance else hic_balance
     hic_mat2 = hic2cooler.matrix(balance=balanced).fetch(exp_chr)  # TODO use balanced for experimental data
     if balanced:
         hic_mat2 = np.nan_to_num(hic_mat2)
@@ -517,8 +517,11 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
         tads = np.zeros(1, dtype=int)
         if tads_boundary is not None:
             if os.path.exists(tads_boundary):
-                midpoints = pd.read_csv(tads_boundary, usecols=["midpoint"], dtype={"midpoint": "int64"}).values
-                tads = np.rint(np.append(tads, midpoints) / res)
+                try:
+                    midpoints = pd.read_csv(tads_boundary, usecols=["midpoint"], dtype={"midpoint": "int64"}).values
+                    tads = np.rint(np.append(tads, midpoints) / res)
+                except:
+                    logger.error(f'Missing or empty TADs boundary file {tads_boundary}')
             else:
                 logger.error(f'Missing TADs boundary file {tads_boundary}')
 
@@ -792,7 +795,7 @@ def get_hic(hic_h5, resolution=SIM_RESOLUTION, balance=CHI2_USE_BALANCED):
         logger.info(f'Extracting hic from {cool_file}...')
         hic_cooler = cooler.Cooler(f'{cool_file}::/')
         hic_chr = list(set(hic_cooler.chromnames) & set(SIM_CHR_SYNONYMS))[0]
-        balanced = balance & (hic_cooler.bins()['weights'] is not None)
+        balanced = (hic_cooler.bins()['weights'] is not None) if balance else balance
         hic = hic_cooler.matrix(balance=balanced).fetch(hic_chr)
         if balanced:
             hic = np.nan_to_num(hic)  # nan -> 0

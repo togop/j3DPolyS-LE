@@ -29,8 +29,8 @@ doc:
 
 test:
 	# under construction
-	pip install pytest
-	pip install pytest-cov
+	conda install pytest
+	conda install pytest-cov
 	# pip install coverage
 	pytest --cov=py3dpolys_le test/
 
