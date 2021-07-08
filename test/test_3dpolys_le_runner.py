@@ -58,7 +58,7 @@ def test_tads_shell_input():
     assert is_file_created('out/test3/r3.55/hic_001_cool.svg'), f"File out/test3/r3.55/hic_001_cool is missing"
     assert is_file_created('out/test3/r3.55/hic_002_cool.svg'), f"File out/test3/r3.55/hic_002_cool is missing"
     assert is_file_created('out/test3/r7.10/hic_001_cool.svg'), f"File out/test3/r7.10/hic_001_cool is missing"
-    assert is_file_created('out/test3/r7.10/hic_003_cool.svg'), f"File out/test3/r7.10/hic_002_cool is missing"
+    assert is_file_created('out/test3/r7.10/hic_002_cool.svg'), f"File out/test3/r7.10/hic_002_cool is missing"
 
 
 def test_no_tads_shell():
