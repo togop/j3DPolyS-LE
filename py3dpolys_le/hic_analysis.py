@@ -969,7 +969,7 @@ def plot_chip_seq(chip_out_file, exp_chip, boundary, bin_size=1, correlation=DEF
 
 
 def merge_hics(hic_mat_upper, hic_mat_lower):
-    for index_row in range(len(hic_mat_upper)):
+    for index_row in range(min(len(hic_mat_upper), len(hic_mat_lower))):
         hic_mat_upper[index_row][:index_row] = hic_mat_lower[index_row][:index_row]
 
     np.fill_diagonal(hic_mat_upper, 0)
