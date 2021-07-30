@@ -15,6 +15,7 @@ From: togop/gcc_gfortran_mpi_hdf5_python:latest
 %environment
      SINGULARITYENV_APPEND_PATH=/opt/miniconda3/bin:
      export SINGULARITYENV_APPEND_PATH
+     export PATH=/opt/miniconda3/bin:$PATH
 
 %post
     # Install py3dpolys_le package
