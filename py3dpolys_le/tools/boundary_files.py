@@ -8,7 +8,7 @@ def read(filepath_input_boundaryfile, bool_return_header=False):
 
     # create boundary file array
     readerobject_boundaryfile = csv.reader(boundaryfile, delimiter=",")
-    array_boundaries = [line for line in readerobject_boundaryfile]
+    array_boundaries = [line[:3] for line in readerobject_boundaryfile]  # [:3] so this only reads the first 3 columns
     header_boundaryfile = ','.join(array_boundaries[0])  # get header
     array_boundaries = array_boundaries[1:]  # crop header
     boundaryfile.close()
@@ -112,7 +112,31 @@ def write(array_boundaryfile_rows, filepath_output_boundaryfile):
         output_boundaryfile.write(output_line)
 
 
+def subtract_thisdoesnotworkatall(boundaries_base, boundaries_to_subtract, resolution=2000):
+
+    for index_subtraction_boundary in range(len(boundaries_to_subtract)):
+        for index_base_boundary in boundaries_base:
+            bpos_base = round(int(index_base_boundary[1]) / resolution)
+            bpos_subtraction = round(int(index_subtraction_boundary[1]) / resolution)
+            if bpos_subtraction == bpos_base:
+                print(bpos_subtraction, bpos_base)
+                print("boundary", index_subtraction_boundary, "was subtracted from base", index_base_boundary)
+                boundaries_base.remove(index_subtraction_boundary)
+
+
 if __name__ == "__main__":
+
+    """
+    # test boundary subtraction
+    filepath_base_boundaries = "../data/ce/boundary_sites/boundaries_chrX_manual_detection.csv"
+    filepath_subtraction_boundaries = "../data/ce/boundary_sites/boundaries_rex_sites.csv"
+
+    boundaries_base = read(filepath_base_boundaries)
+    boundaries_to_subtract = read(filepath_subtraction_boundaries)
+
+    subtract_thisdoesnotworkatall(boundaries_base, boundaries_to_subtract)
+    """
+
     pass
 
 

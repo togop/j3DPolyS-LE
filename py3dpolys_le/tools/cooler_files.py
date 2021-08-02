@@ -2,8 +2,10 @@
 import cooler
 import h5py
 import numpy as np
+import os
 
 # import custom modules
+import hic_arrays as arr
 
 
 def cool_to_arrayHDF5(filepath_input_cool, filename_output_hdf5):
@@ -31,8 +33,18 @@ def cooler_to_coarse_hdf5(filepath_input_cooler, filepath_generated_coarse_coole
     cool_to_arrayHDF5(filepath_generated_coarse_cooler, filepath_output_hdf)
 
 
-def get_cropped_single_chromosome_array_from_cool(filepath_input_cool="/mnt/imaging.data/gzala/published/N2_hicpro_moushumi_20201002_5000.cool",
-                                                  chromosome_to_crop="chrX"):
+def get_single_chromosome_array_from_cool_alternative(filepath_input_cool="/mnt/imaging.data/gzala/published/N2_hicpro_moushumi_20201002_5000.cool",
+                                          chromosome_to_crop="chrX"):
+
+    cooler_hic = cooler.Cooler(filepath_input_cool)
+
+    hic_array = cooler_hic.matrix(balance=True, sparse=True).fetch(chromosome_to_crop)
+
+    return hic_array
+
+
+def get_single_chromosome_array_from_cool(filepath_input_cool="/mnt/imaging.data/gzala/published/N2_hicpro_moushumi_20201002_5000.cool",
+                                          chromosome_to_crop="chrX"):
 
     cooler_hic = cooler.Cooler(filepath_input_cool)
 
@@ -67,6 +79,36 @@ def get_cropped_single_chromosome_array_from_cool(filepath_input_cool="/mnt/imag
     return hic_array
 
 
+def get_single_chromosome_array_from_cool_alternative(filepath_input_cool="/mnt/imaging.data/gzala/published/N2_hicpro_moushumi_20201002_5000.cool",
+                                          chromosome_to_crop="chrX"):
+
+    cooler_hic = cooler.Cooler(filepath_input_cool)
+
+    hic_array = cooler_hic.matrix(balance=True, sparse=True).fetch(chromosome_to_crop)
+
+    return hic_array
+
+
+def get_single_chromosome_array_from_cool_alternative(filepath_input_cool="/mnt/imaging.data/gzala/published/N2_hicpro_moushumi_20201002_5000.cool",
+                                          chromosome_to_crop="chrX"):
+
+    cooler_hic = cooler.Cooler(filepath_input_cool)
+
+    hic_array = cooler_hic.matrix(balance=True, sparse=True).fetch(chromosome_to_crop)
+
+    return hic_array
+
+
+def get_single_chromosome_array_from_cool_alternative(filepath_input_cool="/mnt/imaging.data/gzala/published/N2_hicpro_moushumi_20201002_5000.cool",
+                                          chromosome_to_crop="chrX"):
+
+    cooler_hic = cooler.Cooler(filepath_input_cool)
+
+    hic_array = cooler_hic.matrix(balance=True, sparse=False).fetch(chromosome_to_crop)
+
+    return hic_array
+
+
 def get_single_chromosome_balanced_array_from_cool(filepath_input_cool="/mnt/imaging.data/gzala/published/N2_hicpro_moushumi_20201002_5000.cool",
                                                    chromosome_to_crop="chrX"):
 
@@ -81,7 +123,25 @@ def get_single_chromosome_balanced_array_from_cool(filepath_input_cool="/mnt/ima
 
     hic_array = hic_matrix.toarray()
 
+    hic_array = arr.remove_nan_from_array(hic_array)
+
     return hic_array
+
+
+def create_cropped_rebalanced_cool_from_whole_genome_cool(filepath_multiple_chromosome_cool, chromosome_to_crop, bin_size_of_original_cool):
+
+    array_hic = get_single_chromosome_array_from_cool(filepath_multiple_chromosome_cool, chromosome_to_crop)
+
+    arr.write_hic_array_to_cool(array_hic, chromosome_to_crop, bin_size_of_original_cool, filepath_multiple_chromosome_cool[:-4] + chromosome_to_crop + ".cool")
+
+    os.system("cooler balance " + filepath_multiple_chromosome_cool[:-4] + chromosome_to_crop + ".cool")
+
+
+if __name__ == "__main__":
+
+    filepath_invivo_cool = "../../test/data/N2_hicpro_moushumi_20210618_2000.cool"
+
+    create_cropped_rebalanced_cool_from_whole_genome_cool(filepath_invivo_cool, "chrX", 2000)
 
 
 if __name__ == "__main__":
