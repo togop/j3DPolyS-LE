@@ -89,6 +89,27 @@ def plot_old(hic_array, filename_output=None, set_clim=(-2.75, 0)):
         fig.savefig(filename_output, dpi=2000)
 
 
+def plot_sim_for_figures(hic_array, filename_output=None, set_clim=(-2.75, 0), resolution=2000):
+
+    hic_array = hic_array.astype("float")
+
+    val_max, val_min = info_old(hic_array)
+
+    # show hic image
+    fig = plt.figure()
+
+    plt.imshow(hic_array, interpolation='nearest', cmap="Greys")
+    plt.clim(set_clim)
+
+    lambda_x = lambda x, p: str((x * resolution) / 1000000).split(sep=".")[0] + "mb"
+    lambda_y = lambda y, p: str((y * resolution) / 1000000).split(sep=".")[0] + "mb"
+    plt.gca().get_xaxis().set_major_formatter(FuncFormatter(lambda_x))
+    plt.gca().get_yaxis().set_major_formatter(FuncFormatter(lambda_y))
+
+    if filename_output is not None:
+        fig.savefig(filename_output, dpi=1000)
+
+
 def get_array_from_cool(filepath_input_cool):
 
     cooler_hic = cooler.Cooler(filepath_input_cool)
