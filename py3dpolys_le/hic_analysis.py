@@ -899,15 +899,15 @@ def chip_out_to_bedgraph(chip_out_file: str, bed_graph_file: str = None, chrom=S
     if not bed_graph_file:  # default
         bed_graph_file = f'{os.path.splitext(chip_out_file)[0]}.bedGraph'
 
-    bin_factor = SIM_RESOLUTION // resolution
+    bin_factor = resolution // SIM_RESOLUTION
 
     chip_out = pd.read_csv(chip_out_file, delim_whitespace=True, encoding='utf-8')
     chip_seq_binned = chip_seq(chip_out, bin_factor=bin_factor)  # bin_factor = 5 : 10kb = 5*2kb
-    Nchain = __get_num_chain(chip_out)
+    nbins = __get_num_chain(chip_seq_binned)
 
     chip_seq_df = pd.DataFrame(columns=['chrom', 'start', 'end', 'value'], index=None)
-    chip_seq_df['start'] = np.arange(0, Nchain*SIM_RESOLUTION, resolution)
-    chip_seq_df['end'] = np.arange(SIM_RESOLUTION, (Nchain+1)*SIM_RESOLUTION, resolution)
+    chip_seq_df['start'] = np.arange(0, nbins*resolution, resolution)
+    chip_seq_df['end'] = np.arange(resolution, (nbins+1)*resolution, resolution)
     chip_seq_df['value'] = chip_seq_binned
     chip_seq_df['chrom'] = chrom
 
