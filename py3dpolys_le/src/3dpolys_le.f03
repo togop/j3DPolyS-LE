@@ -80,7 +80,7 @@ subroutine print_help()
     print*, '   -a|--analyse:<analyse folder> Perform analyse step on an already done simulation&
             & and store results in a given folder.'
     print*, '   -b|--boundary:<boundary sites file> Boundary sites file in a csv format with the following columns:&
-            & name,midpoint,impermeability,score. Default: no bondaries'
+            & name,midpoint,impermeability. Default: no bondaries'
     print*, '   -lls|--lef_loading_sites:<loop extrusion loading sites file> LEFs loadding sites file in a csv format&
             & with the following columns: name,position,length,probability. Default: if not given, the whole polymer'
     print*, '   -r|--radius_contact:<radius> contact radius in lattice unit (1=70nm) for extracting Hi-C matrixes, Default: 1.42'
@@ -189,7 +189,6 @@ program mainprogram
         character(len = 20) :: name
         integer :: midpoint
         real :: impermeability
-        real :: score
     end type BoundarySite
     type(BoundarySite) :: boundary_site
 
@@ -476,8 +475,7 @@ program mainprogram
             col1 = ''
             col2 = ''
             col3 = ''
-            col4 = ''
-            read(10, *) col1, col2, col3, col4
+            read(10, *) col1, col2, col3
             if ((trim(col1) == 'name').and.(trim(col2)=='midpoint').and.(trim(col3)=='impermeability')) then
                 do
                     read(10, *, iostat = rc) boundary_site
