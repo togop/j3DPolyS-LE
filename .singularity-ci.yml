@@ -17,7 +17,7 @@ singularity-image:
     # - singularity build py3dpolys_le.sif Singularity
   artifacts:
     paths:
-      - py3dpolys_le.sif
+      # - py3dpolys_le.sif
 
 # Push the image on the registry
 #deploy:

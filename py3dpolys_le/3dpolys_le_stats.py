@@ -44,7 +44,9 @@ def cli_parser():
                                                         "where <max_r> is the value of the --radius_contact parameter."
                    , action='store_true')
     p.add_argument("-f", "--stats_file", default="./sim_stats.csv", help="Simulation statistics' repository file.")
-    p.add_argument("--bin_size", default=1, help="Chip-seq bin size used for plotting. Default: 1 = 2kb.", type=int)
+    p.add_argument("-res", "--resolution", default=ha.SIM_RESOLUTION, type=int,
+                   help=f"Resolution to downscale Chip-seq output data in the .bedGraph format. "
+                        f"Default: {ha.SIM_RESOLUTION} = 2kb.")
     p.add_argument("--replace", help="Whether to replace existing files.", action='store_true')
     p.add_argument("--chi2_mode", default=ha.CHI2_MODE_LINEAR, choices=['log', 'linear'],
                    help="Chi2-min mode for sampling contact distances.")
@@ -121,10 +123,17 @@ def main():
     plot_cmap = cfg_job_runner.get_property(profile='stats', name='plot_cmap')
     plot_format = cfg_job_runner.get_property(profile='stats', name='plot_format')
     hic_plot_file = re.sub('.hdf5', f'_{plot_cmap}.{plot_format}', sim_hic_file)
-    if not os.path.exists(hic_plot_file):
+    if not os.path.exists(hic_plot_file) or args.replace:
         plot_hic.run(args.analyse, resolution=ha.SIM_RESOLUTION, cmap=plot_cmap, plot_format=plot_format)
     else:
         logger.info(f'Hic plot file already created {hic_plot_file} so skip it')
+
+    # ChIP-seq in bedGraph format
+    chip_out_file = os.path.join(args.analyse, ha.CHIP_OUT)
+    bed_graph_file = os.path.join(args.analyse, ha.CHIP_BED_GRAPH)
+    if os.path.exists(chip_out_file) and (not os.path.exists(bed_graph_file) or args.replace):
+        ha.chip_out_to_bedgraph(chip_out_file, bed_graph_file=bed_graph_file,
+                                chrom=ha.SIM_CHR, resolution=ha.SIM_RESOLUTION)
 
 
 if __name__ == '__main__':

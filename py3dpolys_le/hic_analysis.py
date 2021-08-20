@@ -68,6 +68,7 @@ NLEF_OUT = 'Nlef.out'
 PROCESS_OUT = 'process.out'
 # analyse output file
 CHIP_OUT = 'Chip.out'
+CHIP_BED_GRAPH = 'Chip.bedGraph'
 XYZCONFIG_OUT = 'xyzconfig.out'
 
 # MC_HiC pipeline way
@@ -870,19 +871,48 @@ def get_decay_distribution(hic, confidence=0., min_dist=1, max_dist=None):
     return dists, probs, probs_confi_l, probs_confi_u
 
 
-def chip_seq(chip_out, bin_size):
-    Nmeas = chip_out.shape[0] if chip_out.ndim > 1 else 1
-    Nchain = chip_out.shape[1] if chip_out.ndim > 1 else len(chip_out)
+def __get_num_measurements(chip_out):
+    return chip_out.shape[0] if chip_out.ndim > 1 else 1
 
-    bins = math.ceil(Nchain / bin_size)
+
+def __get_num_chain(chip_out):
+    return chip_out.shape[1] if chip_out.ndim > 1 else len(chip_out)
+
+
+def chip_seq(chip_out, bin_factor):
+    Nmeas = __get_num_measurements(chip_out)
+    Nchain = __get_num_chain(chip_out)
+
+    bins = math.ceil(Nchain / bin_factor)
     chip_seq_binned = np.zeros(bins, dtype=float)
     for m in range(Nmeas):
         chip_seq = chip_out.iloc[m].values if isinstance(chip_out, pd.DataFrame) else chip_out[
             m] if chip_out.ndim > 1 else chip_out
         for i in range(bins):
-            chip_seq_binned[i] += np.sum(chip_seq[(i * bin_size):min((i + 1) * bin_size, Nchain)])
+            chip_seq_binned[i] += np.sum(chip_seq[(i * bin_factor):min((i + 1) * bin_factor, Nchain)])
     chip_seq_binned = chip_seq_binned / Nmeas
+
     return chip_seq_binned
+
+
+def chip_out_to_bedgraph(chip_out_file: str, bed_graph_file: str = None, chrom=SIM_CHR, resolution: int = SIM_RESOLUTION):
+    if not bed_graph_file:  # default
+        bed_graph_file = f'{os.path.splitext(chip_out_file)[0]}.bedGraph'
+
+    bin_factor = SIM_RESOLUTION // resolution
+
+    chip_out = pd.read_csv(chip_out_file, delim_whitespace=True, encoding='utf-8')
+    chip_seq_binned = chip_seq(chip_out, bin_factor=bin_factor)  # bin_factor = 5 : 10kb = 5*2kb
+    Nchain = __get_num_chain(chip_out)
+
+    chip_seq_df = pd.DataFrame(columns=['chrom', 'start', 'end', 'value'], index=None)
+    chip_seq_df['start'] = np.arange(0, Nchain*SIM_RESOLUTION, resolution)
+    chip_seq_df['end'] = np.arange(SIM_RESOLUTION, (Nchain+1)*SIM_RESOLUTION, resolution)
+    chip_seq_df['value'] = chip_seq_binned
+    chip_seq_df['chrom'] = chrom
+
+    exp_chip_pd = chip_seq_df.to_csv(bed_graph_file, sep='\t', header=False, index=False)
+    return exp_chip_pd
 
 
 def read_boundary_pos(boundary_file, Nchain):
@@ -897,24 +927,25 @@ def read_boundary_pos(boundary_file, Nchain):
     return boundary_pos
 
 
-def plot_chip_seq(chip_out_file, exp_chip, boundary, bin_size=1, correlation=DEFAULT_CHIP_CORRELATION, plot=True,
+def plot_chip_seq(chip_out_file, exp_chip, boundary, resolution=SIM_RESOLUTION, correlation=DEFAULT_CHIP_CORRELATION, plot=True,
                   replace=True):
     """
     Returns correlation coefficient and optionally produce a comparison plot
     :param chip_out_file: the original simulation chip.out file
     :param exp_chip: the experimental Chip-seq file in the same resolution as the simulation (2kb)
     :param boundary: the boundary file used during the simulation
-    :param bin_size: bin size to be used to downscale the Chip-seq
+    :param resolution: resolution to downscale the Chip-seq
     :param correlation: the comparative correlation to be used
     :param plot: to plot or not in a file
     :param replace: to replace existing plot file
     :return: the correlation as: (correlation coefficient, p-value, L2 distance (simulation - experiment)).
     """
+    bin_factor = SIM_RESOLUTION // resolution
     chip_out = pd.read_csv(chip_out_file, delim_whitespace=True, encoding='utf-8')
     output_folder = os.path.dirname(chip_out_file)
     measurements = chip_out.shape[0]  # + 1  # +1: for the first that has no chip
     # chip_seq_m = chip_out.iloc[-1]  # take the last measurement
-    sim_chip_seq = chip_seq(chip_out, bin_size=bin_size)  # bin_size = 5 : 10kb = 5*2kb
+    sim_chip_seq = chip_seq(chip_out, bin_factor=bin_factor)  # bin_size = 5 : 10kb = 5*2kb
     sim_chip_seq_normed = sim_chip_seq / sum(sim_chip_seq)
     # read BedGraph file format
     if exp_chip:
@@ -922,11 +953,11 @@ def plot_chip_seq(chip_out_file, exp_chip, boundary, bin_size=1, correlation=DEF
                                   encoding='utf-8')
         exp_chip_x_pd = exp_chip_pd[exp_chip_pd.chrom.isin(CHR_X_SYNONYMS)]
         exp_chip_out = exp_chip_x_pd[['value']].values.transpose()
-        exp_chip_x = chip_seq(exp_chip_out, bin_size=bin_size)
+        exp_chip_x = chip_seq(exp_chip_out, bin_factor=bin_factor)
         # sum_x = sum(exp_chip_x['value'])
         exp_chip_x_normed = exp_chip_x / sum(exp_chip_x)
     boundary_pos = read_boundary_pos(boundary, Nchain=chip_out.shape[1])
-    boundary_chip = chip_seq(boundary_pos, bin_size=bin_size)
+    boundary_chip = chip_seq(boundary_pos, bin_factor=bin_factor)
     boundary_chip_normed = boundary_chip * len(np.where(boundary_chip > 0.)[0]) \
         / (max(exp_chip_x) * sum(boundary_chip) * 100) if exp_chip else boundary_chip
     if exp_chip:
@@ -941,7 +972,7 @@ def plot_chip_seq(chip_out_file, exp_chip, boundary, bin_size=1, correlation=DEF
         chip_correlation = 0
 
     if plot:
-        size_kb = SIM_RESOLUTION * bin_size // 1000
+        size_kb = resolution // 1000
         plot_file_name = os.path.join(output_folder, f'chip-seq_{measurements}_{size_kb}kb.png')
         if os.path.exists(plot_file_name):
             if not replace:
