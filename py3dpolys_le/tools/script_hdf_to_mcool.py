@@ -6,7 +6,7 @@ import os
 
 if __name__ == "__main__":
     filepath_mnl = "/media/cubix/D86E-6C50/Thesis Shared/graphics/paper/hic_003.hdf5"
-    filename = "/media/cubix/D86E-6C50/Thesis Shared/graphics/paper/loading_mex_sym.2000.cool"
+    filename = "/media/cubix/D86E-6C50/Thesis Shared/graphics/paper/boundary_fusionXV_bid_sym.2000.cool"
 
     print("load hic array from .hdf file")
     array_hic = arr.get_hic_array_from_hdf5(filepath_mnl)

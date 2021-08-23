@@ -124,7 +124,28 @@ def subtract_thisdoesnotworkatall(boundaries_base, boundaries_to_subtract, resol
                 boundaries_base.remove(index_subtraction_boundary)
 
 
+def boundaryfile_to_tadboundaries_bed(filepath_boundaryfile, filepath_tadboundaries_bedfile, chromosome_name="chrX"):
+
+    boundaries = [line[1] for line in read(filepath_boundaryfile)]
+
+    output_tadboundary_bedfile = open(filepath_tadboundaries_bedfile, "w")
+
+    for loop_number in range(int(len(boundaries) / 2)):
+
+        boundary_end_index = loop_number * 2
+        boundary_start_index = (loop_number * 2) + 1
+
+        output_line = chromosome_name + "\t" + str(boundaries[boundary_start_index]) + "\t" + str(boundaries[boundary_end_index] + "\n")
+
+        output_tadboundary_bedfile.write(output_line)
+
+
 if __name__ == "__main__":
+
+    filepath_boundaryfile = "../../py3dpolys_le/data/ce/boundary_sites/boundaries_chrX_manual_detection.csv"
+    filepath_output_bedfile = "../../py3dpolys_le/data/ce/tad_boundaries/tadboundaries_chrX_manual_detection.bed"
+
+    boundaryfile_to_tadboundaries_bed(filepath_boundaryfile, filepath_output_bedfile)
 
     """
     # test boundary subtraction
@@ -136,7 +157,5 @@ if __name__ == "__main__":
 
     subtract_thisdoesnotworkatall(boundaries_base, boundaries_to_subtract)
     """
-
-    pass
 
 

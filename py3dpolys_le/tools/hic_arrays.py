@@ -110,11 +110,11 @@ def plot_sim_for_figures(hic_array, filename_output=None, set_clim=(-2.75, 0), r
         fig.savefig(filename_output, dpi=1000)
 
 
-def get_array_from_cool(filepath_input_cool):
+def get_array_from_cool(filepath_input_cool, chr_to_fetch='chrX'):
 
     cooler_hic = cooler.Cooler(filepath_input_cool)
 
-    matrix = cooler_hic.matrix(balance=False, sparse=False).fetch('chrX')
+    matrix = cooler_hic.matrix(balance=False, sparse=False).fetch(chr_to_fetch)
     print(np.shape(matrix))
 
     print(matrix.data)

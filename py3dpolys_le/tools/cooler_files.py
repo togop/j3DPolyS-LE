@@ -139,9 +139,9 @@ def create_cropped_rebalanced_cool_from_whole_genome_cool(filepath_multiple_chro
 
 if __name__ == "__main__":
 
-    filepath_invivo_cool = "../../test/data/N2_hicpro_moushumi_20210618_2000.cool"
+    filepath_invivo_cool = "../../test/data/N2_hicpro_moushumi_20210818_5000.cool"
 
-    create_cropped_rebalanced_cool_from_whole_genome_cool(filepath_invivo_cool, "chrX", 2000)
+    create_cropped_rebalanced_cool_from_whole_genome_cool(filepath_invivo_cool, "chrX", 5000)
 
 
 if __name__ == "__main__":
