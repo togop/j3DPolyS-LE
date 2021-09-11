@@ -8,6 +8,7 @@ h5py
 dask
 cooler
 pyranges
+seaborn
 # -r requirements.txt
 pytest
 pytest-flake8

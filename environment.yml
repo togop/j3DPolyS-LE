@@ -15,5 +15,6 @@ dependencies:
   - dask
   - cooler
   - pyranges
+  - seaborn
   #- pip:
   #    - Cython

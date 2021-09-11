@@ -88,7 +88,10 @@ class CfgJobRunner(JobRunner):
             except (configparser.NoOptionError, configparser.NoSectionError) as e:
                 value = ''
         if not value:
-            value = self._config.get('job_runner', name)
+            try:
+                value = self._config.get('job_runner', name)
+            except (configparser.NoOptionError, configparser.NoSectionError) as e:
+                value = ''
         return value
 
     def _cmd_run_shell(self, profile) -> bool:
