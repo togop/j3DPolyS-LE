@@ -14,20 +14,29 @@ import glob
 # Initialization
 logger = logging.getLogger(__name__)
 
+DEFAULT_CMAP = "hot_r"
+DEFAULT_PLOT_FORMAT = "png"
+
 
 def cli_parser():
     p = argparse.ArgumentParser()
     p.add_argument("-o", "--output_folder", default=".",
                    help="'Analysis' step output folder containing raw hic_*.hdf5 files.")
     p.add_argument("-r", "--resolution", default=2000, help="Hi-C data resolution in bp.")
-    p.add_argument("-c", "--cmap", default="hot_r",
-                   help="Color map: cool, hot_r, gist_heat_r, afmhot_r, YlOrRd, Greys, gist_yarg")
-    p.add_argument("-f", "--plot_format", default="png", help="Image file format extension: png, tif, svg")
+    p.add_argument("-c", "--cmap", default=DEFAULT_CMAP,
+                   help="Color map: cool, hot_r, gist_heat_r, afmhot_r, YlOrRd, Greys, gist_yarg. "
+                        f"Default: {DEFAULT_CMAP}")
+    p.add_argument("-f", "--plot_format", default=DEFAULT_PLOT_FORMAT,
+                   help=f"Image file format extension: png, tif, svg. Default: {DEFAULT_PLOT_FORMAT}")
     return p
 
 
 def run(output_folder, resolution, cmap, plot_format):
     logger.info(f'Plotting HiC for {output_folder} with color map: {cmap} in file format: {plot_format} ...')
+    if not cmap:
+        cmap = DEFAULT_CMAP
+    if not plot_format:
+        plot_format = DEFAULT_PLOT_FORMAT
 
     hic_files = sorted(glob.glob(os.path.join(output_folder, "hic*.hdf5")))
     for hic_file in hic_files:
