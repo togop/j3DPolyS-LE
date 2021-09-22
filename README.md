@@ -92,8 +92,11 @@ It is also helpful to save the output of the main 'run' command as it will print
 
 `3dpolys_le_runner run -i my_sim_input.cfg -o ./my_sim_out &> 3dpolys_le_runner.log`
 
+In case you want to generate a shell script and execute the single steps one by one, you can generate the run shell script by:
 
- To see all supported parameters run:
+`3dpolys_le_runner run -i my_sim_input.cfg -o ./my_sim_out --cmd_run_file run_my_sim.sh`
+
+To see all supported parameters run:
 
  `3dpolys_le_runner --help`
 
