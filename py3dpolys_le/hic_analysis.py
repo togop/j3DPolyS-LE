@@ -692,7 +692,7 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, exp_cool=N
 
             # calculate proper chi2_alpha
             chi2, alpha = compare_hic_chromosome(hic, cmp_hic, hic_chrs=[hic_chr], chrs=CHR_SYNONYMS, res=res, tads_boundary=None,
-                                                 norm=True, chi2_mode=chi2_mode)  # , plot=True)
+                                                 norm=True, chi2_mode=chi2_mode, plot=True)
     #        logger.info(f'COMPARE {cmp_hic} <- {hic}: {chi2}, {alpha}')
     #        chi2_rev, alpha_rev = compare_hic_chromosome(cmp_hic, hic, hic_chrs=CHR_SYNONYMS, chrs=hic_chrs, res=res, tads_csv=None,
     #                                             norm=True, chi2_mode=chi2_mode)  # , plot=True)
