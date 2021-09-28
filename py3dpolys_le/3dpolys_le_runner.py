@@ -181,24 +181,24 @@ class DccExtrusionArgs:
 
         self.output_folder = output_folder
         self.analyse = analyse
-        self.boundary = boundary if boundary else self.get_property('boundary')
+        self.boundary = boundary if boundary or not os.path.exists(self.input_cfg) else self.get_property('boundary')
         self.lef_loading_sites = lef_loading_sites
-        self.tads_boundary = tads_boundary if tads_boundary else self.get_property('tads_boundary')
+        self.tads_boundary = tads_boundary if tads_boundary or not os.path.exists(self.input_cfg) else self.get_property('tads_boundary')
         self.stats_file = stats_file
-        self.exp_cool = exp_cool if exp_cool else self.get_property('exp_cool')
+        self.exp_cool = exp_cool if exp_cool or not os.path.exists(self.input_cfg) else self.get_property('exp_cool')
         self.exp_chip = exp_chip  # TODO probably remove
         # self.exp_ins_score = exp_ins_score
-        self.nlef = nlef if nlef else int(self.get_property('Nlef'))
-        self.km = km if km else float(self.get_property('km'))
-        self.radius_contact = radius_contact if radius_contact else float(self.get_property('radius_contact'))
-        self.contact_probability = contact_probability if contact_probability is not None else self.get_property('contact_probability', False)  # TODO probably remove
-        self.boundary_direction = boundary_direction if boundary_direction is not None else int(self.get_property('boundary_direction'))
-        self.z_loop = z_loop if z_loop else self.get_property('z_loop').lower() in ['true', '1', 't', 'y', 'yes']
-        self.unidirectional = unidirectional if unidirectional is not None else self.get_property('unidirectional').lower() in ['true', '1', 't', 'y', 'yes']
-        self.init_mode = init_mode if init_mode else self.get_property('init_mode')
+        self.nlef = nlef if nlef or not os.path.exists(self.input_cfg) else int(self.get_property('Nlef'))
+        self.km = km if km or not os.path.exists(self.input_cfg) else float(self.get_property('km'))
+        self.radius_contact = radius_contact if radius_contact or not os.path.exists(self.input_cfg) else float(self.get_property('radius_contact'))
+        self.contact_probability = contact_probability if contact_probability is not None or not os.path.exists(self.input_cfg) else self.get_property('contact_probability', False)  # TODO probably remove
+        self.boundary_direction = boundary_direction if boundary_direction is not None or not os.path.exists(self.input_cfg) else int(self.get_property('boundary_direction'))
+        self.z_loop = z_loop if z_loop or not os.path.exists(self.input_cfg) or not os.path.exists(self.input_cfg) else self.get_property('z_loop').lower() in ['true', '1', 't', 'y', 'yes']
+        self.unidirectional = unidirectional if unidirectional is not None or not os.path.exists(self.input_cfg) else self.get_property('unidirectional').lower() in ['true', '1', 't', 'y', 'yes']
+        self.init_mode = init_mode if init_mode or not os.path.exists(self.input_cfg) else self.get_property('init_mode')
         self.stats = stats
         self.all_stats = all_stats
-        self.cmp_chrs = cmp_chrs if cmp_chrs else re.split('\\s*;\\s*|\\s*,\\s*|\\s+', self.get_property('cmp_chrs'))
+        self.cmp_chrs = cmp_chrs if cmp_chrs or not os.path.exists(self.input_cfg) else re.split('\\s*;\\s*|\\s*,\\s*|\\s+', self.get_property('cmp_chrs'))
         # self.simultaneously = simultaneously
 
     def get_property(self, name, default=''):
