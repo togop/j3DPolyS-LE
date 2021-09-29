@@ -33,7 +33,7 @@ From: togop/gcc_gfortran_mpi_hdf5_python:latest
     # pip install Cython
     # apt-get update && apt-get install -y git
     # skip update: sometimes cause problems
-    apt-get apt-get install -y git
+    apt-get install -y git
     git clone https://togop:nq3QN9UvMwdmCPnHkCB9@gitlab.com/togop/3DPolyS-LE.git -b develop
     cd 3DPolyS-LE
     make build
