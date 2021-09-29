@@ -11,6 +11,7 @@ From: togop/gcc_gfortran_mpi_hdf5_python:latest
         3dpolys_le_runner
         3dpolys_le_stats
         plot_hic
+        plot_sim_stats
 
 %environment
      SINGULARITYENV_APPEND_PATH=/opt/miniconda3/bin:
@@ -30,7 +31,9 @@ From: togop/gcc_gfortran_mpi_hdf5_python:latest
     conda install -y -q numpy cython pandas matplotlib scipy filelock h5py dask cooler pyranges python=3.8
     conda install cmake
     # pip install Cython
-    apt-get update && apt-get install -y git
+    # apt-get update && apt-get install -y git
+    # skip update: sometimes cause problems
+    apt-get apt-get install -y git
     git clone https://togop:nq3QN9UvMwdmCPnHkCB9@gitlab.com/togop/3DPolyS-LE.git -b develop
     cd 3DPolyS-LE
     make build

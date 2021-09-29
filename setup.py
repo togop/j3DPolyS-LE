@@ -38,7 +38,7 @@ setup(name='py3dpolys_le',
               '3dpolys_le_runner = py3dpolys_le.3dpolys_le_runner:main',
               '3dpolys_le_stats = py3dpolys_le.3dpolys_le_stats:main',
               'plot_hic = py3dpolys_le.plot_hic:main',
-              'plot_sim_stats.py = py3dpolys_le.plot_sim_stats.py:main',
+              'plot_sim_stats = py3dpolys_le.plot_sim_stats:main',
               # 'hdf5_to_cool = py3dpolys_le.hic_converters:hdf5_to_cool', TODO was not ready yet
           ],
       },
