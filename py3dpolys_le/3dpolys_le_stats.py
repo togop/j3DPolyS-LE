@@ -83,7 +83,7 @@ def main():
     # find last HIC.hdf5 do analysis and store
     sim_hic_file = ha.get_last_hic(args.analyse)
 
-    plots_folder = os.path.join(args.output_folder, 'plots')
+    plots_folder = os.path.join(args.output_folder, ha.PLOTS_FOLDER)
 
     # need only normed for chi2_log and chi2_linear and for given tads-boundary sites and 1tad(the whole chromosome)
     (chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,

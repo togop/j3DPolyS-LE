@@ -88,6 +88,8 @@ chr_size = chr_x_size
 
 DEFAULT_CHIP_CORRELATION = 'spearmanr'
 
+PLOTS_FOLDER = 'plots'
+
 
 def get_last_hic(output_folder: str):
     hic_h5s = fnmatch.filter(os.listdir(output_folder), 'hic_*.hdf5')
