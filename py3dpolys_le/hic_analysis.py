@@ -275,7 +275,7 @@ def get_chi2_dist_range(chi2_mode, res, max=None):
     return dist_range
 
 
-def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, plot, norm=True,
+def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, plots_folder, norm=True,
                       chi2_mode=CHI2_MODE_LINEAR, hic_balance=CHI2_USE_BALANCED):
     h1_title = 'simulation HiC'  # hic1cooler.info
     h2_title = 'experimental HiC'  # hic1cooler.info
@@ -308,7 +308,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
             tadi_mat1_end = tad_end // res + 1
             tadi_mat1 = hic1_mat[tadi_mat1_start:tadi_mat1_end, tadi_mat1_start:tadi_mat1_end]
 
-            if plot:
+            if plots_folder:
                 fig, (ax1, ax2) = plt.subplots(1, 2)
                 try:
                     ax1.imshow(np.log10(tadi_mat1), cmap=CMAP, interpolation='nearest')
@@ -332,10 +332,10 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
             tadi_norm_term = 0
             for dist in dist_range:
 
-                (p_i, p_i_sdsem) = average_contact_prob(tadi_mat1, dist, plot, ax1)
+                (p_i, p_i_sdsem) = average_contact_prob(tadi_mat1, dist, plots_folder, ax1)
                 (f_i, f_i_p_i_sdsem) = average_contact_prob(tadi_mat2, dist)
-                if plot:
-                    average_contact_prob(tadi_mat2, dist, plot, ax2)  # use just to plot
+                if plots_folder:
+                    average_contact_prob(tadi_mat2, dist, plots_folder, ax2)  # use just to plot
                 sigma_i_2 = f_i_p_i_sdsem ** 2  # TODO CHECK with Daniel SD or SEM!!
                 if sigma_i_2 > 0:
                     toti_PFS += (p_i * f_i) / sigma_i_2
@@ -362,7 +362,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
                                                     tads_chi2_min_df.columns[3]: tadi_chi2_min},
                                                    ignore_index=True)
 
-        if plot and (toti_PS > 0):
+        if plots_folder and (toti_PS > 0):
             logger.info(f' tadi_chi2_min={tadi_chi2_min}')
             fig.suptitle(
                 f'HIC compare chromosome {comp_chr}/{comp_chr}'
@@ -371,9 +371,9 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
             ax1.set_title(f'{h1_title}: \n p_i: {p_i}, \n tot_PS={tot_PS}')
             ax2.set_title(f'{h2_title}: \n p_i: {f_i}, \n tot_FS={tot_FS}')
             #plt.show()
-            if not os.path.exists('plots/'):
-                os.mkdir('plots/')
-            fig_filename = f'plots/{comp_filename}_{chi2_mode}_tad_{tad_start}-{tad_end}.png'
+            if not os.path.exists(plots_folder):
+                os.mkdir(plots_folder)
+            fig_filename = os.path.join(plots_folder, f'{comp_filename}_{chi2_mode}_tad_{tad_start}-{tad_end}.png')
             logger.info(f'Save figure in file: {fig_filename}')
             fig.savefig(fig_filename)
             plt.close()
@@ -394,7 +394,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
 
 
 def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, res=RESOLUTION, tads_boundary=None,
-                           plot=False, norm=True, chi2_mode=CHI2_MODE_LOG, hic_balance=CHI2_USE_BALANCED):
+                           plots_folder=None, norm=True, chi2_mode=CHI2_MODE_LOG, hic_balance=CHI2_USE_BALANCED):
     """
         Compare a simulation HiC with the first HiC from a list of experimental HiCs.
         The list experimental HiCs is used to calculate the standard deviation of the average contact probability
@@ -405,7 +405,7 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
     :param chrs: synonyms of chromosome to compare with
     :param res: resolution
     :param tads_boundary: TADs boundaries. Default: None, will use the whole chromosome as one TAD
-    :param plot: to plot or not to plot
+    :param plots_folder: plots folder to save plots if not empty otherwise do not produce plots
     :param norm: Experimental! to normalize or not to normalize single TAD by their height (used log-lines for the statistics)
     :param chi2_mode: Chi2-min mode: linear or log
     :param hic_balance: to use ICE balanced Hi-C matrix if available, otherwise not
@@ -478,10 +478,11 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
         tads[0, 0] = 1
         tads[0, 1] = chr_end
 
-    (chi2_min, alpha_min) = chi2_minimization(hic_mat1, hic2cooler, chrs, res, tads, comp_filename, plot=plot,
-                                              norm=norm, chi2_mode=chi2_mode, hic_balance=hic_balance)
+    (chi2_min, alpha_min) = chi2_minimization(hic_mat1, hic2cooler, chrs, res, tads, comp_filename,
+                                              plots_folder=plots_folder, norm=norm, chi2_mode=chi2_mode,
+                                              hic_balance=hic_balance)
 
-    if plot:
+    if plots_folder:
         hic_mat1_log = np.log10(hic_mat1 * alpha_min)
         hic_mat2_log = np.log10(hic_mat2)
         # split
@@ -546,7 +547,9 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
                      [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--')
 
         # plt.show()
-        fig_filename = f'plots/{comp_filename}_{chi2_mode}.png'
+        if not os.path.exists(plots_folder):
+            os.mkdir(plots_folder)
+        fig_filename = os.path.join(plots_folder, f'{comp_filename}_{chi2_mode}.png')
         logger.info(f'Save figure in file: {fig_filename}')
         fig.savefig(fig_filename, dpi=1000)
         plt.close()
@@ -691,8 +694,10 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, exp_cool=N
             max_tad_size = min(max_tad_size, hic_chr_size // res)
 
             # calculate proper chi2_alpha
-            chi2, alpha = compare_hic_chromosome(hic, cmp_hic, hic_chrs=[hic_chr], chrs=CHR_SYNONYMS, res=res, tads_boundary=None,
-                                                 norm=True, chi2_mode=chi2_mode, plot=True)
+            plots_folder = os.path.join(output_folder, 'plots')
+            chi2, alpha = compare_hic_chromosome(hic, cmp_hic, hic_chrs=[hic_chr], chrs=CHR_SYNONYMS, res=res,
+                                                 tads_boundary=None, plots_folder=plots_folder, norm=True,
+                                                 chi2_mode=chi2_mode)
     #        logger.info(f'COMPARE {cmp_hic} <- {hic}: {chi2}, {alpha}')
     #        chi2_rev, alpha_rev = compare_hic_chromosome(cmp_hic, hic, hic_chrs=CHR_SYNONYMS, chrs=hic_chrs, res=res, tads_csv=None,
     #                                             norm=True, chi2_mode=chi2_mode)  # , plot=True)

@@ -83,13 +83,15 @@ def main():
     # find last HIC.hdf5 do analysis and store
     sim_hic_file = ha.get_last_hic(args.analyse)
 
+    plots_folder = os.path.join(args.output_folder, 'plots')
+
     # need only normed for chi2_log and chi2_linear and for given tads-boundary sites and 1tad(the whole chromosome)
-    (chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS, res=ha.RESOLUTION,
-                                                      tads_boundary=tads_boundary, norm=True,
+    (chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
+                                                      res=ha.RESOLUTION, tads_boundary=tads_boundary, norm=True,
                                                       chi2_mode=ha.CHI2_MODE_LINEAR)  # , plot=True)
-    (chi2_log, alpha_log) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS, res=ha.RESOLUTION,
-                                                      tads_boundary=tads_boundary, norm=True, chi2_mode=ha.CHI2_MODE_LOG,
-                                                      plot=True)
+    (chi2_log, alpha_log) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
+                                                      res=ha.RESOLUTION, tads_boundary=tads_boundary,
+                                                      plots_folder=plots_folder, norm=True, chi2_mode=ha.CHI2_MODE_LOG)
 
     # import matplotlib.pyplot as plt
     # plt.plot(exp_score, sim_score, '.')  # juts to visualize with what the correlation coefficient has to deal with

@@ -48,9 +48,8 @@ if __name__ == "1__main__":  # this is for testing invivo vs simulated
     #array_invivo = arr.get_hic_array_from_hdf5(filepath_invivo_hdf, verbose=True)
 
     (chi2_lin, alpha_lin) = ha.compare_hic_chromosome(filepath_mnl, filepath_invivo_cool, chrs=['6', 'chrX', 'X'],
-                                                      res=ha.RESOLUTION,
-                                                      tads_boundary=None, norm=True,
-                                                      chi2_mode=ha.CHI2_MODE_LINEAR, plot=False)
+                                                      res=ha.RESOLUTION, tads_boundary=None, norm=True,
+                                                      chi2_mode=ha.CHI2_MODE_LINEAR)
     print(alpha_lin)
     array_invivo = cool.get_single_chromosome_balanced_array_from_cool(filepath_invivo_cool)
     print("before nanremove", np.max(array_invivo), np.min(array_invivo))

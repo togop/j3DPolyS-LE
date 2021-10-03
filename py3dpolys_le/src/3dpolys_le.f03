@@ -22,7 +22,7 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2021.9.29'
+    character(*), parameter :: VERSION = '2021.10.3'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
     character(25) :: var_name, program_name = '3dpolys_le', program__version = '2021.7.4'
