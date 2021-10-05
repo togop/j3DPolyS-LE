@@ -507,8 +507,9 @@ class DccExtrusionRunner:
     @staticmethod
     def multi_decay_plot(dcc_args: DccExtrusionArgs, res, replace=False):
         sub_folders = sorted([f.path for f in os.scandir(dcc_args.output_folder) if f.is_dir()])
-        if ha.PLOTS_FOLDER in sub_folders:
-            sub_folders = sub_folders.remove(ha.PLOTS_FOLDER)
+        plots_folder = os.path.join(dcc_args.output_folder, ha.PLOTS_FOLDER)
+        if plots_folder in sub_folders:
+            sub_folders.remove(plots_folder)
         hic_h5_list = []
         for analysis_folder in sub_folders:  # list(sub_folders[1:2]):
             # find the last hic
