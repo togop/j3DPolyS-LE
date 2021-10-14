@@ -433,7 +433,12 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
 
     hic2 = cmp_hic
     hic2cooler = cooler.Cooler(f'{cmp_hic_mcool}::/resolutions/{res}')
-    exp_chr = list(set(hic2cooler.chromnames) & set(chrs))[0]
+    exp_chr = list(set(hic2cooler.chromnames) & set(chrs))
+    if exp_chr:
+        exp_chr = exp_chr[0]
+    else:
+        logger.error(f'Experimental HiC data contains none of the chromosome names: {chrs} instead {hic2cooler.chromnames}')
+        exit(1)
 
     # get hic file names
     h1 = hic_file[hic_file.rfind('/') + 1:]

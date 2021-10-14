@@ -11,7 +11,8 @@ from filelock import SoftFileLock
 
 from py3dpolys_le import hic_analysis as ha
 from py3dpolys_le import plot_hic
-from py3dpolys_le.job_runner import CfgJobRunner
+from py3dpolys_le.job_runner import CfgJobRunner, convert_dat_to_cfg
+
 # from _version import __name__
 
 dummy_sim = False  # set to False; True = dummy simulation mode: echo commands only
@@ -65,7 +66,11 @@ def main():
 
     args = cli_parser().parse_args(sys.argv[1:])
 
-    cfg_job_runner = CfgJobRunner(input_cfg=args.input_cfg)
+    input_cfg = args.input_cfg
+    if input_cfg.endswith('.dat'):
+        input_cfg = convert_dat_to_cfg(input_cfg)
+
+    cfg_job_runner = CfgJobRunner(input_cfg=input_cfg)
 
     logger.info(f'start with parameters: {args}')
 

@@ -15,10 +15,9 @@ import sys
 import pkg_resources
 
 from py3dpolys_le import hic_analysis as ha
-from py3dpolys_le.job_runner import CfgJobRunner
+from py3dpolys_le.job_runner import CfgJobRunner, CFG_SECTION_3DPOLYS_LE
 
 EXP_COOL_AS_STATS = '.'
-CFG_SECTION_3DPOLYS_LE = '3dpolys_le'
 
 # Initialization
 logger = logging.getLogger(__name__)
@@ -182,10 +181,22 @@ class DccExtrusionArgs:
         self.output_folder = output_folder
         self.analyse = analyse
         self.boundary = boundary if boundary or not os.path.exists(self.input_cfg) else self.get_property('boundary')
-        self.lef_loading_sites = lef_loading_sites
+        if self.boundary and not os.path.exists(self.boundary):
+            logger.error(f'Boundary file {self.boundary} not found!')
+            exit(1)
+        self.lef_loading_sites = lef_loading_sites if lef_loading_sites or not os.path.exists(self.input_cfg) else self.get_property('lef_loading_sites')
+        if self.lef_loading_sites and not os.path.exists(self.lef_loading_sites):
+            logger.error(f'LEF loading-sites file {self.lef_loading_sites} not found!')
+            exit(1)
         self.tads_boundary = tads_boundary if tads_boundary or not os.path.exists(self.input_cfg) else self.get_property('tads_boundary')
+        if self.tads_boundary and not os.path.exists(self.tads_boundary):
+            logger.error(f'TADs-boundary file {self.tads_boundary} not found!')
+            exit(1)
         self.stats_file = stats_file
         self.exp_cool = exp_cool if exp_cool or not os.path.exists(self.input_cfg) else self.get_property('exp_cool')
+        if self.exp_cool and not os.path.exists(self.exp_cool):
+            logger.error(f'Experimental cool file {self.exp_cool} not found!')
+            exit(1)
         self.exp_chip = exp_chip  # TODO probably remove
         # self.exp_ins_score = exp_ins_score
         self.nlef = nlef if nlef or not os.path.exists(self.input_cfg) else int(self.get_property('Nlef'))

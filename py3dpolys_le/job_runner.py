@@ -11,6 +11,8 @@ from abc import ABC, abstractmethod
 # Initialization
 logger = logging.getLogger(__name__)
 
+CFG_SECTION_3DPOLYS_LE = '3dpolys_le'
+
 
 class JobRunner(ABC):
 
@@ -110,3 +112,21 @@ class CfgJobRunner(JobRunner):
             cmd_run_file = cmd_run.split(':')[1]
             return cmd_run_file.replace('{cmd_run_file}', self.cmd_run_file)
         return ''
+
+
+def convert_dat_to_cfg(input_dat):
+    _config = configparser.ConfigParser()
+    _config.add_section(CFG_SECTION_3DPOLYS_LE)
+    with open(input_dat) as fp:
+        while True:
+            line = fp.readline()
+            if not line:
+                break
+
+            val, name = [x.strip() for x in line.rsplit("::")]
+            _config.set(CFG_SECTION_3DPOLYS_LE, name, val)
+
+    input_cfg = ".cfg".join(input_dat.rsplit(".dat", 1))
+    with open(input_cfg, 'w') as cf:
+        _config.write(cf)
+    return input_cfg
