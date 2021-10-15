@@ -275,8 +275,8 @@ class DccExtrusionRunner:
     def read_stats_file(stats_file):
         # read float as string to avoid rounding errors if decide to save it back
         return pd.read_csv(stats_file, delimiter=',', encoding='utf-8', header=0,
-                           dtype={'boundary_direction': np.str, 'km': np.str, 'radius_contact': np.str,
-                                  'chi2_log': np.str, 'alpha_log': np.str, 'chi2_lin': np.str, 'alpha_lin': np.str})
+                           dtype={'boundary': str, 'boundary_direction': str, 'tads_boundary': str, 'km': str, 'radius_contact': str,
+                                  'chi2_log': str, 'alpha_log': str, 'chi2_lin': str, 'alpha_lin': str}).replace(np.nan, '', regex=True)
         # , engine='python')
 
     def run(self, dcc_args: DccExtrusionArgs, stats_only=False, radii=[], dep_jobid: str = None,
