@@ -15,13 +15,14 @@ before_script:
     - echo "$SYLABS_TOKEN"
     #- echo "$SYLABS_TOKEN_VAR"
     #- cat "$SYLABS_TOKEN"
-    -  apt-get update && apt-get install --yes python3-pip
     - echo "PATH=$PATH:/opt/miniconda3/bin/" >> ~/.bashrc
     - source ~/.bashrc
     - conda init bash
     - source ~/.bashrc
     - make env
     - conda activate py3dpolys_le
+    #- apt-get update
+    - apt-get install --yes python3-pip
     - make all
     - echo "conda activate py3dpolys_le" >> ~/.bashrc
     - cat ~/.bashrc
