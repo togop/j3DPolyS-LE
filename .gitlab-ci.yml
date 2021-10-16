@@ -23,7 +23,9 @@ before_script:
     - conda activate py3dpolys_le
     #- apt-get update
     #- apt-get install --yes python3-pip
-    - python -m ensurepip --upgrade
+    #- python -m ensurepip --upgrade
+    - curl https://bootstrap.pypa.io/get-pip.py | python3
+    - python3 -m pip install -U setuptools
     - make all
     - echo "conda activate py3dpolys_le" >> ~/.bashrc
     - cat ~/.bashrc
