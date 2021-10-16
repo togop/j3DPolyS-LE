@@ -21,8 +21,9 @@ before_script:
     - source ~/.bashrc
     - make env
     - conda activate py3dpolys_le
-    - apt-get update
-    - apt-get install --yes python3-pip
+    #- apt-get update
+    #- apt-get install --yes python3-pip
+    - python -m ensurepip --upgrade
     - make all
     - echo "conda activate py3dpolys_le" >> ~/.bashrc
     - cat ~/.bashrc
