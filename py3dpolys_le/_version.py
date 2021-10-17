@@ -1,2 +1,2 @@
 __name__ = 'py3dpolys_le'
-__version__ = '2021.10.9'
+__version__ = '2021.10.18'

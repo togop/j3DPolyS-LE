@@ -535,16 +535,16 @@ class DccExtrusionRunner:
                                                                        chi2_mode=ha.CHI2_MODE_LINEAR)
 
     @staticmethod
-    def multi_decay_exps_plot(exp_cools, output_folder, res, hic_chrs=None, replace=False):
+    def multi_decay_exps_plot(exp_cools, output_folder, res, hic_chrs=None, tads=None, replace=False):
         if output_folder and not os.path.exists(output_folder):
             os.mkdir(output_folder)
         hic_multi_decay_plot_log = ha.plot_distance_contact_prob_decay(exp_cools[1:], hic_chrs=hic_chrs,
-                                                                       exp_cool=exp_cools[0],
+                                                                       exp_cool=exp_cools[0], tads=tads,
                                                                        output_folder=output_folder, res=res,
                                                                        confidence=0., replace=replace,
                                                                        chi2_mode=ha.CHI2_MODE_LOG)
         hic_multi_decay_plot_lin = ha.plot_distance_contact_prob_decay(exp_cools[1:], hic_chrs=hic_chrs,
-                                                                       exp_cool=exp_cools[0],
+                                                                       exp_cool=exp_cools[0], tads=tads,
                                                                        output_folder=output_folder, res=res,
                                                                        confidence=0., replace=replace,
                                                                        chi2_mode=ha.CHI2_MODE_LINEAR)
@@ -638,8 +638,8 @@ def main():
     elif args.run_command == 'multi_decay_plot':
         dcc_run.multi_decay_plot(dcc_args, res=args.resolution, replace=args.replace)
     elif args.run_command == 'multi_decay_exps_plot':
-        dcc_run.multi_decay_exps_plot(args.exp_cools, args.output_folder, hic_chrs=args.hic_chrs, res=args.resolution,
-                                      replace=args.replace)
+        dcc_run.multi_decay_exps_plot(args.exp_cools, args.output_folder, hic_chrs=args.hic_chrs,
+                                      tads=args.tads_boundary, res=args.resolution, replace=args.replace)
     elif args.run_command == 'run':
         dcc_run.run(dcc_args, radii=args.list_contact_radii, replace=args.replace)
 

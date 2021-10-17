@@ -58,7 +58,7 @@ CHI2_USE_SEM = True
 CHI2_USE_BALANCED = False   # True still cause problems
 
 FIG_FORMAT = 'svg'  # TODO make FIG_FORMAT input parameter
-#FIG_FORMAT = 'png'
+# FIG_FORMAT = 'png'
 
 # simulation output files
 DR_OUT = 'dr.out'
@@ -70,6 +70,8 @@ PROCESS_OUT = 'process.out'
 CHIP_OUT = 'Chip.out'
 CHIP_BED_GRAPH = 'Chip.bedGraph'
 XYZCONFIG_OUT = 'xyzconfig.out'
+
+ALPHA = r'$\alpha$'
 
 # MC_HiC pipeline way
 # clr_map = [cm.hot(ci) for ci in np.linspace(1.0, 0.0, 10)]
@@ -338,7 +340,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
                 (f_i, f_i_p_i_sdsem) = average_contact_prob(tadi_mat2, dist)
                 if plots_folder:
                     average_contact_prob(tadi_mat2, dist, plots_folder, ax2)  # use just to plot
-                sigma_i_2 = f_i_p_i_sdsem ** 2  # TODO CHECK with Daniel SD or SEM!!
+                sigma_i_2 = f_i_p_i_sdsem ** 2  # can use SD or SEM!!
                 if sigma_i_2 > 0:
                     toti_PFS += (p_i * f_i) / sigma_i_2
                     toti_PS += (p_i ** 2) / sigma_i_2
@@ -519,7 +521,7 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
         plt.gca().get_yaxis().set_major_formatter(FuncFormatter(lambda y, p: int(y*res_kb)))
 
         plt.imshow(hic_merged, cmap=CMAP, interpolation='nearest')
-        plt.title(f'HIC compare chromosome {hic1_chr}/{exp_chr} alpha_min:{alpha_min}')
+        plt.title(f'{h1}/{hic1_chr} vs {h2}/{exp_chr}:\n\t chi2-min={chi2_min:7.2f}, {ALPHA}={alpha_min:7.2f}')
 
         # plt.clim(-2.75, 0)
 
@@ -627,7 +629,7 @@ def get_hic_cool(hic_h5, out_prefix, res=EXP_RESOLUTION):
     return hic_cool
 
 
-def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, exp_cool=None, output_folder=None, res=RESOLUTION,
+def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None, exp_cool=None, output_folder=None, res=RESOLUTION,
                                      confidence=0., replace=True, chi2_mode=CHI2_MODE_LOG):
 
     if hic_chrs is None:
@@ -646,8 +648,9 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, exp_cool=N
         hic = hic_list[i]
         hics += '_' + hic_r + (f'.h5{"c" if DECAY_USE_HDF5_COOL else ""}'
                                if os.path.exists(hic) and hic.endswith('.hdf5') and DECAY_USE_HDF5 else '')
+    tads_pref = ('_t'+os.path.splitext(os.path.basename(tads))[0]) if tads is not None else ''
     hic_decay_plot = os.path.join(output_folder,
-                                  f'contact-decay_{exp_base_name}_{CHR_SYNONYMS[-1]}_vs_{hic_chrs[-1]}_{hics}{f"_c{confidence:4.2f}" if confidence > 0. else ""}'
+                                  f'contact-decay_{exp_base_name}_{CHR_SYNONYMS[-1]}_vs_{hic_chrs[-1]}_{hics}{tads_pref}{f"_c{confidence:4.2f}" if confidence > 0. else ""}'
                                   f'_chi2_{chi2_mode[:3]}{"_sd" if not CHI2_USE_SEM else ""}'
                                   f'{"_zoom" if CHI2_MODE_LOG_ZOOM else ""}.{res}.{FIG_FORMAT}')
     if os.path.exists(hic_decay_plot):
@@ -703,7 +706,7 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, exp_cool=N
             # calculate proper chi2_alpha
             plots_folder = os.path.join(output_folder, 'plots')
             chi2, alpha = compare_hic_chromosome(hic, cmp_hic, hic_chrs=[hic_chr], chrs=CHR_SYNONYMS, res=res,
-                                                 tads_boundary=None, plots_folder=plots_folder, norm=True,
+                                                 tads_boundary=tads, plots_folder=plots_folder, norm=True,
                                                  chi2_mode=chi2_mode)
     #        logger.info(f'COMPARE {cmp_hic} <- {hic}: {chi2}, {alpha}')
     #        chi2_rev, alpha_rev = compare_hic_chromosome(cmp_hic, hic, hic_chrs=CHR_SYNONYMS, chrs=hic_chrs, res=res, tads_csv=None,

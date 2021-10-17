@@ -30,7 +30,7 @@ p.add_argument("-f", "--stats_file", default="./sim_stats.csv",
 p.add_argument("-o", "--output_folder", default=".",
                help="Output folder to save plots.")
 p.add_argument("-e", "--file_extension", default="png", help="Image file format extension: png, tif, svg.")
-p.add_argument("-z", "--z_column", default="chi2_log_1tad",
+p.add_argument("-z", "--z_column", default="chi2_log",
                help="Column from a --stats_file to be plotted on the z-axis.")
 # p.add_argument("-u", "--unidirectional", help="Show only unidirectional mode for LEFs.",
 #               action='store_true')
@@ -38,11 +38,11 @@ p.add_argument("-z", "--z_column", default="chi2_log_1tad",
 #               action='store_true')
 p.add_argument("-p", "--plot_mode", choices=[PLOT_3D, PLOT_HMAP], default=PLOT_HMAP,
                help="Plot method. 3d - 3-dimensional scatter plot; hmap - 2D heatmap plot.")
-p.add_argument("-c", "--cmap", default="cool",   # "YlGnBu_r" appropriate for 2D, "cool" for heatmap
+p.add_argument("-c", "--cmap", default="YlGnBu_r",   # "YlGnBu_r" appropriate for 2D, "cool" for heatmap
                help="Color map: YlGnBu, cool, hot_r, gist_heat_r, afmhot_r, YlOrRd, Greys, gist_yarg")
 # p.add_argument("--list_km", nargs='+', default=, help="Shows data only for list of LEF velocities (km)")
 p.add_argument("--list_nlef", nargs='*', default=[], help="Show data only for the list of of LEFs occupancy (Nlefs).")
-p.add_argument("-lr", "--list_contact_radii", nargs='+', default=['1.42', '2.13', '2.84', '3.55', '4.26', '5.0p'],
+p.add_argument("-lr", "--list_contact_radii", nargs='+', default=['2.84', '3.55'],
                help="Show data only for the list of contact radii with a different color for every contact radius.")
 args = p.parse_args(sys.argv[1:])
 
@@ -145,8 +145,8 @@ def main():
     plt.show()
 
     file_name = f'{os.path.basename(args.stats_file)}_{args.plot_mode}_{args.z_column}' \
-                f'{"_u" if args.unidirectional else ""}{"_b" if args.bidirectional else ""}' \
                 f'_r{"_r".join(args.list_contact_radii)}.{args.file_extension}'
+#                f'{"_u" if args.unidirectional else ""}{"_b" if args.bidirectional else ""}' \
     fig.savefig(os.path.join(args.output_folder, file_name), dpi=200)
 
     logger.info(f'Plot saved in {file_name}')
