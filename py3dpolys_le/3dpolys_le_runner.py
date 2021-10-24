@@ -220,7 +220,8 @@ class DccExtrusionArgs:
             else:
                 # make sure needed .mcool are created to avoid concurrency problem
                 # i.e. while new_stats with new exp_cool
-                cmp_hic = re.sub(r'.cool', '', exp_cool)
+                logger.error(f'Ensure .mcool file of {self.exp_cool} is created...')
+                cmp_hic = re.sub(r'.cool', '', self.exp_cool)
                 ha.get_exp_sim_mcool(cmp_hic, self.cmp_chrs, self.resolution)
 
     def get_property(self, name, default=''):
