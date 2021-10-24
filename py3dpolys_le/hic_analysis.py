@@ -57,7 +57,7 @@ CHI2_RANGE_NUM = 100
 CHI2_USE_SEM = True
 CHI2_USE_BALANCED = False   # True still cause problems
 
-FIG_FORMAT = 'svg'  # TODO make FIG_FORMAT input parameter
+PLOT_FORMAT = 'svg'
 # FIG_FORMAT = 'png'
 
 # simulation output files
@@ -630,7 +630,7 @@ def get_hic_cool(hic_h5, out_prefix, res=EXP_RESOLUTION):
 
 
 def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None, exp_cool=None, output_folder=None, res=RESOLUTION,
-                                     confidence=0., replace=True, chi2_mode=CHI2_MODE_LOG):
+                                     confidence=0., replace=True, chi2_mode=CHI2_MODE_LOG, format=PLOT_FORMAT):
 
     if hic_chrs is None:
         hic_chrs = CHR_SYNONYMS
@@ -652,7 +652,7 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None,
     hic_decay_plot = os.path.join(output_folder,
                                   f'contact-decay_{exp_base_name}_{CHR_SYNONYMS[-1]}_vs_{hic_chrs[-1]}_{hics}{tads_pref}{f"_c{confidence:4.2f}" if confidence > 0. else ""}'
                                   f'_chi2_{chi2_mode[:3]}{"_sd" if not CHI2_USE_SEM else ""}'
-                                  f'{"_zoom" if CHI2_MODE_LOG_ZOOM else ""}.{res}.{FIG_FORMAT}')
+                                  f'{"_zoom" if CHI2_MODE_LOG_ZOOM else ""}.{res}.{format}')
     if os.path.exists(hic_decay_plot):
         if not replace:
             logger.info(f'Distance-contact decay plot already existing: {hic_decay_plot}, so skip it')
@@ -676,7 +676,7 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None,
     lines = []
     legend = []
     cmp_hic = re.sub(r'.cool', '', exp_cool)
-    chr_i = 0;
+    chr_i = 0
     for i, hic in enumerate(hic_list):
         if not os.path.exists(hic):
             logger.error(f'Missing file {hic}, skip it!')
@@ -778,7 +778,7 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None,
     plt.ylabel('average #contacts ~ contact probability')
     plt.xlabel(f'genomic distance in {res / 1000}kb')
 
-    fig.savefig(hic_decay_plot, format=FIG_FORMAT)
+    fig.savefig(hic_decay_plot, format=format)
     plt.close()
     logger.info(f' save plot: {hic_decay_plot}')
     return hic_decay_plot

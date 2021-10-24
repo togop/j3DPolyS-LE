@@ -159,6 +159,7 @@ class DccExtrusionArgs:
     all_stats: bool
     # simultaneously: int
     cmp_chrs: list
+    resolution: int
     _config = configparser.ConfigParser()
 
     def __init__(self, stats=False, all_stats=False, boundary="", lef_loading_sites="", input_cfg="./input.cfg",
@@ -169,7 +170,7 @@ class DccExtrusionArgs:
                  nlef=0, km=0, radius_contact=0, contact_probability=None,
                  boundary_direction=None, z_loop=None, unidirectional=None,
                  init_mode='',
-                 output_folder='', analyse='', cmp_chrs=None):  # , simultaneously=1
+                 output_folder='', analyse='', cmp_chrs=None, resolution=ha.RESOLUTION):  # , simultaneously=1
         # input arguments values overwriting configuration values (input.cfg)
         self.input_cfg = input_cfg
         if os.path.exists(self.input_cfg):
@@ -194,9 +195,6 @@ class DccExtrusionArgs:
             exit(1)
         self.stats_file = stats_file
         self.exp_cool = exp_cool if exp_cool or not os.path.exists(self.input_cfg) else self.get_property('exp_cool')
-        if self.exp_cool and not os.path.exists(self.exp_cool):
-            logger.error(f'Experimental cool file {self.exp_cool} not found!')
-            exit(1)
         self.exp_chip = exp_chip  # TODO probably remove
         # self.exp_ins_score = exp_ins_score
         self.nlef = nlef if nlef or not os.path.exists(self.input_cfg) else int(self.get_property('Nlef'))
@@ -210,7 +208,20 @@ class DccExtrusionArgs:
         self.stats = stats
         self.all_stats = all_stats
         self.cmp_chrs = cmp_chrs if cmp_chrs or not os.path.exists(self.input_cfg) else re.split('\\s*;\\s*|\\s*,\\s*|\\s+', self.get_property('cmp_chrs'))
+        self.resolution = resolution
+        if not self.cmp_chrs:
+            # if nothing else final default: c.elegans chrX
+            self.cmp_chrs = ha.CHR_SYNONYMS
         # self.simultaneously = simultaneously
+        if self.exp_cool:
+            if not os.path.exists(self.exp_cool):
+                logger.error(f'Experimental cool file {self.exp_cool} not found!')
+                exit(1)
+            else:
+                # make sure needed .mcool are created to avoid concurrency problem
+                # i.e. while new_stats with new exp_cool
+                cmp_hic = re.sub(r'.cool', '', exp_cool)
+                ha.get_exp_sim_mcool(cmp_hic, self.cmp_chrs, self.resolution)
 
     def get_property(self, name, default=''):
         try:
@@ -535,22 +546,26 @@ class DccExtrusionRunner:
                                                                        chi2_mode=ha.CHI2_MODE_LINEAR)
 
     @staticmethod
-    def multi_decay_exps_plot(exp_cools, output_folder, res, hic_chrs=None, tads=None, replace=False):
+    def multi_decay_exps_plot(exp_cools, output_folder, res, hic_chrs=None, tads=None, plot_format=ha.PLOT_FORMAT,
+                              replace=False):
         if output_folder and not os.path.exists(output_folder):
             os.mkdir(output_folder)
         hic_multi_decay_plot_log = ha.plot_distance_contact_prob_decay(exp_cools[1:], hic_chrs=hic_chrs,
                                                                        exp_cool=exp_cools[0], tads=tads,
                                                                        output_folder=output_folder, res=res,
                                                                        confidence=0., replace=replace,
-                                                                       chi2_mode=ha.CHI2_MODE_LOG)
+                                                                       chi2_mode=ha.CHI2_MODE_LOG,
+                                                                       format=plot_format)
         hic_multi_decay_plot_lin = ha.plot_distance_contact_prob_decay(exp_cools[1:], hic_chrs=hic_chrs,
                                                                        exp_cool=exp_cools[0], tads=tads,
                                                                        output_folder=output_folder, res=res,
                                                                        confidence=0., replace=replace,
-                                                                       chi2_mode=ha.CHI2_MODE_LINEAR)
+                                                                       chi2_mode=ha.CHI2_MODE_LINEAR,
+                                                                       format=plot_format)
 
     @staticmethod
-    def decay_plots(dcc_args: DccExtrusionArgs, res=ha.RESOLUTION, replace=False, use_threading=False):
+    def decay_plots(dcc_args: DccExtrusionArgs, res=ha.RESOLUTION, plot_format=ha.PLOT_FORMAT, replace=False,
+                    use_threading=False):
         sim_stats_pd = DccExtrusionRunner.read_stats_file(dcc_args.stats_file)
         arg_exp_cool = dcc_args.exp_cool
         for index, sim in sim_stats_pd.iterrows():
@@ -573,14 +588,16 @@ class DccExtrusionRunner:
                 t = threading.Thread(target=ha.plot_distance_contact_prob_decay, args=([hic_h5]),
                                      kwargs={'exp_cool': exp_cool,'output_folder': output_folder, 'res': res,
                                              'replace': replace,
-                                             'chi2_mode': ha.CHI2_MODE_LOG})
+                                             'chi2_mode': ha.CHI2_MODE_LOG,
+                                             'format': plot_format})
                 t.start()
             else:
                 hic_decay_prob_plot = ha.plot_distance_contact_prob_decay([hic_h5], exp_cool=exp_cool,
                                                                           output_folder=output_folder,
                                                                           res=res,
                                                                           replace=replace,
-                                                                          chi2_mode=ha.CHI2_MODE_LOG)
+                                                                          chi2_mode=ha.CHI2_MODE_LOG,
+                                                                          format=plot_format)
 
     @staticmethod
     def chip_seq_plots(dcc_args: DccExtrusionArgs, resolution, correlation=ha.DEFAULT_CHIP_CORRELATION, replace=True):
@@ -624,13 +641,14 @@ def main():
                                 boundary_direction=args.boundary_direction,
                                 z_loop=args.z_loop, unidirectional=args.unidirectional, init_mode=args.init_mode,
                                 stats=args.stats, all_stats=args.all_stats,  # simultaneously=args.simultaneously,
-                                cmp_chrs=args.cmp_chrs,
+                                cmp_chrs=args.cmp_chrs, resolution=args.resolution,
                                 output_folder=args.output_folder, analyse=args.analysis_folder)
     dcc_run = DccExtrusionRunner(job_runner=job_runner)
     if args.run_command == 'new_stats':
         dcc_run.analysis_stats(dcc_args, new_stats=True, exp_cool=args.exp_cool)
     if args.run_command == 'decay_plots':
-        dcc_run.decay_plots(dcc_args, res=args.resolution, replace=args.replace, use_threading=args.threading)
+        plot_format = job_runner.get_property(profile='stats', name='plot_format')
+        dcc_run.decay_plots(dcc_args, res=args.resolution, plot_format=plot_format, replace=args.replace, use_threading=args.threading)
     elif args.run_command == 'chip_seq_plots':
         dcc_run.chip_seq_plots(dcc_args, resolution=args.resolution, correlation=args.correlation, replace=args.replace)
     elif args.run_command == 'contact_radius_analysis':
@@ -638,8 +656,10 @@ def main():
     elif args.run_command == 'multi_decay_plot':
         dcc_run.multi_decay_plot(dcc_args, res=args.resolution, replace=args.replace)
     elif args.run_command == 'multi_decay_exps_plot':
+        plot_format = job_runner.get_property(profile='stats', name='plot_format')
         dcc_run.multi_decay_exps_plot(args.exp_cools, args.output_folder, hic_chrs=args.hic_chrs,
-                                      tads=args.tads_boundary, res=args.resolution, replace=args.replace)
+                                      tads=args.tads_boundary, res=args.resolution, plot_format=plot_format,
+                                      replace=args.replace)
     elif args.run_command == 'run':
         dcc_run.run(dcc_args, radii=args.list_contact_radii, replace=args.replace)
 
