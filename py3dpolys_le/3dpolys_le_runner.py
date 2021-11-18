@@ -631,7 +631,7 @@ class DccExtrusionRunner:
                              plot=True, replace=replace)
 
     @staticmethod
-    def grid_nlef_km(self, dcc_args: DccExtrusionArgs, nlef_list, km_list, radii, replace):
+    def grid_nlef_km(dcc_args: DccExtrusionArgs, nlef_list, km_list, radii, replace):
         for nlef in nlef_list:
             for km in km_list:     # for km in np.arange(2.7e-3 / 5, 2 * 2.7e-3, km_step):
                 dcc_args_grid = copy.deepcopy(dcc_args)
