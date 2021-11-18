@@ -141,7 +141,7 @@ def cli_parser():
                    # 0.00054, 0.00162, 0.0027, 0.00378, 0.00486, 0.00648
                    # 10,      30,      50,     70,      90,      120 kb/min
                    # 5.4e-4 = 10kb/min = 167bp/s
-                   help="List of km values. In combination with grid_nlef_km and grid_nlef_km_dirlef commands.", type=float)
+                   help="List of km values. In combination with grid_nlef_km commands.", type=float)
 
     # p.add_argument("--no_overwrite", help="Overwrite old files", action='store_false')
     return p
@@ -665,7 +665,7 @@ def main():
                                 output_folder=args.output_folder, analyse=args.analysis_folder)
     dcc_run = DccExtrusionRunner(job_runner=job_runner)
     if args.run_command == 'grid_nlef_km':
-        dcc_run.grid_nlef_km(dcc_args, nlef_list=args.nlef_list, km_list=args.km_list, radii=args.list_contact_radii,
+        dcc_run.grid_nlef_km(dcc_args=dcc_args, nlef_list=args.nlef_list, km_list=args.km_list, radii=args.list_contact_radii,
                              replace=args.replace)
     elif args.run_command == 'new_stats':
         dcc_run.analysis_stats(dcc_args, new_stats=True, exp_cool=args.exp_cool)
