@@ -479,10 +479,10 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
                     tads[i, 1] = loop[2]
 
         else:
-            logger.error(f'Missing TADs boundary file {tads_boundary}: single TAD mode')
+            logger.info(f'Missing TADs boundary file {tads_boundary}: single TAD mode')
 
     if tads is None:
-        logger.error(f'Whole chromosome as a Single TAD.')
+        logger.info(f'Whole chromosome as a Single TAD.')
         tads = np.zeros((1, 2), dtype=int)
         tads[0, 0] = 1
         tads[0, 1] = chr_end

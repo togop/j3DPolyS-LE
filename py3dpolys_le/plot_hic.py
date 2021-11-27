@@ -13,6 +13,8 @@ import glob
 import cooler
 
 # Initialization
+DEFAULT_RESOLUTION = 2000
+DEFAULT_HIC_WILDCARD = "hic*.hdf5"
 logger = logging.getLogger(__name__)
 
 DEFAULT_CMAP = "hot_r"
@@ -26,11 +28,11 @@ def cli_parser():
     p = argparse.ArgumentParser()
     p.add_argument("-o", "--output_folder", default=".",
                    help="'Analysis' step output folder containing raw hic_*.hdf5 files.")
-    p.add_argument("-w", "--files_wildcard", default="hic*.hdf5", help="Hi-C files wildcard.")
+    p.add_argument("-w", "--hic_wildcard", default=DEFAULT_HIC_WILDCARD, help="Hi-C files wildcard.")
     p.add_argument("--hic_chrs", nargs='*', default=CHR_X_SYNONYMS,
                    help="Synonyms of the chromosome from Hi-C matrixes to be ploted. "
                         "Default: synonyms for chrX in c.elegans: chrX, X, 6 ")
-    p.add_argument("-r", "--resolution", default=2000, type=int, help="Hi-C data resolution in bp.")
+    p.add_argument("-r", "--resolution", default=DEFAULT_RESOLUTION, type=int, help="Hi-C data resolution in bp.")
     p.add_argument("-b", "--balanced", action='store_true', help="Get balanced if available, for .cool and .mcool.")
     p.add_argument("-c", "--cmap", default=DEFAULT_CMAP,
                    help="Color map: cool, hot_r, gist_heat_r, afmhot_r, YlOrRd, Greys, gist_yarg. "
@@ -70,14 +72,16 @@ def get_hic(hic_file, resolution, balanced, hic_chrs):
     return hic
 
 
-def run(output_folder, files_wildcard, resolution, balanced, hic_chrs, cmap, clim, title, plot_format):
+def run(output_folder, hic_wildcard=DEFAULT_HIC_WILDCARD, resolution=DEFAULT_RESOLUTION, balanced=False,
+        hic_chrs=CHR_X_SYNONYMS, cmap=DEFAULT_CMAP, clim=DEFAULT_CLIM, title=DEFAULT_TITLE,
+        plot_format=DEFAULT_PLOT_FORMAT):
     logger.info(f'Plotting HiC for {output_folder} with color map: {cmap} in file format: {plot_format} ...')
     if not cmap:
         cmap = DEFAULT_CMAP
     if not plot_format:
         plot_format = DEFAULT_PLOT_FORMAT
 
-    hic_files = sorted(glob.glob(os.path.join(output_folder, files_wildcard)))
+    hic_files = sorted(glob.glob(os.path.join(output_folder, hic_wildcard)))
     for hic_file in hic_files:
         hic = get_hic(hic_file, resolution, balanced, hic_chrs)
         print(f"data.shape: ${hic.shape}")
@@ -119,8 +123,8 @@ def run(output_folder, files_wildcard, resolution, balanced, hic_chrs, cmap, cli
 def main():
     args = cli_parser().parse_args(sys.argv[1:])
 
-    run(args.output_folder, args.files_wildcard, args.resolution, args.balanced, args.hic_chrs, args.cmap, args.clim,
-        args.title, args.plot_format)
+    run(args.output_folder, hic_wildcard=args.files_wildcard, resolution=args.resolution, balanced=args.balanced,
+        hic_chrs=args.hic_chrs, cmap=args.cmap, clim=args.clim, title=args.title, plot_format=args.plot_format)
 
 
 if __name__ == '__main__':
