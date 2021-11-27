@@ -13,22 +13,24 @@ import glob
 import cooler
 
 # Initialization
-DEFAULT_RESOLUTION = 2000
-DEFAULT_HIC_WILDCARD = "hic*.hdf5"
 logger = logging.getLogger(__name__)
 
 DEFAULT_CMAP = "hot_r"
-DEFAULT_CLIM = [-2.75, 0]  # tuned for simulation HiC
+# tuned for simulation HiCs
+DEFAULT_RESOLUTION = 2000
+DEFAULT_HIC_WILDCARD = "hic*.hdf5"
+DEFAULT_CLIM = [-2.75, 0]
 DEFAULT_PLOT_FORMAT = "png"
 CHR_X_SYNONYMS = ['6', 'chrX', 'X']
-DEFAULT_TITLE = "Hi-C for measurement {hic_file}"  # as used for simulation HiC
+DEFAULT_TITLE = "Hi-C for measurement {hic_file}"
 
 
 def cli_parser():
     p = argparse.ArgumentParser()
     p.add_argument("-o", "--output_folder", default=".",
                    help="'Analysis' step output folder containing raw hic_*.hdf5 files.")
-    p.add_argument("-w", "--hic_wildcard", default=DEFAULT_HIC_WILDCARD, help="Hi-C files wildcard.")
+    p.add_argument("-w", "--hic_wildcard", default=DEFAULT_HIC_WILDCARD,
+                   help="Hi-C files wildcard. Supported hic formats: *.hdf5 (simulation's format), *.cool, *.mcool")
     p.add_argument("--hic_chrs", nargs='*', default=CHR_X_SYNONYMS,
                    help="Synonyms of the chromosome from Hi-C matrixes to be ploted. "
                         "Default: synonyms for chrX in c.elegans: chrX, X, 6 ")
