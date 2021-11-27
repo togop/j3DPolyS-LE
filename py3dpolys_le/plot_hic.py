@@ -125,7 +125,7 @@ def run(output_folder, hic_wildcard=DEFAULT_HIC_WILDCARD, resolution=DEFAULT_RES
 def main():
     args = cli_parser().parse_args(sys.argv[1:])
 
-    run(args.output_folder, hic_wildcard=args.files_wildcard, resolution=args.resolution, balanced=args.balanced,
+    run(args.output_folder, hic_wildcard=args.hic_wildcard, resolution=args.resolution, balanced=args.balanced,
         hic_chrs=args.hic_chrs, cmap=args.cmap, clim=args.clim, title=args.title, plot_format=args.plot_format)
 
 
