@@ -2,7 +2,7 @@
 
 3D Polymer Simulation of chromosome folding by modeled loop extrusion, boundary elements and loading sites.
 
-# Instalation
+# Installation
 
 ### Requirements
 
@@ -62,24 +62,24 @@ Be aware that all required HPC modules have to be loaded before you run simulati
 
 ### 1. Clone repository
 
-from master branch:
+from the master branch:
 `git clone https://gitlab.com/togop/3DPolyS-LE.git`
 
-or from development branch:
+or from the development branch:
 `git clone https://gitlab.com/togop/3DPolyS-LE.git -b develop`
 
 ### 2. Build and install 
 
-To build and install as Python package run the following commands:
+To build and install as Python package, run the following commands:
 
 ```
-# go to the cloned repositry project folder 
+# go to the cloned repository project folder 
 cd 3DPolyS-LE 
 make all
 ```
 
 ### Troubleshooting
-Depending on your installation environment you might want to create a dedicated Python environment.
+Depending on your installation environment, you might want to create a dedicated Python environment.
 
 Go to the cloned repository project's folder:
 ```
@@ -117,7 +117,7 @@ To run a simulation:
 Create a copy of an input.cfg file and update the parameters you want.
 An example copy of such a configuration file you can find in the package:
 https://gitlab.com/togop/3DPolyS-LE/-/blob/develop/py3dpolys_le/data/ce/input.cfg
-All simullation's parameters are under section _[3dpolys_le]_, here an esample:
+All simulation's parameters are under section *[3dpolys_le]*, here is an example:
 ```
 [3dpolys_le]
 # default 3dpolys_le parameters' values
@@ -160,7 +160,7 @@ exp_cool=./test/data/wt_N2_Moushumi2020_HIC1_5000.cool
 tads_boundary=./test/sip_loopanchor_boundaries.csv
 ```
 
-Be aware to update properly the _[job_runner]_ section according to your system environment.
+Be aware to update properly the *[job_runner]* section according to your system environment.
 
 For Slurm environment you can use such a configuration (also could be found in the example input.cfg):
 
@@ -195,7 +195,7 @@ In case you want to generate a shell script and execute the single steps one by 
 
 `3dpolys_le_runner run -i my_sim_input.cfg -o ./my_sim_out --cmd_run_file run_my_sim.sh`
 
-To see all supported parameters run:
+To see all supported parameters, run the following command:
 
  `3dpolys_le_runner --help`
 
