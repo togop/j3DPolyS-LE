@@ -13,8 +13,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-import __init__
-
 PLOT_3D = '3d'
 PLOT_HMAP = 'hmap'
 
@@ -22,7 +20,7 @@ PLOT_HMAP = 'hmap'
 SUBSTR_UNIDIR = '_unidir'
 logging.basicConfig(level=logging.DEBUG)
 logging.getLogger("").setLevel(logging.INFO)
-logger = logging.getLogger(__init__.__name__)
+logger = logging.getLogger(__name__)
 
 p = argparse.ArgumentParser()
 p.add_argument("-f", "--stats_file", default="./sim_stats.csv",

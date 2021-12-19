@@ -25,6 +25,7 @@ setup(name='py3dpolys_le',
       setup_requires=['sphinx', 'sphinx-argparse', 'sphinx-argparse-cli'],
       install_requires=[
           'numpy',
+          'cython',
           'pandas',
           'matplotlib',
           'scipy',
@@ -32,6 +33,7 @@ setup(name='py3dpolys_le',
           'h5py',
           'pyranges',
           'dask',
+          'seaborn',
           'cooler'],
       entry_points={
           'console_scripts': [

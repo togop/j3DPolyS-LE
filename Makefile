@@ -26,4 +26,11 @@ test:
 	conda install pytest-cov
 	pytest --cov=py3dpolys_le test/
 
+uninstall:
+	conda env remove --name py3dpolys_le
+
+clean:
+	cmake --build cmake-build --target clean
+	cmake --build cmake-build-debug --target clean
+
 all: build install

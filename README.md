@@ -1,10 +1,12 @@
 # 3DPolyS-LE
 
-3D Polymer Simulation of chromosome folding by modeled loop extrusion, boundary elements and binding sites.
+3D Polymer Simulation of chromosome folding by modeled loop extrusion, boundary elements and loading sites.
 
 # Instalation
 
-Required packages and libraries:
+### Requirements
+
+Packages and libraries:
 
 - **git** client version 2.17.1, only if you use git command to download the repository;
 - **gcc** compiler version 7.5.0 or higher;
@@ -16,42 +18,97 @@ Required packages and libraries:
 - **Python** 3.7, all required packages are listed in the requirements.txt file and alternatively in the environment.yml file;
 - **Conda** version 4.8.2 or higher.
 
-1. Clone repository
+Make sure you have installed or loaded the required libraries.
+
+For example on a HPC cluster (Slurm) you might need to load the following modules:
+
+###### Conda (https://conda.io)
+```
+module load Anaconda3
+```
+Alternative could be installation of Miniconda (https://docs.conda.io/en/latest/miniconda.html)
+
+###### HDF5 (https://www.hdfgroup.org/solutions/hdf5/)
+```
+module load HDF5
+```
+
+###### MPI (Message Passing Interface)
+```
+# https://www.open-mpi.org/
+module load OpenMPI
+
+# OR https://www.mpich.org/
+module load mvapich2
+```
+
+On Ubuntu linus could be installed like hits:
+```
+sudo apt-get install mpich
+```
+
+###### CMake (https://cmake.org/)
+```
+module load CMake
+```
+Alternatively, you can install it using Conda:
+```
+conda install cmake
+```
+
+This module is required only when you build and install the py3DPlyS-LE package. 
+
+Be aware that all required HPC modules have to be loaded before you run simulations.  
+
+### 1. Clone repository
 
 from master branch:
 `git clone https://gitlab.com/togop/3DPolyS-LE.git`
 
-from development branch:
+or from development branch:
 `git clone https://gitlab.com/togop/3DPolyS-LE.git -b develop`
 
-2. Install 
+### 2. Build and install 
 
-run the following commands:
+To build and install as Python package run the following commands:
 
 ```
+# go to the cloned repositry project folder 
 cd 3DPolyS-LE 
+make all
+```
 
-# optional for Slurm environment
-module load Anaconda3
-# or manual installation of Miniconda
+### Troubleshooting
+Depending on your installation environment you might want to create a dedicated Python environment.
 
-# optional or as troubleshooting for problems with python environments
+Go to the cloned repository project's folder:
+```
+cd 3DPolyS-LE 
+```
+
+Build the default *3DPolyS-LE*'s Python environment *py3dpolys_le*:
+```
 make env
+```
+If your default Python version is a bit old you might need to specify a newer version.
+In this case, you can install the *py3dpolys_le* like that:
+```
+conda env create -f environment.yml python=3.9
+# or 
+conda env create -f requirements_dev.txt python=3.8
+```
+
+Active your *py3dpolys_le* environment:
+```
 conda activate py3dpolys_le
 # or
 source activate py3dpolys_le
-# optional or as troubleshooting for problems with curently system installed cmake 
-conda install cmake
-# or as troubleshooting in case of problems with the conda version  of cmake
-module load CMake
-
-# optional for Slurm environment
-# If you use this during installation you need to load them always you want to use the package after new login!  
-module load HDF5
-module load OpenMPI
-
+```
+Finally, build and install:
+```
 make all
 ```
+
 
 # Usage
 
@@ -60,6 +117,48 @@ To run a simulation:
 Create a copy of an input.cfg file and update the parameters you want.
 An example copy of such a configuration file you can find in the package:
 https://gitlab.com/togop/3DPolyS-LE/-/blob/develop/py3dpolys_le/data/ce/input.cfg
+All simullation's parameters are under section _[3dpolys_le]_, here an esample:
+```
+[3dpolys_le]
+# default 3dpolys_le parameters' values
+# polymer characteristics
+Nchain = 8860
+L = 16
+# not used yet: kint = 1.17
+Ea = 0.
+init_mode = z
+
+# measurements
+Niter = 250
+Nmeas = 3
+Ninter = 840000
+burnin = 0
+burnout = 0
+burnoutM = 0
+
+# Loop-Extrusion factors
+kb = 2.8e-6
+ku = 2e-6
+km = 2.7e-3
+Nlef = 200
+# optional lef_loading_sites.csv: name,position,length,factor
+lef_loading_sites = py3dpolys_le/data/ce/dcc_rex-sites_Crane2015_bindings.csv
+basal_loading_factor = 0.
+# optional boundaries.csv: name,midpoint,impermeability,score,b-position,strand
+boundary = py3dpolys_le/data/ce/dcc_mex-sites_boundaries.csv
+boundary_direction = 0
+z_loop = true
+unidirectional = false
+
+# analysis: experiments in silico:
+# 1.42 = 100nm
+radius_contact = 2.84
+
+# hic-chi2-min:
+cmp_chrs=chrX,X,6
+exp_cool=./test/data/wt_N2_Moushumi2020_HIC1_5000.cool
+tads_boundary=./test/sip_loopanchor_boundaries.csv
+```
 
 Be aware to update properly the _[job_runner]_ section according to your system environment.
 
@@ -105,4 +204,7 @@ Other available commands are:
   `3dpolys_le_stats --help`
 
   `plot_hic --help`
+
+  `plot_sijm_stats --help`
+
 
