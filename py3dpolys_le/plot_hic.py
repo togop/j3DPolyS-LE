@@ -30,8 +30,8 @@ DEFAULT_DPI = 150
 # default simulation resolution
 SIM_RESOLUTION = 2000
 
-# extra optional
-crop = [9000//2, 15000//2]
+# experimental: extra optional
+crop = None  # [9000//2, 15000//2]
 
 
 def cli_parser():
