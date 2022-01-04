@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='py3dpolys_le',
-      version='2021.11.11',
+      version='2022.1.4',
       description='3D Polymer Simulations - Loop Extrusion model',
       url='https://gitlab.com/togop/3DPolyS-LE',
       author='Daniel Jost, Todor Gitchev',
@@ -41,7 +41,7 @@ setup(name='py3dpolys_le',
               '3dpolys_le_stats = py3dpolys_le.3dpolys_le_stats:main',
               'plot_hic = py3dpolys_le.plot_hic:main',
               'plot_sim_stats = py3dpolys_le.plot_sim_stats:main',
-              # 'hdf5_to_cool = py3dpolys_le.hic_converters:hdf5_to_cool', TODO was not ready yet
+              'hdf5_to_cooler = py3dpolys_le.hic_converters:hdf5_to_cooler'
           ],
       },
       zip_safe=False)

@@ -83,7 +83,7 @@ def main():
     boundary = args.boundary
     tads_boundary = args.tads_boundary
 
-    cmp_hic_file = re.sub(r'.cool', '', exp_cool)  # hic to compare with
+    cmp_hic_file = re.sub(r'\.cool|\.mcool', '', exp_cool)  # hic to compare with
 
     # find last HIC.hdf5 do analysis and store
     sim_hic_file = ha.get_last_hic(args.analyse)

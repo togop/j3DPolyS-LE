@@ -11,6 +11,8 @@ from matplotlib import pyplot as plt
 from matplotlib.ticker import FuncFormatter
 import glob
 import cooler
+import dask.array as da
+from scipy.signal import savgol_filter, find_peaks, find_peaks_cwt
 
 # Initialization
 logger = logging.getLogger(__name__)
@@ -23,6 +25,13 @@ DEFAULT_CLIM = [-2.75, 0]
 DEFAULT_PLOT_FORMAT = "png"
 CHR_X_SYNONYMS = ['6', 'chrX', 'X']
 DEFAULT_TITLE = "Hi-C for measurement {hic_file}"
+DEFAULT_DPI = 150
+
+# default simulation resolution
+SIM_RESOLUTION = 2000
+
+# extra optional
+crop = [9000//2, 15000//2]
 
 
 def cli_parser():
@@ -61,6 +70,9 @@ def get_hic(hic_file, resolution, balanced, hic_chrs):
             data = list(f[a_group_key])
             hic = np.array(data)
             np.fill_diagonal(hic, 0)
+            if resolution > SIM_RESOLUTION:  # need binning
+                hic = hic_coarsen(hic, hic_file, resolution)
+            res = SIM_RESOLUTION
     elif hic_file.endswith('.cool') or hic_file.endswith('.mcool'):
         # use the root cool
         cooler_ref = f'{hic_file}::/' if hic_file.endswith('.cool') else f'{hic_file}::/resolutions/{resolution}'
@@ -71,6 +83,20 @@ def get_hic(hic_file, resolution, balanced, hic_chrs):
         if balanced:
             hic = np.nan_to_num(hic)  # nan -> 0
         np.fill_diagonal(hic, 0)
+    return hic
+
+
+def hic_coarsen(hic, hic_h5, resolution, from_resolution=SIM_RESOLUTION):
+    factor = resolution // from_resolution
+    if factor == 1:
+        return hic   # no coarsen
+    if resolution % from_resolution != 0:
+        logger.error(f'Cannot do binning from resolution {from_resolution} to {resolution} '
+                     f'for hic file {hic_h5}')
+    # coarsen
+    dhic = da.from_array(hic)  # , chunks=hic.shape[0] // factor)
+    dhic_binned = da.coarsen(np.sum, dhic, {0: factor, 1: factor})
+    hic = dhic_binned.compute()
     return hic
 
 
@@ -90,14 +116,34 @@ def run(output_folder, hic_wildcard=DEFAULT_HIC_WILDCARD, resolution=DEFAULT_RES
 
         fig = plt.figure()
 
+        # crop desired section
+        if crop:
+            if len(crop) == 2:
+                hic = hic[crop[0]:crop[1], crop[0]:crop[1]]
+            else:
+                hic = hic[crop[0]:, crop[0]:]
+
         hic_log = np.log10(hic)
 
-        res_kb = resolution//1000
+        res_kb = resolution/1000
         plt.gca().get_xaxis().set_major_formatter(FuncFormatter(lambda x, p: int(x*res_kb)))
         plt.gca().get_yaxis().set_major_formatter(FuncFormatter(lambda y, p: int(y*res_kb)))
 
         plt.imshow(hic_log, interpolation='nearest', cmap=cmap)  # color scale
         # cbar_h = plt.colorbar()
+
+        # # START: loop anchors finder: for experimental HiCs
+        # hic_aggregated = np.log10(hic.sum(axis=0)) * -1000
+        # hic_aggregated[hic_aggregated == -np.inf] = 0
+        # hic_aggregated[hic_aggregated == np.inf] = 0
+        # hic_aggregated_smooth = savgol_filter(hic_aggregated, 7, 3) + 700
+        # plt.plot(hic_aggregated_smooth)
+        # # peaks, _ = find_peaks(1000-hic_aggregated_smooth, height=170, width=6)  # np.arange(10, 20))
+        # # resolution: 20000
+        # #peaks = find_peaks_cwt(-hic_aggregated_smooth, widths=np.arange(5, 30))
+        # peaks = find_peaks_cwt(-hic_aggregated_smooth, widths=np.arange(5, 27))
+        # plt.plot(peaks, hic_aggregated_smooth[peaks], "x")
+        # # END: loop anchors finder
 
         print(plt.rcParams['axes.prop_cycle'].by_key()['color'])
 
@@ -108,16 +154,18 @@ def run(output_folder, hic_wildcard=DEFAULT_HIC_WILDCARD, resolution=DEFAULT_RES
         # plt.clim(np.log2(mu + 1.25*sd), 0)
         if clim and len(clim) > 1:
             plt.clim(clim[0], clim[1])
-        plt.title(title.format(hic_file=hic_file, output_folder=output_folder, resolution=resolution, balanced=balanced))
+        hic_file_clean = hic_file.replace('_hic_003.hdf5', '').replace('./', '')   # extra clean
+        plt.title(title.format(hic_file=hic_file_clean, output_folder=output_folder, resolution=resolution, balanced=balanced))
 
         # cbar_h.ax.tick_params(labelsize=11)
         # plt.show()
 
         basename = os.path.basename(hic_file)
         extension = basename.split(".")[-1]
-        plot_file = os.path.join(output_folder, basename.replace(f'.{extension}', f'_{cmap}.{plot_format}'))
+        crop_ext = f'_c{crop[0]}{f"-{crop[1]}" if len(crop)==2 else ""}' if crop else ""
+        plot_file = os.path.join(output_folder, basename.replace(f'.{extension}', f'{crop_ext}_{cmap}.{plot_format}'))
 
-        fig.savefig(plot_file, dpi=200)
+        fig.savefig(plot_file, dpi=DEFAULT_DPI)
         plt.close()
         print(f'Hic plot saved in file {plot_file}')
 

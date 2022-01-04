@@ -55,7 +55,7 @@ CHI2_RANGE_END = 2000
 CHI2_RANGE_NUM = 100
 
 CHI2_USE_SEM = True
-CHI2_USE_BALANCED = False   # True still cause problems
+CHI2_USE_BALANCED = False  # True used only for plotting mixed comparisons
 
 PLOT_FORMAT = 'svg'
 # FIG_FORMAT = 'png'
@@ -558,7 +558,7 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
         # plt.show()
         if not os.path.exists(plots_folder):
             os.mkdir(plots_folder)
-        fig_filename = os.path.join(plots_folder, f'{comp_filename}_{chi2_mode}.png')
+        fig_filename = os.path.join(plots_folder, f'{comp_filename}_{"balanced" if hic_balance else ""}_{chi2_mode}.png')
         logger.info(f'Save figure in file: {fig_filename}')
         fig.savefig(fig_filename, dpi=1000)
         plt.close()

@@ -3,17 +3,28 @@
 import argparse
 import logging
 import os
-import sys
+import re
 
 import cooler
+import h5py
 import numpy as np
 import pandas as pd
+import sys
 
-from . import hic_converters as hc
-from ._version import __version__
+from py3dpolys_le import _version
 
 # Initialization
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(_version.__name__)
+
+
+def read_hic_hdf5(hic_hdf5):
+    with h5py.File(hic_hdf5, 'r') as f:
+        # List all groups
+        logger.info(f"Read hic file {hic_hdf5} with Keys: {f.keys()} ...")
+        a_group_key = list(f.keys())[0]
+        data = list(f[a_group_key])
+        hic = np.array(data)
+        return hic
 
 
 def diff_matrix_to_cool(matrix1_file, matrix2_file, chr, resolution):
@@ -87,7 +98,7 @@ def hic_to_cool(hic, chr, resolution, cool_file):
                 'bin-size': resolution,
                 'storage-mode': 'symmetric-upper',
                 'genome-assembly': 'ce11',
-                'generated-by': __name__ + '-' + __version__,
+                'generated-by': _version.__name__ + '-' + _version.__version__,
                 # 'creation-date': datetime.date.today()
                 }
 
@@ -122,20 +133,37 @@ def matrix_to_mcool(matrix_file, chr, resolution, factors):
     return mcool_file
 
 
-def hdf5_to_cool():
+def hdf5_to_cooler():
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("").setLevel(logging.INFO)
 
     p = argparse.ArgumentParser()
     p.add_argument("-i", "--input_file", help="input file name")
-    p.add_argument("-o", "--output_file", help="output file name")
+    p.add_argument("-o", "--output_file", help="output file name. Allowed file types: .cool, .mcool")
     p.add_argument("-chr", help="Chromosome name to be used for")
-    p.add_argument("-r", "--resolution", help="Chromosome name to be used for")
+    p.add_argument("-r", "--resolutions", nargs='+', default=[2000], type=int,
+                   help="List of resolutions for .mcool output file. "
+                        "Default: 2000, for a .cool file in a simulation's resolution.")
+    p.add_argument("-f", "--foctors", help="Chromosome name to be used for")
     args = p.parse_args(sys.argv[1:])
 
-    # TODO need to do it like in hic_analysis.py
-    hic_to_cool(hic=args.input_file, chr=args.chr, resolution=args.resolution, cool_file=args.output_file)
+    hic = read_hic_hdf5(args.input_file)
+    if args.output_file.endswith('.cool'):
+        hic_to_cool(hic=hic, chr=args.chr, resolution=args.resolutions[0], cool_file=args.output_file)
+    elif args.output_file.endswith('.mcool'):
+        cool_file = re.sub(r'\.mcool', '.cool', args.output_file)  # hic to compare with
+        hic_to_cool(hic,  chr=args.chr, resolution=args.resolutions[0], cool_file=cool_file)
+        # using CLI
+        res_str = str(args.resolutions).strip('[]')
+        cmd = f'cooler zoomify -o {args.output_file} -c 10000000 -r \'{res_str}\' {cool_file}'
+        logging.info(f'call: {cmd}')
+        os.system(cmd)
+        # using API: there was some problems sometime
+        # try:
+        #    cooler.zoomify_cooler(cool_file, args.output_file, resolutions=args.resolutions, chunksize=int(10e6))
+        # except:
+        #    logger.warning(f'Failed to zoomify file {cool_file}! Will try CLI cooler zoomify ...')
 
 
 if __name__ == "__main__":
-    hdf5_to_cool()
+    hdf5_to_cooler()
