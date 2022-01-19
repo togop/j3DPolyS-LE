@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2022.1.4'
+    character(*), parameter :: VERSION = '2022.1.19'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2021.7.4'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2022.1.19'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -465,6 +465,7 @@ program mainprogram
     !load the local state of the 2kbp-bins
     ! used to init a polymermodel.boundary
     allocate (boundary(2, Nchain))
+    boundary = 0.
 
     if (trim(boundary_file) /= '') then
         open(10, file = trim(boundary_file), action = 'read', iostat = rc)
