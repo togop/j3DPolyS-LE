@@ -642,7 +642,7 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None,
     # assuming they are all from the same simulation
     exp_base_name = os.path.splitext(os.path.basename(exp_cool))[0] if exp_cool else ""
     # exp_base_name = exp_base_name[0] if exp_base_name else ''
-    # hic_sim_folder = os.path.basename(output_folder)
+    hic_sim_folder = os.path.basename(output_folder)
     hics = ''
     for i, hic_r in enumerate(hic_names):
         hic = hic_list[i]
@@ -726,7 +726,7 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None,
             legend.append(f'{hic_names[i]}.{hic_chr} chi2_min: {chi2:7.3f}')
 
             if SAVE_DECAY_PROBABILITY:  # save the exp decay probability
-                f_name = f'{hic}.{res}_decay_probs_{chi2_mode[:3]}.txt'
+                f_name = f'decay_probs_{hic_sim_folder}_{hic}.{res}_{chi2_mode[:3]}.txt'
                 logger.info(f'Save simulation data from Distance-contact decay plot: {hic} to {f_name}')
                 f = open(f_name, 'w')
                 f.write('\n'.join([str(elem) for elem in probs]))
