@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2022.1.19'
+    character(*), parameter :: VERSION = '2022.1.20'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2022.1.19'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2022.1.20'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -62,7 +62,7 @@ subroutine print_version()
             end if
         end if
 
-        print*, program_name, ' version ', program__version
+        print*, program_name, ' version ', VERSION
 
     end if
 end subroutine print_version

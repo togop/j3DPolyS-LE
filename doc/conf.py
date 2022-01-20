@@ -32,6 +32,7 @@ release = '2012.6.12'
 # ones.
 extensions = ['sphinx.ext.autodoc']
 extensions += ['sphinxarg.ext']
+#extensions += ['sphinx_argparse']
 extensions += ['sphinx_argparse_cli']
 
 # Add any paths that contain templates here, relative to this directory.
