@@ -88,7 +88,7 @@ def cli_parser():
                    help="TADs boundary file used to calculate the chi-2-min score in the same format as the "
                         "boundary sites file used for simulation. Default: no boundaries equivalent to"
                         "the whole chromosome seen as a single TAD.")
-    p.add_argument("-e", "--exp_cool", nargs='?',
+    p.add_argument("-e", "--exp_cool", default="",
                    help=f"Experimental cooler (.cool) file with which a simulation data to be compared. "
                         f"When used in combination with a new_stats command, if the value is '{EXP_COOL_AS_STATS}', "
                         f"it will use values stored in a given sim_stats.tsv file (--stats_file).")

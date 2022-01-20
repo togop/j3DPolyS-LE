@@ -640,7 +640,7 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None,
     hic_names = [os.path.splitext(os.path.basename(hic))[0] for hic in hic_list]
     # we will use the simulation folder (../<radius_analyse>) of the first hic,
     # assuming they are all from the same simulation
-    exp_base_name = os.path.splitext(os.path.basename(exp_cool))[0]
+    exp_base_name = os.path.splitext(os.path.basename(exp_cool))[0] if exp_cool else ""
     # exp_base_name = exp_base_name[0] if exp_base_name else ''
     # hic_sim_folder = os.path.basename(output_folder)
     hics = ''
@@ -675,7 +675,7 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None,
     plt.yscale('log')
     lines = []
     legend = []
-    cmp_hic = re.sub(r'.cool', '', exp_cool)
+    cmp_hic = re.sub(r'.cool', '', exp_cool) if exp_cool else ""
     chr_i = 0
     for i, hic in enumerate(hic_list):
         if not os.path.exists(hic):
@@ -705,9 +705,12 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None,
 
             # calculate proper chi2_alpha
             plots_folder = os.path.join(output_folder, 'plots')
-            chi2, alpha = compare_hic_chromosome(hic, cmp_hic, hic_chrs=[hic_chr], chrs=CHR_SYNONYMS, res=res,
-                                                 tads_boundary=tads, plots_folder=plots_folder, norm=True,
-                                                 chi2_mode=chi2_mode)
+            if cmp_hic:
+                chi2, alpha = compare_hic_chromosome(hic, cmp_hic, hic_chrs=[hic_chr], chrs=CHR_SYNONYMS, res=res,
+                                                     tads_boundary=tads, plots_folder=plots_folder, norm=True,
+                                                     chi2_mode=chi2_mode)
+            else:
+                chi2, alpha = 0, 1
     #        logger.info(f'COMPARE {cmp_hic} <- {hic}: {chi2}, {alpha}')
     #        chi2_rev, alpha_rev = compare_hic_chromosome(cmp_hic, hic, hic_chrs=CHR_SYNONYMS, chrs=hic_chrs, res=res, tads_csv=None,
     #                                             norm=True, chi2_mode=chi2_mode)  # , plot=True)

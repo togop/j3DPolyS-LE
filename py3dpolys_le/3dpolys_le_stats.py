@@ -31,7 +31,7 @@ def cli_parser():
                    help="TADs boundary file in CSV format (same as boundary.csv) to be used for calculating chi2-min score. "
                         "Also supported Loops file in .bed.tsv format, with the following columns: "
                         "chromosome  anchor1  anchor2")
-    p.add_argument("-e", "--exp_cool",
+    p.add_argument("-e", "--exp_cool", default="",
                    help="Experimental cool file with which simulation data to be compared.")
     p.add_argument("-l", "--nlef", default="200", help="Nlef value used in a simulation.")  # TODO optional read it form input.dat
     p.add_argument("-m", "--km", default="2.7e-3", help="km value used in a simulation.")  # TODO optional read it form input.dat
@@ -83,7 +83,7 @@ def main():
     boundary = args.boundary
     tads_boundary = args.tads_boundary
 
-    cmp_hic_file = re.sub(r'\.cool|\.mcool', '', exp_cool)  # hic to compare with
+    cmp_hic_file = re.sub(r'\.cool|\.mcool', '', exp_cool) if exp_cool else None  # hic to compare with
 
     # find last HIC.hdf5 do analysis and store
     sim_hic_file = ha.get_last_hic(args.analyse)
@@ -91,13 +91,16 @@ def main():
     plots_folder = os.path.join(args.output_folder, ha.PLOTS_FOLDER)
 
     # need only normed for chi2_log and chi2_linear and for given tads-boundary sites and 1tad(the whole chromosome)
-    (chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
-                                                      res=ha.RESOLUTION, tads_boundary=tads_boundary, norm=True,
-                                                      chi2_mode=ha.CHI2_MODE_LINEAR)  # , plot=True)
-    (chi2_log, alpha_log) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
-                                                      res=ha.RESOLUTION, tads_boundary=tads_boundary,
-                                                      plots_folder=plots_folder, norm=True, chi2_mode=ha.CHI2_MODE_LOG)
-
+    if exp_cool:
+        (chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
+                                                          res=ha.RESOLUTION, tads_boundary=tads_boundary, norm=True,
+                                                          chi2_mode=ha.CHI2_MODE_LINEAR)  # , plot=True)
+        (chi2_log, alpha_log) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
+                                                          res=ha.RESOLUTION, tads_boundary=tads_boundary,
+                                                          plots_folder=plots_folder, norm=True, chi2_mode=ha.CHI2_MODE_LOG)
+    else:
+        (chi2_lin, alpha_lin) = (0, 1)
+        (chi2_log, alpha_log) = (0, 1)
     # import matplotlib.pyplot as plt
     # plt.plot(exp_score, sim_score, '.')  # juts to visualize with what the correlation coefficient has to deal with
 
