@@ -306,11 +306,11 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
         else:
             logger.info(f'calculate TAD:{tad_start}-{tad_end}, size:{tadi_size}')
             balanced = (cmp_hic_cooler.bins()['weights'] is not None) if hic_balance else hic_balance
-            tadi_mat2 = (cmp_hic_cooler.matrix(balance=balanced).fetch((comp_chr, tad_start, tad_end)))
+            tadi_mat2 = (cmp_hic_cooler.matrix(balance=balanced).fetch((comp_chr, tad_start, tad_end - res)))  # -1 bead: fetch do inclusive start, end
             if balanced:
                 tadi_mat2 = np.nan_to_num(tadi_mat2)
             tadi_mat1_start = tad_start // res
-            tadi_mat1_end = tad_end // res + 1
+            tadi_mat1_end = tad_end // res
             tadi_mat1 = hic1_mat[tadi_mat1_start:tadi_mat1_end, tadi_mat1_start:tadi_mat1_end]
 
             if plots_folder:
@@ -385,7 +385,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
 
     tads_chi2_min_gr = pr.PyRanges(tads_chi2_min_df)
     # save tads_chi2_min_df as bigwig
-    tads_chi2_min_gr.to_bed(os.path.join(plots_folder if plots_folder else '', f'{comp_filename}_tads_chi2-min.bed'), keep=True)
+    tads_chi2_min_gr.to_bed(os.path.join(plots_folder if plots_folder else '', f'{comp_filename}_tads_chi2-min_{chi2_mode}.bed'), keep=True)
     #tads_chi2_min_gr.to_bed(f'{comp_filename}_tads_chi2-min.bed', keep=True)
     #chr_sizes_gr = pr.from_dict({'Chromosome': [comp_chr], 'Start': [0], 'End': [chr_size]})
     #pr.to_bigwig(tads_chi2_min_gr, f'{comp_filename}_tads_chi2-min.bw', chr_sizes_gr)

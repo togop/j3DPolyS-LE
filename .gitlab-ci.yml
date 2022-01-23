@@ -50,8 +50,8 @@ test:
     - chmod +x ./run_test_shell_input.sh
     - ./run_test_shell_input.sh
     - ./test/test.sh ./out-8860/config.out
-    - ./test/test.sh ./out-8860/contact-decay_wt_N2_Moushumi2020_HIC1_5000_6_vs_X__hic_002.h5_chi2_lin.10000.svg
-    - ./test/test.sh ./out-8860/contact-decay_wt_N2_Moushumi2020_HIC1_5000_6_vs_X__hic_002.h5_chi2_log.10000.svg
+    - ./test/test.sh ./out-8860/contact-decay_wt_N2_Moushumi2020_HIC1_5000_6_vs_X__hic_002.h5_chi2_lin.10000.png
+    - ./test/test.sh ./out-8860/contact-decay_wt_N2_Moushumi2020_HIC1_5000_6_vs_X__hic_002.h5_chi2_log.10000.png
     - ls -la ./out-8860
     - ls -la ./out-8860/r2.84
     - ./test/test.sh ./out-8860/3dpoys_le.cfg
