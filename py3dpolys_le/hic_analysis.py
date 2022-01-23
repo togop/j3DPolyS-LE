@@ -158,7 +158,7 @@ def print_hdf5_structure(hdf5_file):
 def remove_duplicates(list, max=None):
     final_list = []
     for el in list:
-        if el <= max and el not in final_list:
+        if (el <= max if max else True) and el not in final_list:
             final_list.append(el)
     return final_list
 
@@ -624,7 +624,6 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None,
     # assuming they are all from the same simulation
     exp_base_name = os.path.splitext(os.path.basename(exp_cool))[0] if exp_cool else ""
     # exp_base_name = exp_base_name[0] if exp_base_name else ''
-    hic_sim_folder = os.path.basename(output_folder)
     hics = ''
     for i, hic_r in enumerate(hic_names):
         hic = hic_list[i]
