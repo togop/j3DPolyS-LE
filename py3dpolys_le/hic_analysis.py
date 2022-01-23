@@ -57,8 +57,8 @@ CHI2_RANGE_NUM = 100
 CHI2_USE_SEM = True
 CHI2_USE_BALANCED = False  # True used only for plotting mixed comparisons
 
-PLOT_FORMAT = 'svg'
-# FIG_FORMAT = 'png'
+# PLOT_FORMAT = 'svg'
+PLOT_FORMAT = 'png'
 
 # simulation output files
 DR_OUT = 'dr.out'
@@ -155,10 +155,10 @@ def print_hdf5_structure(hdf5_file):
 
 # print_hdf5_structure('/Users/todor/UniBern/master_project/MC-HiC-guppy/target/frag_files/frg_20190501_HIC6_7_barcode08_pass_WS235.hdf5')
 
-def remove_duplicates(list):
+def remove_duplicates(list, max=None):
     final_list = []
     for el in list:
-        if el not in final_list:
+        if el <= max and el not in final_list:
             final_list.append(el)
     return final_list
 
@@ -253,17 +253,18 @@ def average_contact_prob(prob_mat, dist, plot=False, ax=plt):
 
     # probs_filtered = list(filter(lambda x: x > 0, probs)) if count > 0 and filtered else probs
     # count = len(probs_filtered)
-    avrg_prob = np.mean(probs) if count > 0 else 0
+    avrg_prob = np.mean(probs, dtype=np.float128) if count > 0 else 0
     if CHI2_USE_SEM:
         sd_sem = stats.sem(probs) if count > 1 else 0
     else:
-        sd_sem = np.std(probs) if count > 1 else 0  # np.std(probs)**2 == np.var(probs)
+        sd_sem = np.std(probs, dtype=np.float128) if count > 1 else 0  # np.std(probs)**2 == np.var(probs)
     if plot:
         ax.plot(x, y)
     # avrg_prob_log = -np.log(max(avrg_prob, 1.e-8)) if avrg_prob < 1. else 0
     # std_prob_log = 0.1 * avrg_prob_log
     # return avrg_prob_log, std_prob_log  # , sem
-    return avrg_prob, sd_sem  # std_prob  # , sem
+    # float128: need highest precision
+    return np.float128(avrg_prob), np.float128(sd_sem)  # std_prob  # , sem
 
 
 def get_chi2_dist_range(chi2_mode, res, max=None):
@@ -275,7 +276,7 @@ def get_chi2_dist_range(chi2_mode, res, max=None):
                                                     num=CHI2_RANGE_NUM)  # // 10)  # if wanted less points
         # OLD WAY [(log_base ** x) for x in range(1, max_x + 1)]  # math.floor(math.exp(x))  # log_base**x
     dist_range = [int(round(x)) for x in (dist_range * SIM_RESOLUTION / res)]
-    dist_range = remove_duplicates(dist_range)  # dist_range = list(filter(lambda d: d < max, dist_range)) : not needed
+    dist_range = np.asarray(remove_duplicates(dist_range, max))  # - 1  # TODO check also: filter by max; index start from 0(-1)
     return dist_range
 
 
@@ -341,7 +342,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
                 if plots_folder:
                     average_contact_prob(tadi_mat2, dist, plots_folder, ax2)  # use just to plot
                 sigma_i_2 = f_i_p_i_sdsem ** 2  # can use SD or SEM!!
-                if sigma_i_2 > 0:
+                if sigma_i_2 != 0:
                     toti_PFS += (p_i * f_i) / sigma_i_2
                     toti_PS += (p_i ** 2) / sigma_i_2
                     toti_FS += (f_i ** 2) / sigma_i_2
@@ -384,7 +385,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
 
     tads_chi2_min_gr = pr.PyRanges(tads_chi2_min_df)
     # save tads_chi2_min_df as bigwig
-    tads_chi2_min_gr.to_bed(f'{comp_filename}_tads_chi2-min.bed', keep=True)
+    tads_chi2_min_gr.to_bed(os.path.join(plots_folder, f'{comp_filename}_tads_chi2-min.bed'), keep=True)
     #chr_sizes_gr = pr.from_dict({'Chromosome': [comp_chr], 'Start': [0], 'End': [chr_size]})
     #pr.to_bigwig(tads_chi2_min_gr, f'{comp_filename}_tads_chi2-min.bw', chr_sizes_gr)
 
@@ -456,33 +457,10 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
     comp_filename = f'comp_{h1}_{h2}_res{res}{tads_pref}{"_balanced" if balanced else ""}'
 
     chr_end = min(hic1_chr_size, hic2cooler.chromsizes[exp_chr])
-    tads = None
-    if tads_boundary is not None:
-        if os.path.exists(tads_boundary):
-            if pathlib.Path(tads_boundary).suffix == '.csv':
-                # get rex/mex-sites midpoints
-                midpoints = pd.read_csv(tads_boundary, usecols=["midpoint"], dtype={"midpoint": "int64"}).values
-                borders = np.zeros(1, dtype=int)
-                borders = np.append(borders, midpoints)
-                borders = np.append(borders, chr_end)
-                # from sites to TADs
-                tads = np.zeros((borders.shape[0] - 1, 2), dtype=int)
-                for i in range(borders.shape[0] - 1):  # -1: skip header
-                    tads[i, 0] = borders[i]
-                    tads[i, 1] = borders[i + 1]
-
-            elif pathlib.Path(tads_boundary).suffix == '.tsv' or pathlib.Path(tads_boundary).suffix == '.bed':
-                loops_df = pr.read_bed(tads_boundary, as_df=True)
-                tads = np.zeros((loops_df.shape[0], 2), dtype=int)
-                for i, loop in loops_df.iterrows():
-                    tads[i, 0] = loop[1]
-                    tads[i, 1] = loop[2]
-
-        else:
-            logger.info(f'Missing TADs boundary file {tads_boundary}: single TAD mode')
+    tads = read_tads_bed(tads_boundary)
 
     if tads is None:
-        logger.info(f'Whole chromosome as a Single TAD.')
+        logger.info(f'Whole chromosome as a single TAD representing the whole chromosome.')
         tads = np.zeros((1, 2), dtype=int)
         tads[0, 0] = 1
         tads[0, 1] = chr_end
@@ -525,27 +503,15 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
 
         # plt.clim(-2.75, 0)
 
-        tads = np.zeros(1, dtype=int)
-        if tads_boundary is not None:
-            if os.path.exists(tads_boundary):
-                try:
-                    midpoints = pd.read_csv(tads_boundary, usecols=["midpoint"], dtype={"midpoint": "int64"}).values
-                    tads = np.rint(np.append(tads, midpoints) / res)
-                except:
-                    logger.error(f'Missing or empty TADs boundary file {tads_boundary}')
-            else:
-                logger.error(f'Missing TADs boundary file {tads_boundary}')
-
         # hic1cooler.info['nbins'] * hic1cooler.info['bin-size']
-        chr_end = min(hic_mat1.shape[0], hic_mat2.shape[0])  # * res
-        tads = np.append(tads, chr_end)
+        # chr_end = min(hic_mat1.shape[0], hic_mat2.shape[0])  # * res
+        # tads = np.append(tads, chr_end)
 
-        for i in range(tads.shape[0] - 1):
-            # TODO update plot: compatible with loop TADs
-            tad_start = tads[i]
-            tad_end = tads[i + 1]
+        for tadi in tads:
+            tad_start = tadi[0]/res
+            tad_end = tadi[1]/res
             # ax2.plot([tad_start, tad_start+tad_end], "b-")
-            logger.info(f'plot TAD{i} {tad_start}-{tad_end}')
+            logger.info(f'plot TAD {tad_start}-{tad_end}')
             # split
             # ax1.plot([tad_start, tad_end, tad_end, tad_start, tad_start],
             #          [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--')
@@ -553,7 +519,7 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
             #          [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--')
             # merged
             plt.plot([tad_start, tad_end, tad_end, tad_start, tad_start],
-                     [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--')
+                     [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--', linewidth=1, alpha=0.25)
 
         # plt.show()
         if not os.path.exists(plots_folder):
@@ -565,6 +531,22 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
 
     logger.info(f'chi2_minimization score for {h1} and {h2} (resolution: {res}): {chi2_min},{alpha_min} on TADs: {tads_boundary}')
     return chi2_min, alpha_min
+
+
+def read_tads_bed(tads_bed_file):
+    tads = None
+    if tads_bed_file is not None:
+        if os.path.exists(tads_bed_file):
+            if pathlib.Path(tads_bed_file).suffix == '.tsv' or pathlib.Path(tads_bed_file).suffix == '.bed':
+                loops_df = pr.read_bed(tads_bed_file, as_df=True)
+                tads = np.zeros((loops_df.shape[0], 2), dtype=int)
+                for i, loop in loops_df.iterrows():
+                    tads[i, 0] = loop[1]
+                    tads[i, 1] = loop[2]
+
+        else:
+            logger.info(f'Missing TADs BED format file {tads_bed_file}: single TAD mode')
+    return tads
 
 
 def get_exp_sim_mcool(hic, chrs, res=RESOLUTION):
@@ -681,6 +663,7 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None,
         if not os.path.exists(hic):
             logger.error(f'Missing file {hic}, skip it!')
             continue
+        # hic_folder = os.path.dirname(hic)
         if os.path.exists(hic) and hic.endswith('.hdf5') and DECAY_USE_HDF5:
             # it's a simulation HDF5 file containing only one chromosome so let's use the first chromosome synonym
             hic_chrs_select = [hic_chrs[0]]
@@ -726,7 +709,7 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None,
             legend.append(f'{hic_names[i]}.{hic_chr} chi2_min: {chi2:7.3f}')
 
             if SAVE_DECAY_PROBABILITY:  # save the exp decay probability
-                f_name = f'decay_probs_{hic_sim_folder}_{hic}.{res}_{chi2_mode[:3]}.txt'
+                f_name = f'{hic}.{res}_decay_probs_{chi2_mode[:3]}.txt'
                 logger.info(f'Save simulation data from Distance-contact decay plot: {hic} to {f_name}')
                 f = open(f_name, 'w')
                 f.write('\n'.join([str(elem) for elem in probs]))

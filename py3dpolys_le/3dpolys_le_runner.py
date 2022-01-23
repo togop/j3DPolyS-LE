@@ -663,13 +663,18 @@ def main():
                                 cmp_chrs=args.cmp_chrs, resolution=args.resolution,
                                 output_folder=args.output_folder, analyse=args.analysis_folder)
     dcc_run = DccExtrusionRunner(job_runner=job_runner)
+
+    # plot_format = args.plot_format # TODO add args.plot_format
+    plot_format = job_runner.get_property(profile='stats', name='plot_format')
+    if not plot_format:
+        plot_format = ha.PLOT_FORMAT  # default in case of ""
+
     if args.run_command == 'grid_nlef_km':
         dcc_run.grid_nlef_km(dcc_args=dcc_args, nlef_list=args.nlef_list, km_list=args.km_list, radii=args.list_contact_radii,
                              replace=args.replace)
     elif args.run_command == 'new_stats':
         dcc_run.analysis_stats(dcc_args, new_stats=True, exp_cool=args.exp_cool)
     elif args.run_command == 'decay_plots':
-        plot_format = job_runner.get_property(profile='stats', name='plot_format')
         dcc_run.decay_plots(dcc_args, res=args.resolution, plot_format=plot_format, replace=args.replace, use_threading=args.threading)
     elif args.run_command == 'chip_seq_plots':
         dcc_run.chip_seq_plots(dcc_args, resolution=args.resolution, correlation=args.correlation, replace=args.replace)
@@ -678,7 +683,6 @@ def main():
     elif args.run_command == 'multi_decay_plot':
         dcc_run.multi_decay_plot(dcc_args, res=args.resolution, replace=args.replace)
     elif args.run_command == 'multi_decay_exps_plot':
-        plot_format = job_runner.get_property(profile='stats', name='plot_format')
         dcc_run.multi_decay_exps_plot(args.exp_cools, args.output_folder, hic_chrs=args.hic_chrs,
                                       tads=args.tads_boundary, res=args.resolution, plot_format=plot_format,
                                       replace=args.replace)

@@ -9,12 +9,26 @@ import cooler
 import h5py
 import numpy as np
 import pandas as pd
+import scipy.io
 import sys
 
 from py3dpolys_le import _version
 
 # Initialization
 logger = logging.getLogger(_version.__name__)
+
+
+def cli_parser():
+    p = argparse.ArgumentParser()
+    p.add_argument("-i", "--input_file",
+                   help="input file name. Supported file types: .hdf5 (3DPolyS_LE format), .mat (MATLAB 2D matrix)")
+    p.add_argument("-o", "--output_file", help="output file name. Allowed file types: .cool, .mcool")
+    p.add_argument("-chr", help="Chromosome name to be used for")
+    p.add_argument("-r", "--resolutions", nargs='+', default=[2000], type=int,
+                   help="List of resolutions for .mcool output file. "
+                        "Default: 2000, for a .cool file in a simulation's resolution.")
+    p.add_argument("-f", "--foctors", help="Chromosome name to be used for")
+    return p
 
 
 def read_hic_hdf5(hic_hdf5):
@@ -137,33 +151,75 @@ def hdf5_to_cooler():
     logging.basicConfig(level=logging.DEBUG)
     logging.getLogger("").setLevel(logging.INFO)
 
-    p = argparse.ArgumentParser()
-    p.add_argument("-i", "--input_file", help="input file name")
-    p.add_argument("-o", "--output_file", help="output file name. Allowed file types: .cool, .mcool")
-    p.add_argument("-chr", help="Chromosome name to be used for")
-    p.add_argument("-r", "--resolutions", nargs='+', default=[2000], type=int,
-                   help="List of resolutions for .mcool output file. "
-                        "Default: 2000, for a .cool file in a simulation's resolution.")
-    p.add_argument("-f", "--foctors", help="Chromosome name to be used for")
+    p = cli_parser()
     args = p.parse_args(sys.argv[1:])
 
     hic = read_hic_hdf5(args.input_file)
     if args.output_file.endswith('.cool'):
         hic_to_cool(hic=hic, chr=args.chr, resolution=args.resolutions[0], cool_file=args.output_file)
     elif args.output_file.endswith('.mcool'):
-        cool_file = re.sub(r'\.mcool', '.cool', args.output_file)  # hic to compare with
-        hic_to_cool(hic,  chr=args.chr, resolution=args.resolutions[0], cool_file=cool_file)
-        # using CLI
-        res_str = str(args.resolutions).strip('[]')
-        cmd = f'cooler zoomify -o {args.output_file} -c 10000000 -r \'{res_str}\' {cool_file}'
-        logging.info(f'call: {cmd}')
-        os.system(cmd)
-        # using API: there was some problems sometime
-        # try:
-        #    cooler.zoomify_cooler(cool_file, args.output_file, resolutions=args.resolutions, chunksize=int(10e6))
-        # except:
-        #    logger.warning(f'Failed to zoomify file {cool_file}! Will try CLI cooler zoomify ...')
+        hic_to_mcool(hic, chr=args.chr, resolutions=args.resolutions, mcool_file=args.output_file)
+
+
+def hic_to_mcool(hic, chr, resolutions, mcool_file):
+    cool_file = re.sub(r'\.mcool', '.cool', mcool_file)  # hic to compare with
+    hic_to_cool(hic, chr=chr, resolution=resolutions[0], cool_file=cool_file)
+    # using CLI
+    res_str = str(resolutions).strip('[]')
+    cmd = f'cooler zoomify -o {mcool_file} -c 10000000 -r \'{res_str}\' {cool_file}'
+    logging.info(f'call: {cmd}')
+    os.system(cmd)
+    # using API: there was some problems sometime
+    # try:
+    #    cooler.zoomify_cooler(cool_file, args.output_file, resolutions=args.resolutions, chunksize=int(10e6))
+    # except:
+    #    logger.warning(f'Failed to zoomify file {cool_file}! Will try CLI cooler zoomify ...')
+
+
+def mat_to_cooler():
+    logging.basicConfig(level=logging.DEBUG)
+    logging.getLogger("").setLevel(logging.INFO)
+
+    p = cli_parser()
+    args = p.parse_args(sys.argv[1:])
+
+    hic = scipy.io.loadmat(args.input_file).get('m')
+    # hic_to_cool(hic=hic, chr='chr1', resolution=2000, cool_file='/Users/todor/unibe/git/3DPolyS-LE/test/data/fakematrix_TAD300_600k_peaked.mcool')
+    if args.output_file.endswith('.cool'):
+        hic_to_cool(hic=hic, chr=args.chr, resolution=args.resolutions[0], cool_file=args.output_file)
+    elif args.output_file.endswith('.mcool'):
+        hic_to_mcool(hic, chr=args.chr, resolutions=args.resolutions, mcool_file=args.output_file)
+    print("DONE")
+
+
+def main():
+    logging.basicConfig(level=logging.DEBUG)
+    logging.getLogger("").setLevel(logging.INFO)
+
+    p = cli_parser()
+    args = p.parse_args(sys.argv[1:])
+    if args.input_file.endswith('.hdf5'):
+        hic = read_hic_hdf5(args.input_file)
+    elif args.input_file.endswith('.mat'):
+        hic = scipy.io.loadmat(args.input_file).get('m')
+    else:
+        logging.error(f'Unsupported input format {args.input_file}. '
+                      f'Supported file types: .hdf5 (3DPolyS_LE format), .mat (MATLAB 2D matrix)')
+        exit(1)
+
+    if args.output_file.endswith('.cool'):
+        hic_to_cool(hic=hic, chr=args.chr, resolution=args.resolutions[0], cool_file=args.output_file)
+    elif args.output_file.endswith('.mcool'):
+        hic_to_mcool(hic, chr=args.chr, resolutions=args.resolutions, mcool_file=args.output_file)
+    elif args.output_file.endswith('.mat'):
+        mdic = {"m": hic}
+        scipy.io.savemat(args.output_file, mdic)
+    else:
+        logging.error(f'Unsupported output format {args.output_file}. '
+                      f'Supported file types: .cool, .mcool, .mat')
+        exit(1)
 
 
 if __name__ == "__main__":
-    hdf5_to_cooler()
+    main()
+    # hdf5_to_cooler()

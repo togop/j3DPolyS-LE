@@ -42,7 +42,8 @@ setup(name='py3dpolys_le',
               '3dpolys_le_stats = py3dpolys_le.3dpolys_le_stats:main',
               'plot_hic = py3dpolys_le.plot_hic:main',
               'plot_sim_stats = py3dpolys_le.plot_sim_stats:main',
-              'hdf5_to_cooler = py3dpolys_le.hic_converters:hdf5_to_cooler'
+              'hdf5_to_cooler = py3dpolys_le.hic_converters:hdf5_to_cooler',
+              'hic_converters = py3dpolys_le.hic_converters:main'
           ],
       },
       zip_safe=False)
