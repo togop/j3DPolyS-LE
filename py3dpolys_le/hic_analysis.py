@@ -324,7 +324,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
                 (ax1, ax2) = (0, 0)
 
             # log_base = 2  # 10 is too sparse  # e = math.exp(1)
-            # max_x = max(1, np.int(math.log(tadi_size, log_base)))
+            # max_x = max(1, np.int64(math.log(tadi_size, log_base)))
             # np.log((tad_end - tad_start) / res)  # /np.log(log_base))
             dist_range = get_chi2_dist_range(chi2_mode, res, tadi_size)
             # logger.info('chi2 used distances: ' + ', '.join(map(str, dist_range)))
@@ -385,7 +385,8 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
 
     tads_chi2_min_gr = pr.PyRanges(tads_chi2_min_df)
     # save tads_chi2_min_df as bigwig
-    tads_chi2_min_gr.to_bed(os.path.join(plots_folder, f'{comp_filename}_tads_chi2-min.bed'), keep=True)
+    tads_chi2_min_gr.to_bed(os.path.join(plots_folder if plots_folder else '', f'{comp_filename}_tads_chi2-min.bed'), keep=True)
+    #tads_chi2_min_gr.to_bed(f'{comp_filename}_tads_chi2-min.bed', keep=True)
     #chr_sizes_gr = pr.from_dict({'Chromosome': [comp_chr], 'Start': [0], 'End': [chr_size]})
     #pr.to_bigwig(tads_chi2_min_gr, f'{comp_filename}_tads_chi2-min.bw', chr_sizes_gr)
 

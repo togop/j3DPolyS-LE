@@ -88,7 +88,8 @@ def main():
     # find last HIC.hdf5 do analysis and store
     sim_hic_file = ha.get_last_hic(args.analyse)
 
-    plots_folder = os.path.join(args.output_folder, ha.PLOTS_FOLDER)
+    hic_folder = os.path.dirname(sim_hic_file)
+    plots_folder = os.path.join(hic_folder, ha.PLOTS_FOLDER)
 
     # need only normed for chi2_log and chi2_linear and for given tads-boundary sites and 1tad(the whole chromosome)
     if exp_cool:
