@@ -142,7 +142,8 @@ def cli_parser():
                    # 10,      30,      50,     70,      90,      120 kb/min
                    # 5.4e-4 = 10kb/min = 167bp/s
                    help="List of km values. In combination with grid_nlef_km commands.", type=float)
-
+    # TODO refactor help to group params with commands
+    # TODO load params properly for new_stats: CLI parameters over in file saved values
     # p.add_argument("--no_overwrite", help="Overwrite old files", action='store_false')
     return p
 
@@ -297,7 +298,7 @@ class DccExtrusionRunner:
     def read_stats_file(stats_file):
         # read float as string to avoid rounding errors if decide to save it back
         return pd.read_csv(stats_file, delimiter=',', encoding='utf-8', header=0,
-                           dtype={'boundary': str, 'boundary_direction': str, 'tads_boundary': str, 'km': str, 'radius_contact': str,
+                           dtype={'boundary': str, 'boundary_direction': str, 'km': str, 'radius_contact': str,
                                   'chi2_log': str, 'alpha_log': str, 'chi2_lin': str, 'alpha_lin': str}).replace(np.nan, '', regex=True)
         # , engine='python')
 
@@ -461,8 +462,6 @@ class DccExtrusionRunner:
                 dcc_args_analysis.boundary = sim['boundary']
                 dcc_args_analysis.boundary_direction = sim['boundary_direction'] if columns.__contains__(
                     'boundary_direction') else 0
-                dcc_args_analysis.tads_boundary = sim['tads_boundary']
-                dcc_args_analysis.input_cfg = sim['input.cfg']
                 dcc_args_analysis.nlef = sim['nlef']
                 dcc_args_analysis.km = sim['km']
                 rcp = sim['radius_contact']   # in the sim_stat.csv is saved in this format TODO use proper column name
