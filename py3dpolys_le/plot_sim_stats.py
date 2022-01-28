@@ -138,9 +138,11 @@ plot_3d_stats(args.z_column, args.list_nlef, plt_1)
 # plt_2 = fig.add_subplot(122, projection='3d')
 # plot_3d_stats('chi2_log', plt_2)
 
+# TODO make build help CLI; clean code
+
 
 def main():
-    plt.show()
+    # plt.show()  # only for interactive mode to choose the right perspective
 
     file_name = f'{os.path.basename(args.stats_file)}_{args.plot_mode}_{args.z_column}' \
                 f'_r{"_r".join(args.list_contact_radii)}.{args.file_extension}'

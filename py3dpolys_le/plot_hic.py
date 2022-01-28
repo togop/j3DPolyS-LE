@@ -21,7 +21,7 @@ DEFAULT_CMAP = "hot_r"
 # tuned for simulation HiCs
 DEFAULT_RESOLUTION = 2000
 DEFAULT_HIC_WILDCARD = "hic*.hdf5"
-DEFAULT_CLIM = [-2.75, 0]
+DEFAULT_CLIM = [-2.75, 0]  # found to be mostly OK for our experimental and simulation HiCs
 DEFAULT_PLOT_FORMAT = "png"
 CHR_X_SYNONYMS = ['6', 'chrX', 'X']
 DEFAULT_TITLE = "Hi-C for measurement {hic_file}"
@@ -147,6 +147,7 @@ def run(output_folder, hic_wildcard=DEFAULT_HIC_WILDCARD, resolution=DEFAULT_RES
 
         print(plt.rcParams['axes.prop_cycle'].by_key()['color'])
 
+        cbar_h = plt.colorbar()
         # mu = np.mean(hic)
         # sd = np.std(hic)
         # qt = np.quantile(hic, 0.50)
