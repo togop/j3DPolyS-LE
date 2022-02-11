@@ -14,10 +14,10 @@ singularity-image:
     - cat "$SYLABS_TOKEN" > ~/.singularity/sylabs-token
     - singularity remote login SylabsCloud < ~/.singularity/sylabs-token
     - singularity build --remote --force library://todor/default/py3dpolys_le:latest Singularity
-    - singularity pull py3dpolys_le.sif library://todor/default/py3dpolys_le:latest
-    - singularity key list
-    - singularity sign --keyidx 0 py3dpolys_le.sif
-    - singularity push py3dpolys_le.sif library://todor/default/py3dpolys_le:latest
+    #- singularity pull py3dpolys_le.sif library://todor/default/py3dpolys_le:latest
+    #- singularity key list
+    #- singularity sign --keyidx 0 py3dpolys_le.sif
+    #- singularity push py3dpolys_le.sif library://todor/default/py3dpolys_le:latest
     # - singularity build py3dpolys_le.sif Singularity
   artifacts:
     paths:
