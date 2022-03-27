@@ -1,3 +1,5 @@
+import bisect
+import copy
 import csv
 import fnmatch
 import logging
@@ -14,6 +16,7 @@ import numpy as np
 import pandas as pd
 import pyranges as pr
 from matplotlib import pyplot as plt
+from matplotlib.ticker import FuncFormatter
 from scipy import stats
 
 # from matplotlib import cm
@@ -27,8 +30,7 @@ EXP_RESOLUTION = 10000
 
 RESOLUTION = 10000
 
-EXP_FACTORS = [1, 2, 4]  # , 8, 16]
-SIM_FACTORS = [5, 10, 20]  # , 40, 80]  #, 160, 320]
+RES_FACTORS = [1, 2, 4]  # , 8, 16]
 
 # CMAP = 'hot'
 CMAP = 'YlOrRd'
@@ -53,9 +55,10 @@ CHI2_RANGE_END = 2000
 CHI2_RANGE_NUM = 100
 
 CHI2_USE_SEM = True
+CHI2_USE_BALANCED = False  # True used only for plotting mixed comparisons
 
-FIG_FORMAT = 'svg'  # TODO make FIG_FORMAT input parameter
-#FIG_FORMAT = 'png'
+# PLOT_FORMAT = 'svg'
+PLOT_FORMAT = 'png'
 
 # simulation output files
 DR_OUT = 'dr.out'
@@ -65,7 +68,10 @@ NLEF_OUT = 'Nlef.out'
 PROCESS_OUT = 'process.out'
 # analyse output file
 CHIP_OUT = 'Chip.out'
+CHIP_BED_GRAPH = 'Chip.bedGraph'
 XYZCONFIG_OUT = 'xyzconfig.out'
+
+ALPHA = r'$\alpha$'
 
 # MC_HiC pipeline way
 # clr_map = [cm.hot(ci) for ci in np.linspace(1.0, 0.0, 10)]
@@ -83,6 +89,11 @@ CHR_SYNONYMS = CHR_X_SYNONYMS
 chr_size = chr_x_size
 
 DEFAULT_CHIP_CORRELATION = 'spearmanr'
+
+PLOTS_FOLDER = 'plots'
+DEMO_CLIM = [-1, 3]
+DEFAULT_CLIM = DEMO_CLIM  # just from the DEMO: TODO set DEFAULT_CLIM=None
+PLOT_COMP_TADS = False
 
 
 def get_last_hic(output_folder: str):
@@ -147,10 +158,10 @@ def print_hdf5_structure(hdf5_file):
 
 # print_hdf5_structure('/Users/todor/UniBern/master_project/MC-HiC-guppy/target/frag_files/frg_20190501_HIC6_7_barcode08_pass_WS235.hdf5')
 
-def remove_duplicates(list):
+def remove_duplicates(list, max=None):
     final_list = []
     for el in list:
-        if el not in final_list:
+        if (el <= max if max else True) and el not in final_list:
             final_list.append(el)
     return final_list
 
@@ -230,21 +241,6 @@ def save_chromosome_sizes(chr_lst, chr_size, file_name):
             # chromsizes_file.write(str(chr_name)+"   "+str(chr_size[chr_ind])+"\n")
 
 
-def extract_chromosome_hic(hic_mcool, chr):
-    # hic = cooler.create(hic_mcool)
-    print_hdf5_structure(hic_mcool)
-
-    hic10k = cooler.Cooler(hic_mcool + '::/resolutions/10000')
-
-    hic_mat = hic10k.matrix(balance=False).fetch(f'{chr}')  # [1:chr_size, 0:chr_size]
-
-    plt.imshow(np.log10(hic_mat), cmap=CMAP, interpolation='nearest')
-    #plt.show()
-
-    pixs = hic10k.pixels()
-    logger.debug('end')
-
-
 def average_contact_prob(prob_mat, dist, plot=False, ax=plt):
     count = 0
     probs = []
@@ -260,17 +256,18 @@ def average_contact_prob(prob_mat, dist, plot=False, ax=plt):
 
     # probs_filtered = list(filter(lambda x: x > 0, probs)) if count > 0 and filtered else probs
     # count = len(probs_filtered)
-    avrg_prob = np.mean(probs) if count > 0 else 0
+    avrg_prob = np.mean(probs, dtype=np.float128) if count > 0 else 0
     if CHI2_USE_SEM:
         sd_sem = stats.sem(probs) if count > 1 else 0
     else:
-        sd_sem = np.std(probs) if count > 1 else 0  # np.std(probs)**2 == np.var(probs)
+        sd_sem = np.std(probs, dtype=np.float128) if count > 1 else 0  # np.std(probs)**2 == np.var(probs)
     if plot:
         ax.plot(x, y)
     # avrg_prob_log = -np.log(max(avrg_prob, 1.e-8)) if avrg_prob < 1. else 0
     # std_prob_log = 0.1 * avrg_prob_log
     # return avrg_prob_log, std_prob_log  # , sem
-    return avrg_prob, sd_sem  # std_prob  # , sem
+    # float128: need highest precision
+    return np.float128(avrg_prob), np.float128(sd_sem)  # std_prob  # , sem
 
 
 def get_chi2_dist_range(chi2_mode, res, max=None):
@@ -282,12 +279,12 @@ def get_chi2_dist_range(chi2_mode, res, max=None):
                                                     num=CHI2_RANGE_NUM)  # // 10)  # if wanted less points
         # OLD WAY [(log_base ** x) for x in range(1, max_x + 1)]  # math.floor(math.exp(x))  # log_base**x
     dist_range = [int(round(x)) for x in (dist_range * SIM_RESOLUTION / res)]
-    dist_range = remove_duplicates(dist_range)  # dist_range = list(filter(lambda d: d < max, dist_range)) : not needed
+    dist_range = np.asarray(remove_duplicates(dist_range, max))  # - 1  # TODO check also: filter by max; index start from 0(-1)
     return dist_range
 
 
-def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, plot, norm=True,
-                      chi2_mode=CHI2_MODE_LINEAR):
+def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, plots_folder, norm=True,
+                      chi2_mode=CHI2_MODE_LINEAR, hic_balance=CHI2_USE_BALANCED):
     h1_title = 'simulation HiC'  # hic1cooler.info
     h2_title = 'experimental HiC'  # hic1cooler.info
 
@@ -311,21 +308,26 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
             logger.info(f'skip TAD:{tad_start}-{tad_end}, size:{tadi_size}')
         else:
             logger.info(f'calculate TAD:{tad_start}-{tad_end}, size:{tadi_size}')
-
-            tadi_mat2 = (cmp_hic_cooler.matrix(balance=False).fetch((comp_chr, tad_start, tad_end)))
+            balanced = (cmp_hic_cooler.bins()['weights'] is not None) if hic_balance else hic_balance
+            tadi_mat2 = (cmp_hic_cooler.matrix(balance=balanced).fetch((comp_chr, tad_start, tad_end - res)))  # -1 bead: fetch do inclusive start, end
+            if balanced:
+                tadi_mat2 = np.nan_to_num(tadi_mat2)
             tadi_mat1_start = tad_start // res
-            tadi_mat1_end = tad_end // res + 1
+            tadi_mat1_end = tad_end // res
             tadi_mat1 = hic1_mat[tadi_mat1_start:tadi_mat1_end, tadi_mat1_start:tadi_mat1_end]
 
-            if plot:
+            if plots_folder:
                 fig, (ax1, ax2) = plt.subplots(1, 2)
-                ax1.imshow(np.log10(tadi_mat1), cmap=CMAP, interpolation='nearest')
-                ax2.imshow(np.log10(tadi_mat2), cmap=CMAP, interpolation='nearest')
+                try:
+                    ax1.imshow(np.log10(tadi_mat1), cmap=CMAP, interpolation='nearest')
+                    ax2.imshow(np.log10(tadi_mat2), cmap=CMAP, interpolation='nearest')
+                except:
+                    logger.warning(f'Problem to plot TAD: {tad_start}-{tad_end}')
             else:
                 (ax1, ax2) = (0, 0)
 
             # log_base = 2  # 10 is too sparse  # e = math.exp(1)
-            # max_x = max(1, np.int(math.log(tadi_size, log_base)))
+            # max_x = max(1, np.int64(math.log(tadi_size, log_base)))
             # np.log((tad_end - tad_start) / res)  # /np.log(log_base))
             dist_range = get_chi2_dist_range(chi2_mode, res, tadi_size)
             # logger.info('chi2 used distances: ' + ', '.join(map(str, dist_range)))
@@ -337,13 +339,13 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
                     f'Empty chi2-dist-range for tad with size chi2(mode:{chi2_mode}, resolution:{res}), TADi_size:{tadi_size}[{tad_start}-{tad_end}]')
             tadi_norm_term = 0
             for dist in dist_range:
-                # dist = int(round(dist))  # optimization: do it here
-                (p_i, p_i_sdsem) = average_contact_prob(tadi_mat1, dist, plot, ax1)
+
+                (p_i, p_i_sdsem) = average_contact_prob(tadi_mat1, dist, plots_folder, ax1)
                 (f_i, f_i_p_i_sdsem) = average_contact_prob(tadi_mat2, dist)
-                if plot:
-                    average_contact_prob(tadi_mat2, dist, plot, ax2)  # use just to plot
-                sigma_i_2 = f_i_p_i_sdsem ** 2  # TODO CHECK with Daniel SD or SEM!!
-                if sigma_i_2 > 0:
+                if plots_folder:
+                    average_contact_prob(tadi_mat2, dist, plots_folder, ax2)  # use just to plot
+                sigma_i_2 = f_i_p_i_sdsem ** 2  # can use SD or SEM!!
+                if sigma_i_2 != 0:
                     toti_PFS += (p_i * f_i) / sigma_i_2
                     toti_PS += (p_i ** 2) / sigma_i_2
                     toti_FS += (f_i ** 2) / sigma_i_2
@@ -368,7 +370,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
                                                     tads_chi2_min_df.columns[3]: tadi_chi2_min},
                                                    ignore_index=True)
 
-        if plot and (toti_PS > 0):
+        if plots_folder and (toti_PS > 0):
             logger.info(f' tadi_chi2_min={tadi_chi2_min}')
             fig.suptitle(
                 f'HIC compare chromosome {comp_chr}/{comp_chr}'
@@ -377,14 +379,17 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
             ax1.set_title(f'{h1_title}: \n p_i: {p_i}, \n tot_PS={tot_PS}')
             ax2.set_title(f'{h2_title}: \n p_i: {f_i}, \n tot_FS={tot_FS}')
             #plt.show()
-            fig_filename = f'data/plots/{comp_filename}_{chi2_mode}_tad_{tad_start}-{tad_end}.png'
+            if not os.path.exists(plots_folder):
+                os.mkdir(plots_folder)
+            fig_filename = os.path.join(plots_folder, f'{comp_filename}_{chi2_mode}_tad_{tad_start}-{tad_end}.png')
             logger.info(f'Save figure in file: {fig_filename}')
             fig.savefig(fig_filename)
             plt.close()
 
     tads_chi2_min_gr = pr.PyRanges(tads_chi2_min_df)
     # save tads_chi2_min_df as bigwig
-    tads_chi2_min_gr.to_bed(f'{comp_filename}_tads_chi2-min.bed', keep=True)
+    tads_chi2_min_gr.to_bed(os.path.join(plots_folder if plots_folder else '', f'{comp_filename}_tads_chi2-min_{chi2_mode}.bed'), keep=True)
+    #tads_chi2_min_gr.to_bed(f'{comp_filename}_tads_chi2-min.bed', keep=True)
     #chr_sizes_gr = pr.from_dict({'Chromosome': [comp_chr], 'Start': [0], 'End': [chr_size]})
     #pr.to_bigwig(tads_chi2_min_gr, f'{comp_filename}_tads_chi2-min.bw', chr_sizes_gr)
 
@@ -398,7 +403,7 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
 
 
 def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, res=RESOLUTION, tads_boundary=None,
-                           plot=False, norm=True, chi2_mode=CHI2_MODE_LOG):
+                           plots_folder=None, norm=True, chi2_mode=CHI2_MODE_LOG, hic_balance=CHI2_USE_BALANCED):
     """
         Compare a simulation HiC with the first HiC from a list of experimental HiCs.
         The list experimental HiCs is used to calculate the standard deviation of the average contact probability
@@ -409,135 +414,171 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
     :param chrs: synonyms of chromosome to compare with
     :param res: resolution
     :param tads_boundary: TADs boundaries. Default: None, will use the whole chromosome as one TAD
-    :param plot: to plot or not to plot
+    :param plots_folder: plots folder to save plots if not empty otherwise do not produce plots
     :param norm: Experimental! to normalize or not to normalize single TAD by their height (used log-lines for the statistics)
     :param chi2_mode: Chi2-min mode: linear or log
+    :param hic_balance: to use ICE balanced Hi-C matrix if available, otherwise not
     """
     if hic_chrs is None:
         hic_chrs = chrs
 
     if os.path.exists(hic_file) and hic_file.endswith('.hdf5') and DECAY_USE_HDF5:
-        hic_mat1 = get_hic(hic_file, resolution=res)
+        hic_mat1 = get_hic(hic_file, resolution=res, balance=hic_balance)
         hic1_chr = hic_chrs[0]
         hic1_chr_size = hic_mat1.shape[0]*res
     else:
         hic1cooler, hic1_chrs = get_hic_cooler_res(hic_file, hic_chrs, res)
         # we can compare only one chromosome: we assume we have a list of chromosome synonyms
         hic1_chr = hic1_chrs[0]
-        hic_mat1 = hic1cooler.matrix(balance=False).fetch(hic1_chr)
+        balanced = (hic1cooler.bins()['weights'] is not None) if hic_balance else hic_balance
+        hic_mat1 = hic1cooler.matrix(balance=balanced).fetch(hic1_chr)
+        if balanced:
+            hic_mat1 = np.nan_to_num(hic_mat1)
         hic1_chr_size = hic1cooler.chromsizes[hic1_chr]
 
-    cmp_hic_mcool = get_exp_sim_mcool(cmp_hic, chrs)  # maybe not needed, root_res=EXP_RESOLUTION, factors=EXP_FACTORS)
+    cmp_hic_mcool = get_exp_sim_mcool(cmp_hic, chrs, res)
 
     hic2 = cmp_hic
     hic2cooler = cooler.Cooler(f'{cmp_hic_mcool}::/resolutions/{res}')
-    exp_chr = list(set(hic2cooler.chromnames) & set(chrs))[0]
+    exp_chr = list(set(hic2cooler.chromnames) & set(chrs))
+    if exp_chr:
+        exp_chr = exp_chr[0]
+    else:
+        logger.error(f'Experimental HiC data contains none of the chromosome names: {chrs} instead {hic2cooler.chromnames}')
+        exit(1)
 
     # get hic file names
     h1 = hic_file[hic_file.rfind('/') + 1:]
     h2 = hic2[hic2.rfind('/') + 1:]
 
     # to evaluate in debug: cooler.Cooler(f'{hic_file}.{SIM_RESOLUTION}.cool').matrix(balance=False).fetch('6')
-    # hic_mat1 = hic_mat1 / np.max(hic_mat1)   # need to rethink this normalization
-    hic_mat2 = hic2cooler.matrix(balance=False).fetch(exp_chr)  # TODO use balanced for experimental data
-    # hic_mat2 = hic_mat2 / np.max(hic_mat2)
+    balanced = (hic2cooler.bins()['weights'] is not None) if hic_balance else hic_balance
+    hic_mat2 = hic2cooler.matrix(balance=balanced).fetch(exp_chr)  # TODO use balanced for experimental data
+    if balanced:
+        hic_mat2 = np.nan_to_num(hic_mat2)
 
-    comp_filename = f'comp_{h1}_{h2}_res{res}'
+    tads_pref = ('_t'+os.path.splitext(os.path.basename(tads_boundary))[0]) if tads_boundary is not None else ''
+    comp_filename = f'comp_{h1}_{h2}_res{res}{tads_pref}{"_balanced" if balanced else ""}'
 
     chr_end = min(hic1_chr_size, hic2cooler.chromsizes[exp_chr])
-    tads = None
-    if tads_boundary is not None:
-        if os.path.exists(tads_boundary):
-            if pathlib.Path(tads_boundary).suffix == '.csv':
-                # get rex/mex-sites midpoints
-                midpoints = pd.read_csv(tads_boundary, usecols=["midpoint"], dtype={"midpoint": "int64"}).values
-                borders = np.zeros(1, dtype=int)
-                borders = np.append(borders, midpoints)
-                borders = np.append(borders, chr_end)
-                # from sites to TADs
-                tads = np.zeros((borders.shape[0] - 1, 2), dtype=int)
-                for i in range(borders.shape[0] - 1):  # -1: skip header
-                    tads[i, 0] = borders[i]
-                    tads[i, 1] = borders[i + 1]
+    tads = read_tads_bed(tads_boundary)
 
-            elif pathlib.Path(tads_boundary).suffix == '.tsv' or pathlib.Path(tads_boundary).suffix == '.bed':
-                loops_df = pr.read_bed(tads_boundary, as_df=True)
+    if tads is None:
+        logger.info(f'Whole chromosome as a single TAD representing the whole chromosome.')
+        tads = np.zeros((1, 2), dtype=int)
+        tads[0, 0] = 1
+        tads[0, 1] = chr_end
+
+    (chi2_min, alpha_min) = chi2_minimization(hic_mat1, hic2cooler, chrs, res, tads, comp_filename,
+                                              plots_folder=plots_folder, norm=norm, chi2_mode=chi2_mode,
+                                              hic_balance=hic_balance)
+
+    if plots_folder:
+        hic_mat1_log = np.log10(hic_mat1 * alpha_min)
+        hic_mat2_log = np.log10(hic_mat2)
+        # split
+        # fig, (ax1, ax2) = plt.subplots(1, 2)
+        # fig.suptitle(f'HIC compare chromosome {hic1_chr}/{exp_chr} alpha_min:{alpha_min}')
+        #
+        # res_kb = res//1000
+        # ax1.get_xaxis().set_major_formatter(FuncFormatter(lambda x, p: int(x*res_kb)))
+        # ax1.get_yaxis().set_major_formatter(FuncFormatter(lambda y, p: int(y*res_kb)))
+        #
+        # ax1.imshow(hic_mat1_log, cmap=CMAP, interpolation='nearest')  # / hic_mat1.sum()
+        # ax1.set_title(h1)
+        # #ax1.clim(-2.75, 0)
+        #
+        # ax2.imshow(hic_mat2_log, cmap=CMAP, interpolation='nearest')  # / hic_mat2.sum()
+        # ax2.set_title(h2)
+        #
+        # ax2.autoscale(False)
+
+        # merged
+        fig = plt.figure()
+
+        hic_merged = merge_hics(hic_mat2_log, hic_mat1_log)
+
+        res_kb = res//1000
+        plt.gca().get_xaxis().set_major_formatter(FuncFormatter(lambda x, p: int(x*res_kb)))
+        plt.gca().get_yaxis().set_major_formatter(FuncFormatter(lambda y, p: int(y*res_kb)))
+
+        plt.imshow(hic_merged, cmap=CMAP, interpolation='nearest')
+        plt.title(f'{h1}/{hic1_chr} vs {h2}/{exp_chr}:\n\t chi2-min={chi2_min:7.2f}, {ALPHA}={alpha_min:7.2f}')
+
+        if DEFAULT_CLIM:
+            plt.clim(DEFAULT_CLIM[0], DEFAULT_CLIM[1])  # for the demo_hic # -2.75, 0) # best found for simulations
+        # cbar_h = plt.colorbar()
+
+        # hic1cooler.info['nbins'] * hic1cooler.info['bin-size']
+        # chr_end = min(hic_mat1.shape[0], hic_mat2.shape[0])  # * res
+        # tads = np.append(tads, chr_end)
+
+        for tadi in tads:
+            tad_start = tadi[0]/res
+            tad_end = tadi[1]/res
+            # ax2.plot([tad_start, tad_start+tad_end], "b-")
+            logger.info(f'plot TAD {tad_start}-{tad_end}')
+            # split
+            # ax1.plot([tad_start, tad_end, tad_end, tad_start, tad_start],
+            #          [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--')
+            # ax2.plot([tad_start, tad_end, tad_end, tad_start, tad_start],
+            #          [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--')
+            # merged
+
+            if PLOT_COMP_TADS:
+                plt.plot([tad_start, tad_end, tad_end, tad_start, tad_start],
+                         [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--', linewidth=1, alpha=0.25)
+
+        # plt.show()
+        if not os.path.exists(plots_folder):
+            os.mkdir(plots_folder)
+        fig_filename = os.path.join(plots_folder, f'{comp_filename}_{"balanced" if hic_balance else ""}_{chi2_mode}.{PLOT_FORMAT}')
+        logger.info(f'Save figure in file: {fig_filename}')
+        fig.savefig(fig_filename, dpi=1000, format=PLOT_FORMAT)
+        plt.close()
+
+    logger.info(f'chi2_minimization score for {h1} and {h2} (resolution: {res}): {chi2_min},{alpha_min} on TADs: {tads_boundary}')
+    return chi2_min, alpha_min
+
+
+def read_tads_bed(tads_bed_file):
+    tads = None
+    if tads_bed_file is not None:
+        if os.path.exists(tads_bed_file):
+            if pathlib.Path(tads_bed_file).suffix == '.tsv' or pathlib.Path(tads_bed_file).suffix == '.bed':
+                loops_df = pr.read_bed(tads_bed_file, as_df=True)
                 tads = np.zeros((loops_df.shape[0], 2), dtype=int)
                 for i, loop in loops_df.iterrows():
                     tads[i, 0] = loop[1]
                     tads[i, 1] = loop[2]
 
         else:
-            logger.error(f'Missing TADs boundary file {tads_boundary}: single TAD mode')
-
-    if tads is None:
-        logger.error(f'Whole chromosome as a Single TAD.')
-        tads = np.zeros((1, 2), dtype=int)
-        tads[0, 0] = 1
-        tads[0, 1] = chr_end
-
-    (chi2_min, alpha_min) = chi2_minimization(hic_mat1, hic2cooler, chrs, res, tads, comp_filename, plot, norm,
-                                              chi2_mode)
-
-    if plot:
-        fig, (ax1, ax2) = plt.subplots(1, 2)
-        fig.suptitle(f'HIC compare chromosome {hic1_chr}/{exp_chr} alpha_min:{alpha_min}')
-
-        ax1.imshow(np.log10(hic_mat1 * alpha_min), cmap=CMAP, interpolation='nearest')  # / hic_mat1.sum()
-        ax1.set_title(h1)
-
-        ax2.imshow(np.log10(hic_mat2), cmap=CMAP, interpolation='nearest')  # / hic_mat2.sum()
-        ax2.set_title(h2)
-
-        ax2.autoscale(False)
-
-        tads = np.zeros(1, dtype=int)
-        if tads_boundary is not None:
-            if os.path.exists(tads_boundary):
-                midpoints = pd.read_csv(tads_boundary, usecols=["midpoint"], dtype={"midpoint": "int64"}).values
-                tads = np.rint(np.append(tads, midpoints) / res)
-            else:
-                logger.error(f'Missing TADs boundary file {tads_boundary}')
-
-        # hic1cooler.info['nbins'] * hic1cooler.info['bin-size']
-        chr_end = min(hic_mat1.shape[0], hic_mat2.shape[0])  # * res
-        tads = np.append(tads, chr_end)
-
-        for i in range(tads.shape[0] - 1):
-            # TODO update plot: compatible with loop TADs
-            tad_start = tads[i]
-            tad_end = tads[i + 1]
-            # ax2.plot([tad_start, tad_start+tad_end], "b-")
-            logger.info(f'plot TAD{i} {tad_start}-{tad_end}')
-            ax1.plot([tad_start, tad_end, tad_end, tad_start, tad_start],
-                     [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--')
-            ax2.plot([tad_start, tad_end, tad_end, tad_start, tad_start],
-                     [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--')
-
-        #plt.show()
-        fig_filename = f'data/plots/{comp_filename}_{chi2_mode}.png'
-        logger.info(f'Save figure in file: {fig_filename}')
-        fig.savefig(fig_filename, dpi=1000)
-
-    logger.info(f'chi2_minimization score for {h1} and {h2} (resolution: {res}): {chi2_min},{alpha_min} on TADs: {tads_boundary}')
-    return chi2_min, alpha_min
+            logger.info(f'Missing TADs BED format file {tads_bed_file}: single TAD mode')
+    return tads
 
 
-def get_exp_sim_mcool(hic, chrs, root_res=None, factors=None):
+def get_exp_sim_mcool(hic, chrs, res=RESOLUTION):
     exp_sim_cool = hic if hic.endswith('.cool') else f'{hic}.cool'
     if os.path.exists(exp_sim_cool) and not os.path.exists(f'{hic}.hdf5'):  # experiment
-        if not root_res:
-            root_res = EXP_RESOLUTION
-            factors = EXP_FACTORS
+        hic_cooler = cooler.Cooler(f'{exp_sim_cool}::/')
+        root_res = hic_cooler.binsize
+        factors = copy.deepcopy(RES_FACTORS)
+        bisect.insort(factors, res//root_res)
         resolutions = [int(i * root_res) for i in factors]
         exp_sim_mcool = re.sub(r'.cool', f'.{resolutions[0]}.mcool', exp_sim_cool)
-        if not os.path.isfile(exp_sim_mcool):
+        try:
+            res_cool = cooler.Cooler(f'{exp_sim_mcool}::/resolutions/{res}') if os.path.isfile(exp_sim_mcool) else None
+        except:
+            logger.info(f'Missing resolution {res} in {exp_sim_mcool} so it will be generated again')
+            res_cool = None
+        if not os.path.isfile(exp_sim_mcool) or not res_cool:
             exp_sim_mcool = balance_mcool(exp_sim_cool, resolutions, exp_sim_mcool)
     else:  # simulation !!!
-        if not root_res:
-            root_res = SIM_RESOLUTION
-            factors = SIM_FACTORS
-        exp_sim_mcool = f'{hic}.{RESOLUTION}.mcool'
+        root_res = SIM_RESOLUTION
+        factors = RES_FACTORS
+        bisect.insort(factors, res//root_res)
+        resolutions = [int(i * root_res) for i in factors]
+        exp_sim_mcool = f'{hic}.{resolutions[0]}.mcool'
         if not os.path.exists(exp_sim_mcool):
             logger.info(f'Generating cooler files for {hic}')
             exp_sim_mcool = hic_to_mcool(hic, chrs[0], root_res, factors)
@@ -578,8 +619,8 @@ def get_hic_cool(hic_h5, out_prefix, res=EXP_RESOLUTION):
     return hic_cool
 
 
-def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, exp_cool=None, output_folder=None, res=RESOLUTION,
-                                     confidence=0., replace=True, chi2_mode=CHI2_MODE_LOG):
+def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, tads=None, exp_cool=None, output_folder=None, res=RESOLUTION,
+                                     confidence=0., replace=True, chi2_mode=CHI2_MODE_LOG, format=PLOT_FORMAT):
 
     if hic_chrs is None:
         hic_chrs = CHR_SYNONYMS
@@ -589,18 +630,18 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, exp_cool=N
     hic_names = [os.path.splitext(os.path.basename(hic))[0] for hic in hic_list]
     # we will use the simulation folder (../<radius_analyse>) of the first hic,
     # assuming they are all from the same simulation
-    exp_base_name = os.path.splitext(os.path.basename(exp_cool))[0]
+    exp_base_name = os.path.splitext(os.path.basename(exp_cool))[0] if exp_cool else ""
     # exp_base_name = exp_base_name[0] if exp_base_name else ''
-    # hic_sim_folder = os.path.basename(output_folder)
     hics = ''
     for i, hic_r in enumerate(hic_names):
         hic = hic_list[i]
         hics += '_' + hic_r + (f'.h5{"c" if DECAY_USE_HDF5_COOL else ""}'
                                if os.path.exists(hic) and hic.endswith('.hdf5') and DECAY_USE_HDF5 else '')
+    tads_pref = ('_t'+os.path.splitext(os.path.basename(tads))[0]) if tads is not None else ''
     hic_decay_plot = os.path.join(output_folder,
-                                  f'contact-decay_{exp_base_name}_{CHR_SYNONYMS[-1]}_vs_{hic_chrs[-1]}_{hics}{f"_c{confidence:4.2f}" if confidence > 0. else ""}'
+                                  f'contact-decay_{exp_base_name}_{CHR_SYNONYMS[-1]}_vs_{hic_chrs[-1]}_{hics}{tads_pref}{f"_c{confidence:4.2f}" if confidence > 0. else ""}'
                                   f'_chi2_{chi2_mode[:3]}{"_sd" if not CHI2_USE_SEM else ""}'
-                                  f'{"_zoom" if CHI2_MODE_LOG_ZOOM else ""}.{res}.{FIG_FORMAT}')
+                                  f'{"_zoom" if CHI2_MODE_LOG_ZOOM else ""}.{res}.{format}')
     if os.path.exists(hic_decay_plot):
         if not replace:
             logger.info(f'Distance-contact decay plot already existing: {hic_decay_plot}, so skip it')
@@ -623,12 +664,13 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, exp_cool=N
     plt.yscale('log')
     lines = []
     legend = []
-    cmp_hic = re.sub(r'.cool', '', exp_cool)
-    chr_i = 0;
+    cmp_hic = re.sub(r'.cool', '', exp_cool) if exp_cool else ""
+    chr_i = 0
     for i, hic in enumerate(hic_list):
         if not os.path.exists(hic):
             logger.error(f'Missing file {hic}, skip it!')
             continue
+        # hic_folder = os.path.dirname(hic)
         if os.path.exists(hic) and hic.endswith('.hdf5') and DECAY_USE_HDF5:
             # it's a simulation HDF5 file containing only one chromosome so let's use the first chromosome synonym
             hic_chrs_select = [hic_chrs[0]]
@@ -652,8 +694,13 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, exp_cool=N
             max_tad_size = min(max_tad_size, hic_chr_size // res)
 
             # calculate proper chi2_alpha
-            chi2, alpha = compare_hic_chromosome(hic, cmp_hic, hic_chrs=[hic_chr], chrs=CHR_SYNONYMS, res=res, tads_boundary=None,
-                                                 norm=True, chi2_mode=chi2_mode)  # , plot=True)
+            plots_folder = os.path.join(output_folder, 'plots')
+            if cmp_hic:
+                chi2, alpha = compare_hic_chromosome(hic, cmp_hic, hic_chrs=[hic_chr], chrs=CHR_SYNONYMS, res=res,
+                                                     tads_boundary=tads, plots_folder=plots_folder, norm=True,
+                                                     chi2_mode=chi2_mode)
+            else:
+                chi2, alpha = 0, 1
     #        logger.info(f'COMPARE {cmp_hic} <- {hic}: {chi2}, {alpha}')
     #        chi2_rev, alpha_rev = compare_hic_chromosome(cmp_hic, hic, hic_chrs=CHR_SYNONYMS, chrs=hic_chrs, res=res, tads_csv=None,
     #                                             norm=True, chi2_mode=chi2_mode)  # , plot=True)
@@ -724,7 +771,7 @@ def plot_distance_contact_prob_decay(hic_list, hic_chrs=CHR_SYNONYMS, exp_cool=N
     plt.ylabel('average #contacts ~ contact probability')
     plt.xlabel(f'genomic distance in {res / 1000}kb')
 
-    fig.savefig(hic_decay_plot, format=FIG_FORMAT)
+    fig.savefig(hic_decay_plot, format=format)
     plt.close()
     logger.info(f' save plot: {hic_decay_plot}')
     return hic_decay_plot
@@ -735,7 +782,7 @@ def get_decay_distribution_hdf5(hic_h5, resolution, confidence=0., min_dist=1, m
     return get_decay_distribution(hic, confidence=confidence, min_dist=min_dist, max_dist=max_dist), hic.shape[0]
 
 
-def get_hic(hic_h5, resolution=SIM_RESOLUTION):
+def get_hic(hic_h5, resolution=SIM_RESOLUTION, balance=CHI2_USE_BALANCED):
     if not DECAY_USE_HDF5_COOL:
         # directly from .hdf5
         with h5py.File(hic_h5, 'r') as f:
@@ -757,8 +804,12 @@ def get_hic(hic_h5, resolution=SIM_RESOLUTION):
         logger.info(f'Extracting hic from {cool_file}...')
         hic_cooler = cooler.Cooler(f'{cool_file}::/')
         hic_chr = list(set(hic_cooler.chromnames) & set(SIM_CHR_SYNONYMS))[0]
-        hic = hic_cooler.matrix(balance=False).fetch(hic_chr)
+        balanced = (hic_cooler.bins()['weights'] is not None) if balance else balance
+        hic = hic_cooler.matrix(balance=balanced).fetch(hic_chr)
+        if balanced:
+            hic = np.nan_to_num(hic)  # nan -> 0
         hic = hic_coarsen(hic, hic_h5, resolution)
+        np.fill_diagonal(hic, 0)
     return hic
 
 
@@ -828,19 +879,48 @@ def get_decay_distribution(hic, confidence=0., min_dist=1, max_dist=None):
     return dists, probs, probs_confi_l, probs_confi_u
 
 
-def chip_seq(chip_out, bin_size):
-    Nmeas = chip_out.shape[0] if chip_out.ndim > 1 else 1
-    Nchain = chip_out.shape[1] if chip_out.ndim > 1 else len(chip_out)
+def __get_num_measurements(chip_out):
+    return chip_out.shape[0] if chip_out.ndim > 1 else 1
 
-    bins = math.ceil(Nchain / bin_size)
+
+def __get_num_chain(chip_out):
+    return chip_out.shape[1] if chip_out.ndim > 1 else len(chip_out)
+
+
+def chip_seq(chip_out, bin_factor):
+    Nmeas = __get_num_measurements(chip_out)
+    Nchain = __get_num_chain(chip_out)
+
+    bins = math.ceil(Nchain / bin_factor)
     chip_seq_binned = np.zeros(bins, dtype=float)
     for m in range(Nmeas):
         chip_seq = chip_out.iloc[m].values if isinstance(chip_out, pd.DataFrame) else chip_out[
             m] if chip_out.ndim > 1 else chip_out
         for i in range(bins):
-            chip_seq_binned[i] += np.sum(chip_seq[(i * bin_size):min((i + 1) * bin_size, Nchain)])
+            chip_seq_binned[i] += np.sum(chip_seq[(i * bin_factor):min((i + 1) * bin_factor, Nchain)])
     chip_seq_binned = chip_seq_binned / Nmeas
+
     return chip_seq_binned
+
+
+def chip_out_to_bedgraph(chip_out_file: str, bed_graph_file: str = None, chrom=SIM_CHR, resolution: int = SIM_RESOLUTION):
+    if not bed_graph_file:  # default
+        bed_graph_file = f'{os.path.splitext(chip_out_file)[0]}.bedGraph'
+
+    bin_factor = resolution // SIM_RESOLUTION
+
+    chip_out = pd.read_csv(chip_out_file, delim_whitespace=True, encoding='utf-8')
+    chip_seq_binned = chip_seq(chip_out, bin_factor=bin_factor)  # bin_factor = 5 : 10kb = 5*2kb
+    nbins = __get_num_chain(chip_seq_binned)
+
+    chip_seq_df = pd.DataFrame(columns=['chrom', 'start', 'end', 'value'], index=None)
+    chip_seq_df['start'] = np.arange(0, nbins*resolution, resolution)
+    chip_seq_df['end'] = np.arange(resolution, (nbins+1)*resolution, resolution)
+    chip_seq_df['value'] = chip_seq_binned
+    chip_seq_df['chrom'] = chrom
+
+    exp_chip_pd = chip_seq_df.to_csv(bed_graph_file, sep='\t', header=False, index=False)
+    return exp_chip_pd
 
 
 def read_boundary_pos(boundary_file, Nchain):
@@ -855,47 +935,52 @@ def read_boundary_pos(boundary_file, Nchain):
     return boundary_pos
 
 
-def get_chip_correlation(chip_out_file, exp_chip, boundary, bin_size=1, correlation=DEFAULT_CHIP_CORRELATION, plot=True,
-                         replace=True):
+def plot_chip_seq(chip_out_file, exp_chip, boundary, resolution=SIM_RESOLUTION, correlation=DEFAULT_CHIP_CORRELATION, plot=True,
+                  replace=True):
     """
     Returns correlation coefficient and optionally produce a comparison plot
     :param chip_out_file: the original simulation chip.out file
     :param exp_chip: the experimental Chip-seq file in the same resolution as the simulation (2kb)
     :param boundary: the boundary file used during the simulation
-    :param bin_size: bin size to be used to downscale the Chip-seq
+    :param resolution: resolution to downscale the Chip-seq
     :param correlation: the comparative correlation to be used
     :param plot: to plot or not in a file
     :param replace: to replace existing plot file
     :return: the correlation as: (correlation coefficient, p-value, L2 distance (simulation - experiment)).
     """
+    bin_factor = SIM_RESOLUTION // resolution
     chip_out = pd.read_csv(chip_out_file, delim_whitespace=True, encoding='utf-8')
     output_folder = os.path.dirname(chip_out_file)
     measurements = chip_out.shape[0]  # + 1  # +1: for the first that has no chip
     # chip_seq_m = chip_out.iloc[-1]  # take the last measurement
-    sim_chip_seq = chip_seq(chip_out, bin_size=bin_size)  # bin_size = 5 : 10kb = 5*2kb
+    sim_chip_seq = chip_seq(chip_out, bin_factor=bin_factor)  # bin_size = 5 : 10kb = 5*2kb
     sim_chip_seq_normed = sim_chip_seq / sum(sim_chip_seq)
     # read BedGraph file format
-    exp_chip_pd = pd.read_csv(exp_chip, delim_whitespace=True, names=['chrom', 'start', 'end', 'value'],
-                              encoding='utf-8')
-    exp_chip_x_pd = exp_chip_pd[exp_chip_pd.chrom.isin(CHR_X_SYNONYMS)]
-    exp_chip_out = exp_chip_x_pd[['value']].values.transpose()
-    exp_chip_x = chip_seq(exp_chip_out, bin_size=bin_size)
-    # sum_x = sum(exp_chip_x['value'])
-    exp_chip_x_normed = exp_chip_x / sum(exp_chip_x)
+    if exp_chip:
+        exp_chip_pd = pd.read_csv(exp_chip, delim_whitespace=True, names=['chrom', 'start', 'end', 'value'],
+                                  encoding='utf-8')
+        exp_chip_x_pd = exp_chip_pd[exp_chip_pd.chrom.isin(CHR_X_SYNONYMS)]
+        exp_chip_out = exp_chip_x_pd[['value']].values.transpose()
+        exp_chip_x = chip_seq(exp_chip_out, bin_factor=bin_factor)
+        # sum_x = sum(exp_chip_x['value'])
+        exp_chip_x_normed = exp_chip_x / sum(exp_chip_x)
     boundary_pos = read_boundary_pos(boundary, Nchain=chip_out.shape[1])
-    boundary_chip = chip_seq(boundary_pos, bin_size=bin_size)
+    boundary_chip = chip_seq(boundary_pos, bin_factor=bin_factor)
     boundary_chip_normed = boundary_chip * len(np.where(boundary_chip > 0.)[0]) \
-        / (max(exp_chip_x) * sum(boundary_chip) * 100)
-    chip_l2 = np.linalg.norm(exp_chip_x_normed - sim_chip_seq_normed)
-    if correlation == 'spearmanr':
-        corr = stats.spearmanr(exp_chip_x_normed, sim_chip_seq_normed)
-        chip_correlation = (corr.correlation, corr.pvalue, chip_l2)
-    elif correlation == 'pearsonr':
-        corr = stats.pearsonr(exp_chip_x_normed, sim_chip_seq_normed)
-        chip_correlation = (corr[0], corr[1], chip_l2)
+        / (max(exp_chip_x) * sum(boundary_chip) * 100) if exp_chip else boundary_chip
+    if exp_chip:
+        chip_l2 = np.linalg.norm(exp_chip_x_normed - sim_chip_seq_normed)
+        if correlation == 'spearmanr':
+            corr = stats.spearmanr(exp_chip_x_normed, sim_chip_seq_normed)
+            chip_correlation = (corr.correlation, corr.pvalue, chip_l2)
+        elif correlation == 'pearsonr':
+            corr = stats.pearsonr(exp_chip_x_normed, sim_chip_seq_normed)
+            chip_correlation = (corr[0], corr[1], chip_l2)
+    else:
+        chip_correlation = 0
 
     if plot:
-        size_kb = SIM_RESOLUTION * bin_size // 1000
+        size_kb = resolution // 1000
         plot_file_name = os.path.join(output_folder, f'chip-seq_{measurements}_{size_kb}kb.png')
         if os.path.exists(plot_file_name):
             if not replace:
@@ -904,12 +989,15 @@ def get_chip_correlation(chip_out_file, exp_chip, boundary, bin_size=1, correlat
             else:
                 logger.warning(f'Replacing existing Chip-seq plot: {plot_file_name}')
         fig = plt.figure()
-        exp_chip_line = plt.plot(exp_chip_x_normed, color='b', linewidth=1, alpha=DECAY_PLOT_ALPHA)
+        if exp_chip:
+            exp_chip_line = plt.plot(exp_chip_x_normed, color='b', linewidth=1, alpha=DECAY_PLOT_ALPHA)
+            chip_correlation_title = f'{correlation}: {chip_correlation[0]:8.5f}, p-val:{chip_correlation[1]:8.5f}, L2:{chip_correlation[2]:8.5f}'
+        else:
+            chip_correlation_title = ""
         sim_chip_line = plt.plot(sim_chip_seq_normed, color='r', linewidth=1, alpha=DECAY_PLOT_ALPHA)
         boundary_chip_line = plt.plot(boundary_chip_normed, color='black', linewidth=1, alpha=DECAY_PLOT_ALPHA)
         sim_folder = output_folder   # .split('/')[-2]
-        plt.title(f'ChIP-seq for simulation \n {sim_folder} snapshots: {measurements} \n'
-                  f'{correlation}: {chip_correlation[0]:8.5f}, p-val:{chip_correlation[1]:8.5f}, L2:{chip_correlation[2]:8.5f}')
+        plt.title(f'ChIP-seq for simulation \n {sim_folder} snapshots: {measurements} \n{chip_correlation_title}')
         plt.ylabel('average #bound LEFs')
         plt.xlabel(f'genomic position in {size_kb}kb')
         plt.legend(('experimental', 'simulation', 'boundary'))
@@ -917,3 +1005,16 @@ def get_chip_correlation(chip_out_file, exp_chip, boundary, bin_size=1, correlat
         plt.close()
 
     return chip_correlation
+
+
+def merge_hics(hic_mat_upper, hic_mat_lower):
+    if len(hic_mat_upper) != len(hic_mat_lower):
+        logger.warning(f'Comparing different size of Hi-C matrices: '
+                       f'size(hic_mat_upper)={len(hic_mat_upper)} != size(hic_mat_upper)={len(hic_mat_lower)}.'
+                       f'It will be used the smaller size for the merged plot!')
+    for index_row in range(min(len(hic_mat_upper), len(hic_mat_lower))):
+        hic_mat_upper[index_row][:index_row] = hic_mat_lower[index_row][:index_row]
+
+    np.fill_diagonal(hic_mat_upper, 0)
+
+    return hic_mat_upper

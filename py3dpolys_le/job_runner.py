@@ -11,6 +11,8 @@ from abc import ABC, abstractmethod
 # Initialization
 logger = logging.getLogger(__name__)
 
+CFG_SECTION_3DPOLYS_LE = '3dpolys_le'
+
 
 class JobRunner(ABC):
 
@@ -65,22 +67,22 @@ class CfgJobRunner(JobRunner):
     cmd_run_file: str
     _config = configparser.ConfigParser()
 
-    def __init__(self, input_cfg, cmd_run_file):
+    def __init__(self, input_cfg, cmd_run_file=None):
         self.input_cfg = input_cfg
         self.cmd_run_file = cmd_run_file
         self._config.read(self.input_cfg)
 
     def _get_start_cmd(self, dep_jobid, profile) -> str:
-        cmd_job_dependency = self._get_property(profile, 'cmd_job_dependency')
+        cmd_job_dependency = self.get_property(profile, 'cmd_job_dependency')
         cmd_dep = cmd_job_dependency.replace('{jobid}', dep_jobid) if dep_jobid else ''
-        cmd_prefix = self._get_property(profile, 'cmd_prefix')
+        cmd_prefix = self.get_property(profile, 'cmd_prefix')
         return cmd_prefix.replace('{cmd_job_dependency}', cmd_dep)
 
     def _get_jobid(self, jobout, profile) -> str:
-        jobid_re = self._get_property(profile, 'jobid_re')
+        jobid_re = self.get_property(profile, 'jobid_re')
         return re.search(jobid_re, jobout)[0]
 
-    def _get_property(self, profile, name):
+    def get_property(self, profile, name):
         value = ''
         if profile:
             try:
@@ -88,20 +90,43 @@ class CfgJobRunner(JobRunner):
             except (configparser.NoOptionError, configparser.NoSectionError) as e:
                 value = ''
         if not value:
-            value = self._config.get('job_runner', name)
+            try:
+                value = self._config.get('job_runner', name)
+            except (configparser.NoOptionError, configparser.NoSectionError) as e:
+                value = ''
         return value
 
     def _cmd_run_shell(self, profile) -> bool:
-        cmd_run = self._get_property(profile, 'cmd_run')
-        return cmd_run == 'shell'
+        cmd_run = self.get_property(profile, 'cmd_run')
+        return cmd_run == 'shell' and not self.cmd_run_file
 
     def _cmd_run_stdout(self, profile) -> bool:
-        cmd_run = self._get_property(profile, 'cmd_run')
-        return cmd_run == 'stdout'
+        cmd_run = self.get_property(profile, 'cmd_run')
+        return cmd_run == 'stdout'  and not self.cmd_run_file
 
     def _cmd_run_file(self, profile) -> str:
-        cmd_run = self._get_property(profile, 'cmd_run')
+        if self.cmd_run_file:
+            return self.cmd_run_file
+        cmd_run = self.get_property(profile, 'cmd_run')
         if cmd_run.startswith('file:'):
             cmd_run_file = cmd_run.split(':')[1]
             return cmd_run_file.replace('{cmd_run_file}', self.cmd_run_file)
         return ''
+
+
+def convert_dat_to_cfg(input_dat):
+    _config = configparser.ConfigParser()
+    _config.add_section(CFG_SECTION_3DPOLYS_LE)
+    with open(input_dat) as fp:
+        while True:
+            line = fp.readline()
+            if not line:
+                break
+
+            val, name = [x.strip() for x in line.rsplit("::")]
+            _config.set(CFG_SECTION_3DPOLYS_LE, name, val)
+
+    input_cfg = ".cfg".join(input_dat.rsplit(".dat", 1))
+    with open(input_cfg, 'w') as cf:
+        _config.write(cf)
+    return input_cfg

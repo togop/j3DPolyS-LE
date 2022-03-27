@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2021.5.12'
+    character(*), parameter :: VERSION = '2022.1.20'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2021.5.12'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2022.1.20'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -49,7 +49,7 @@ subroutine print_version()
         if (len(trim(program_folder))>0) then
             ! print*, ' program_folder ', trim(program_folder)
 
-            init__py_file = adjustl(trim(program_folder)) // path_sep // '__init__.py'
+            init__py_file = adjustl(trim(program_folder)) // path_sep // '..' // path_sep // '__init__.py'
             ! print*, trim(init__py_file)
 
             inquire(file = trim(init__py_file), exist = file_exists)
@@ -62,7 +62,7 @@ subroutine print_version()
             end if
         end if
 
-        print*, program_name, ' version ', program__version
+        print*, program_name, ' version ', VERSION
 
     end if
 end subroutine print_version
@@ -80,8 +80,8 @@ subroutine print_help()
     print*, '   -a|--analyse:<analyse folder> Perform analyse step on an already done simulation&
             & and store results in a given folder.'
     print*, '   -b|--boundary:<boundary sites file> Boundary sites file in a csv format with the following columns:&
-            & name,midpoint,impermeability,score. Default: no bondaries'
-    print*, '   -lbs|--lef_binding_sites:<loop extrusion binding sites file> LEFs binding sites file in a csv format&
+            & name,midpoint,impermeability. Default: no bondaries'
+    print*, '   -lls|--lef_loading_sites:<loop extrusion loading sites file> LEFs loadding sites file in a csv format&
             & with the following columns: name,position,length,probability. Default: if not given, the whole polymer'
     print*, '   -r|--radius_contact:<radius> contact radius in lattice unit (1=70nm) for extracting Hi-C matrixes, Default: 1.42'
     print*, '   -cp|--contact_probability Together with the contact radius use contact probability with the formula&
@@ -89,12 +89,9 @@ subroutine print_help()
             & Default: false - uniform distributed.'
     print*, '   -l|-nlef:<Nlef_val>: Nlef value, overwriting the one from the inpiut.dat'
     print*, '   -m|--km:<km_val>: km value, overwriting the one from the inpiut.dat'
-    print*, '   -bf|--boundary_factor:<boundary_factor>: impermeability factor applied to all boundaries. Default: 1 -&
-            & no permeability'
     print*, '   -bd|--boundary_direction:<boundary_direction>: impermeability direction applied to all boundaries:&
             & -1:opposite direction, 0:both, 1:same direction. Default: 0'
-    print*, '   -bs|--boundary_score : Apply each boundary matching score (column "score") to its boundary’s impermeability.'
-    print*, '   -im|--init_mode:<init_mosw>: Initial folding mode: h for helices-like, z for zigzag-like polymer state.'
+    print*, '   -im|--init_mode:<init_mode>: Initial folding mode: h for helices-like, z for zigzag-like polymer state.'
     print*, '   -z|--z_loop : Allow z_loop for LEFs move, where LEFs can traverse one another. Default: false'
     print*, '   -u|--unidirectional : Unidirectional mode for LEFs move otherwise bidirectional. Default: false=bidirectional'
     print*, '<3dpolys_le.cfg file>: path to the inpit.dat file. Default: ./3dpolys_le.cfg'
@@ -104,10 +101,10 @@ subroutine print_help()
     print*, 'parameters in a configuration file (3dpolys_le.cfg):'
     print*, 'Nchain     Polymer chain length in monomers of 2kb.'
     print*, 'L          Polymer compartment box size L (choose L so that Nchain/(4*L^3) ~ 0.5).'
-    print*, 'Niter      Number of iterations, aka number of independent trajectories as polymer replicas. &
-            & 1 min = 12000 interaction steps'
+    print*, 'Niter      Number of iterations, aka number of independent trajectories as polymer replicas.'
     print*, 'Nmeas      Number of measures >=3 (initial, burin-in, n*simulation steps, burn-out), aka number of snapshots.'
-    print*, 'Ninter     Interval between measures, aka number of Monte Carlo steps (MCS) between two snapshots.'
+    print*, 'Ninter     Interval between measures, aka number of Monte Carlo steps (MCS) between two snapshots. &
+            & 1 min = 12000 interaction steps'
     print*, 'kint       Bending energy of the polymer (do not change).'
     print*, 'kb         LEFs binding rate (do not change).'
     print*, 'ku         LEFs half-unbinding rate (do not change).'
@@ -141,12 +138,13 @@ program mainprogram
 
     implicit none
 
-    character(100) :: input_options
+    character(1000) :: input_options
     character(1000) :: input_dat_file
+    character(1000) :: save_input_cfg_file
     character(1000) :: input_folder
     character(1000) :: output_folder = ''
     character(1000) :: boundary_file = ''
-    character(1000) :: lef_binding_sites = ''
+    character(1000) :: lef_loading_sites = ''
     character(20) :: opt_s = ''
     integer :: ai = 1  ! input argument position the 3dpolys_le.cfg in the CLI, the ai+1 is the output folder
     character(1) :: path_separator, path_sep
@@ -154,7 +152,7 @@ program mainprogram
 
     integer :: L, Nchain, Niter, Nmeas, Ninter, iku, ikm, ikb, Nlef = 0, burnin = 0, burnout = 0, burnoutM = 0
     !integer :: simburnin = 0, burn_Nmeas = 0
-    real :: kint, kb, ku, km = 0., Ea
+    real :: kint, kb, ku, km = 0., Ea, kb_factor
 
     integer :: i, time
     !real :: pt
@@ -162,11 +160,9 @@ program mainprogram
     ! real :: seed
     type(Timer) :: crono
     real, dimension(:, :), allocatable :: boundary  ! (strand -/+, permeability)
-    integer, dimension(:), allocatable :: binding_site_pos
-    real, dimension(:), allocatable :: binding_site_prob
-    integer :: binding_sites_count = 0 ! deafault: there is no lef_binding_site file so the whole polymer is binding site
-    integer :: binding_site_pos_i = 0
-    real :: boundary_factor = 0., boundary_score = 0.  ! not defined
+    real, dimension(:), allocatable :: loading_sites_factor
+    integer :: loading_sites_count = 0 ! deafault: there is no lef_loading_site file so the whole polymer is loading site
+    real :: basal_loading_factor = -1. ! not defined
     integer :: boundary_direction = -9 ! not defned direction
     integer, parameter :: resolution_factor = 2000
     type(PolymerModel) :: model
@@ -185,7 +181,6 @@ program mainprogram
     character(len = 20) :: col1, col2, col3, col4
     type(Logger) :: log = Logger(source = '3dpolys_le', level = LOG_INFO)
     integer :: hic3d_factor = 0
-    logical :: use_boundary_score = .false.
     logical :: z_loop = .false.
     logical :: unidirectional = .false.
     logical :: file_exists
@@ -194,17 +189,16 @@ program mainprogram
         character(len = 20) :: name
         integer :: midpoint
         real :: impermeability
-        real :: score
     end type BoundarySite
     type(BoundarySite) :: boundary_site
 
-    type :: BindingSite
+    type :: LoadingSite
         character(len = 20) :: name
         integer :: position
         integer :: length
-        real :: probability
-    end type BindingSite
-    type(BindingSite) :: binding_site
+        real :: factor
+    end type LoadingSite
+    type(LoadingSite) :: loading_site
 
     real :: impermeability_prev
     integer :: strand
@@ -231,7 +225,9 @@ program mainprogram
     global_log_level = LOG_INFO  ! default
     if (command_argument_count() > 0) then
         CALL get_command_argument(ai, input_options)
-        do while (index(input_options, '-') > 0)
+        i = index(input_options, '-')
+        do while (i == 1)
+            ! call log%debug('argument i: ' // trim(str(i)))
             if (index(input_options, '--log:') > 0) then
                 i = index(input_options, ':')
                 global_log_level = str2loglevel(trim(input_options(i + 1:)))
@@ -261,11 +257,11 @@ program mainprogram
                 if (rank == 0) then
                     call log%info('input ' // trim(input_options(:i)) // trim(boundary_file))
                 end if
-            elseif ((index(input_options, '--lef_binding_sites:') > 0).or.(index(input_options, '-lbs:') > 0)) then
+            elseif ((index(input_options, '--lef_loading_sites:') > 0).or.(index(input_options, '-lls:') > 0)) then
                 i = index(input_options, ':')
-                lef_binding_sites = trim(input_options(i + 1:))
+                lef_loading_sites = trim(input_options(i + 1:))
                 if (rank == 0) then
-                    call log%info('input ' // trim(input_options(:i)) // trim(lef_binding_sites))
+                    call log%info('input ' // trim(input_options(:i)) // trim(lef_loading_sites))
                 end if
             elseif ((index(input_options, '--radius_contact:') > 0).or.(index(input_options, '-r:') > 0)) then
                 i = index(input_options, ':')
@@ -303,24 +299,12 @@ program mainprogram
                 if (rank == 0) then
                     call log%info('input ' // trim(input_options(:i)) // trim(strf(km)))
                 end if
-            elseif ((index(input_options, '--boundary_factor:') > 0).or.(index(input_options, '-bf:') > 0)) then
-                i = index(input_options, ':')
-                opt_s = trim(input_options(i + 1:))
-                READ(opt_s, *) boundary_factor
-                if (rank == 0) then
-                    call log%info('input ' // trim(input_options(:i)) // trim(strf(boundary_factor)))
-                end if
             elseif ((index(input_options, '--boundary_direction:') > 0).or.(index(input_options, '-bd:') > 0)) then
                 i = index(input_options, ':')
                 opt_s = trim(input_options(i + 1:))
                 READ(opt_s, *) boundary_direction
                 if (rank == 0) then
                     call log%info('input ' // trim(input_options(:i)) // trim(str(boundary_direction)))
-                end if
-            elseif ((index(input_options, '--boundary_score') > 0).or.(index(input_options, '-bs') > 0)) then
-                use_boundary_score = .true.
-                if (rank == 0) then
-                    call log%info('At the end perform PCA analysis on HiC-maps')
                 end if
             elseif ((index(input_options, '--z_loop') > 0).or.(index(input_options, '-z') > 0)) then
                 z_loop = .true.
@@ -354,6 +338,7 @@ program mainprogram
             else
                 exit
             end if
+            i = index(input_options, '-')   ! next argument
         end do
         CALL get_command_argument(ai, input_dat_file)
     else
@@ -391,7 +376,14 @@ program mainprogram
         call log%info('Output folder: ' // trim(output_folder))
     end if
 
-    call load_config_file(input_dat_file)
+    call load_config_file(input_dat_file, iostat=ierr)
+    if (ierr /= 0) then
+        if (rank == 0) then
+            call log%error('Could not find or open input configuration file: ' // trim(input_dat_file))
+            call print_help()
+        end if
+        call exit(1)
+    end if
     call read_config('Nchain',    Nchain)
     call read_config('L',    L)
     call read_config('Niter',    Niter)
@@ -416,14 +408,11 @@ program mainprogram
     if (boundary_file == '') then
         call read_config('boundary', boundary_file, default='')
     end if
-    if (lef_binding_sites == '') then
-        call read_config('lef_binding_sites', lef_binding_sites, default='')
+    if (lef_loading_sites == '') then
+        call read_config('lef_loading_sites', lef_loading_sites, default='')
     end if
-    if (boundary_factor == 0.) then
-        call read_config('boundary_factor', boundary_factor)
-    end if
-    if (boundary_score == 0.) then
-        call read_config('boundary_score', boundary_score)
+    if (basal_loading_factor == -1) then
+        call read_config('basal_loading_factor', basal_loading_factor, default=1.)
     end if
     if (boundary_direction < -1) then
         call read_config('boundary_direction', boundary_direction)
@@ -457,9 +446,8 @@ program mainprogram
 
         call log%info('init_mode=' // trim(init_mode))
         call log%info('boundary=' // trim(boundary_file))
-        call log%info('lef_binding_sites=' // trim(lef_binding_sites))
-        call log%info('boundary_factor=' // trim(strf(boundary_factor)))
-        call log%info('boundary_score=' // trim(strf(boundary_score)))
+        call log%info('lef_loading_sites=' // trim(lef_loading_sites))
+        call log%info('basal_loading_factor=' // trim(strf(basal_loading_factor)))
         call log%info('boundary_direction=' // trim(str(boundary_direction)))
         if (z_loop) then
             call log%info('z_loop=true')
@@ -477,31 +465,18 @@ program mainprogram
     !load the local state of the 2kbp-bins
     ! used to init a polymermodel.boundary
     allocate (boundary(2, Nchain))
-
-    open(10, file = trim(input_folder) // 'boundary.tsv', action = 'read', iostat = rc)
-    if (rc == 0) then
-        if (rank == 0) then
-            call log%info('Found and loading boundary.tsv!')
-        end if
-        read(10, *) boundary !between 0 and 1: the local rate of movement at bin_8860 i is (1-boundary(i))xkm
-    else
-        boundary = 0
-    end if
-    close(10)
+    boundary = 0.
 
     if (trim(boundary_file) /= '') then
         open(10, file = trim(boundary_file), action = 'read', iostat = rc)
         if (rc == 0) then
             if (rank == 0) then
-                call log%info('Load boundaries file ' // trim(boundary_file) // ' with boundary_foctor ' // &
-                        trim(strf(boundary_factor)) // ' ...')
+                call log%info('Load boundaries file ' // trim(boundary_file) // ' ...')
             end if
             col1 = ''
             col2 = ''
             col3 = ''
-            col4 = ''
-            read(10, *) col1, col2, col3, col4
-            ! TODO add (trim(col1) == "name").and.
+            read(10, *) col1, col2, col3
             if ((trim(col1) == 'name').and.(trim(col2)=='midpoint').and.(trim(col3)=='impermeability')) then
                 do
                     read(10, *, iostat = rc) boundary_site
@@ -532,18 +507,8 @@ program mainprogram
                             end if
                         end if
 
-                        ! call log%info('boundary_score col4: ' // trim(col4))
-                        if (use_boundary_score.and.(col4=='score')) then
-                            boundary_score = boundary_site%score / 10.
-                        else
-                            boundary_score = 1.
-                        end if
                         ! print*, 'old impermeability_prev: ' // trim(strf(impermeability_prev))
-                        impermeability_prev = 1 - (1 - impermeability_prev) * &
-                                (1 - abs(boundary_site%impermeability * boundary_factor * boundary_score))
-                        ! print*, 'new impermeability_prev: ' // trim(strf(impermeability_prev)) // &
-                        !         ' by boundary_factor:' // trim(strf(boundary_factor)) // &
-                        !        ' and boundary_score:' // trim(strf(boundary_score))
+                        impermeability_prev = 1 - (1 - impermeability_prev) * (1 - abs(boundary_site%impermeability))
                         if (strand /= 0) then
                             boundary(strand, i) = impermeability_prev
                         else
@@ -585,11 +550,14 @@ program mainprogram
         close(10)
     end if
 
-    if (trim(lef_binding_sites) /= '') then
-        open(10, file = trim(lef_binding_sites), action = 'read', iostat = rc)
+    allocate (loading_sites_factor(Nchain))
+    loading_sites_factor = basal_loading_factor
+
+    if (trim(lef_loading_sites) /= '') then
+        open(10, file = trim(lef_loading_sites), action = 'read', iostat = rc)
         if (rc == 0) then
             if (rank == 0) then
-                call log%info('Load lef_binding_sites file ' // trim(lef_binding_sites) // ' ...')
+                call log%info('Load lef_loading_sites file ' // trim(lef_loading_sites) // ' ...')
             end if
             col1 = ''
             col2 = ''
@@ -598,50 +566,39 @@ program mainprogram
             read(10, *) col1, col2, col3, col4
             ! print "(A, A, A)", 'col1[', trim(col1), ']'
             ! TODO add (trim(col1) == "name").and.
-            if ((trim(col2)=="position").and.(trim(col3)=="length") &
-                .and.(trim(col4)=='probability')) then
+            if ((trim(col2)=="position").and.(trim(col3)=="length")) then
+                !&
+                !.and.(trim(col4)=='factor')) then
+
+                loading_sites_count = 0
+                kb_factor = 0
                 do
-                    read(10, *, iostat = rc) binding_site
-                    binding_sites_count = binding_sites_count + binding_site%length
+                    read(10, *, iostat = rc) loading_site
                     if (rc /= 0) exit
-                end do
-                if (rank == 0) then
-                    call log%info('Adding ' // trim(str(binding_sites_count)) // ' LEFs binding sites...')
-                end if
-
-                allocate (binding_site_pos(binding_sites_count))
-                allocate (binding_site_prob(binding_sites_count))
-
-                ! start from the beginning and prepare binding_site_pos
-                ! call FSEEK(10, 0, 0, rc) ! didn't work
-                close(10)
-                open(10, file = trim(lef_binding_sites), action = 'read', iostat = rc)
-
-                read(10, *) col1, col2, col3, col4 ! skip header
-                binding_sites_count = 0
-                binding_site_pos_i = 0
-                do
-                    read(10, *, iostat = rc) binding_site
-                    if (rc /= 0) exit
-                    do binding_site_pos_i = (binding_site%position/resolution_factor), &
-                            (binding_site%position/resolution_factor + binding_site%length - 1)
-                        binding_sites_count = binding_sites_count + 1
-                        binding_site_pos(binding_sites_count) = binding_site_pos_i
-                        binding_site_prob(binding_sites_count) = binding_site%probability
+                    do i = (1 + loading_site%position/resolution_factor), &
+                            (loading_site%position/resolution_factor + loading_site%length)
+                        loading_sites_count = loading_sites_count + 1
+                        loading_sites_factor(i) = loading_site%factor
+                        kb_factor = kb_factor + loading_site%factor
                         if (rank == 0) then
-                            call log%info('Added  LEFs binding site: binding_site_pos(' // trim(str(binding_sites_count)) // &
-                                    ')=' // trim(str(binding_site_pos_i)) // &
-                                    ' with probability ' // trim(strf(binding_site%probability)))
+                            call log%info('Added  LEFs loading site: loading_sites_factor(' // trim(str(i)) &
+                                    // ')= ' // trim(strf(loading_site%factor)))
                         end if
                     end do
                 end do
+                ! correct kb
+                kb_factor = real(Nchain) / (kb_factor + real(Nchain-loading_sites_count)*basal_loading_factor)
+                ! should be same == real(Nchain) / SUM(loading_sites_factor)
+                kb = kb * kb_factor
                 if (rank == 0) then
-                    call log%info('Added ' // trim(str(binding_sites_count)) // ' LEFs binding sites.')
+                    call log%info('Added ' // trim(str(loading_sites_count)) // ' LEFs binding sites.')
+                    call log%info('Loading kb_factor= ' // trim(strf(kb_factor)))
+                    call log%info('New kb= ' // trim(strf(kb)))
                 end if
             else
                 if (rank == 0) then
                     call log%error('wrong format for lef binding sites: ' // col1 // col2 // col3 // col4 // ' but expected: ' // &
-                            'name position length probability. STOP PROCEEDING. Please provide a correct binding_sites.csv file.')
+                            'name position length probability. STOP PROCEEDING. Please provide a correct loading_sites.csv file.')
 
                 end if
                 call MPI_FINALIZE(ierr)
@@ -651,7 +608,7 @@ program mainprogram
             end if
         else
             if (rank == 0) then
-                call log%error('Cound not find ' // trim(lef_binding_sites) // ' file!')
+                call log%error('Cound not find ' // trim(lef_loading_sites) // ' file!')
             end if
             call MPI_FINALIZE(ierr)
             if (ierr /= 0) error stop 'mpi finalize error'
@@ -740,18 +697,20 @@ program mainprogram
 
             !generate initial configuration
             model = PolymerModel(L = L, Nchain = Nchain, iku = iku, ikm = ikm, ikb = ikb, Nleffree = Nlef, &
-                    kb = kb, ku = ku, km = km, Ea = Ea, z_loop = z_loop, unidirectional = unidirectional, &
-                    binding_sites_count = binding_sites_count)
+                    kb = kb, ku = ku, km = km, Ea = Ea, z_loop = z_loop, unidirectional = unidirectional)
 
-            if (i == 1) then
-                open(20, file = trim(output_folder) // '3dpoys_le.cfg', action = 'write', status = 'new', iostat = rc)
-                call model%output_parameters(20, init_mode, boundary_file, lef_binding_sites, &
-                        boundary_factor, boundary_score, boundary_direction, &
+            if ((rank == 0).and.(i == 1)) then                ! do it only once
+                save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')
+                call log%info('Save parameters in file: ' // save_input_cfg_file)
+
+                open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
+                call model%output_parameters(20, init_mode, boundary_file, lef_loading_sites, &
+                        basal_loading_factor, boundary_direction, &
                         Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
                 close(20)
             end if
 
-            call model%init(boundary, binding_site_pos, binding_site_prob, init_mode)  ! TODO add binding_site_pos
+            call model%init(boundary, loading_sites_factor, init_mode)
 
             call model%do_simulation(trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
 

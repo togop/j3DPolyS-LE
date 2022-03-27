@@ -5,7 +5,7 @@ channels:
   - defaults
 dependencies:
   - python>=3.8
-  - pip
+  - pip=21.2.4
   - numpy
   - pandas
   - matplotlib
@@ -15,3 +15,6 @@ dependencies:
   - dask
   - cooler
   - pyranges
+  - seaborn
+  #- pip:
+  #    - Cython

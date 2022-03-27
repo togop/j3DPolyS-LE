@@ -1,6 +1,6 @@
 """
 3DPolyS_LE
-~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 3D Polymer Simulations - Loop Extrusion model
 

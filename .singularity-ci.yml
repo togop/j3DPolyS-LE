@@ -1,0 +1,34 @@
+image:
+  name: quay.io/singularity/singularity:v3.9.2
+  entrypoint: [""]
+
+stages:
+  - build
+  - deploy
+
+# Build Singularity container
+singularity-image:
+  stage: build
+  script:
+    - mkdir -p ~/.singularity
+    - cat "$SYLABS_TOKEN" > ~/.singularity/sylabs-token
+    - singularity remote login SylabsCloud < ~/.singularity/sylabs-token
+    - singularity build --remote --force library://todor/default/py3dpolys_le:latest Singularity
+    #- singularity pull py3dpolys_le.sif library://todor/default/py3dpolys_le:latest
+    #- singularity key list
+    #- singularity sign --keyidx 0 py3dpolys_le.sif
+    #- singularity push py3dpolys_le.sif library://todor/default/py3dpolys_le:latest
+    # - singularity build py3dpolys_le.sif Singularity
+  artifacts:
+    paths:
+      # - py3dpolys_le.sif
+
+# Push the image on the registry
+#deploy:
+#  stage: deploy
+#  script:
+#    - mkdir ~/.singularity
+#    - cat "$SYLABS_TOKEN" > ~/.singularity/sylabs-token
+#    #- singularity push --docker-username "${CI_REGISTRY_USER}" --docker-password "${CI_REGISTRY_PASSWORD}" py3dpolys_le.sif oras://"$CI_REGISTRY_IMAGE"/"$CI_PROJECT_NAME":"$CI_COMMIT_TAG"
+#    - singularity remote login SylabsCloud < ~/.singularity/sylabs-token
+#    - singularity push -U py3dpolys_le.sif library://todor/default/py3dpolys_le:latest

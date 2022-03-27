@@ -142,7 +142,7 @@ contains
     end select
   end subroutine read_logical_from_string
 
-  subroutine load_config_file(filename)
+  subroutine load_config_file(filename, iostat)
 
     implicit none
 
@@ -151,6 +151,9 @@ contains
     character(len=*),intent(in) :: filename
     ! the name of the .conf file to read in
 
+    integer,intent(inout) :: iostat
+    ! used for I/O errors
+
     ! --- Local variables --- !
 
     character(len=config_line_len) :: line_temp
@@ -158,7 +161,8 @@ contains
     integer :: ioerr
     ! used for I/O errors
 
-    open(unit=80, file=filename, status='old')
+    open(unit=80, file=filename, status='old', iostat=iostat)
+    if(iostat.ne.0) return
 
     n_lines = 0
     line = ''
@@ -245,8 +249,12 @@ contains
     end do
 
     if(.not.found) then
-       print *, "Parameter not found : "//trim(par_name_new)
-       stop
+        if(present(default)) then
+            value = default
+        else
+           print *, "Parameter not found : "//trim(par_name_new)
+           stop
+        end if
     end if
 
   end subroutine config_logical
@@ -307,8 +315,12 @@ contains
     end do
 
     if(.not.found) then
-       print *, "Parameter not found : "//trim(par_name_new)
-       stop
+        if(present(default)) then
+            value = default
+        else
+           print *, "Parameter not found : "//trim(par_name_new)
+           stop
+        end if
     end if
 
   end subroutine config_real8
@@ -369,8 +381,12 @@ contains
     end do
 
     if(.not.found) then
-       print *, "Parameter not found : "//trim(par_name_new)
-       stop
+        if(present(default)) then
+            value = default
+        else
+           print *, "Parameter not found : "//trim(par_name_new)
+           stop
+       end if
     end if
 
   end subroutine config_real4
@@ -497,8 +513,12 @@ contains
     end do
 
     if(.not.found) then
-       print *, "Parameter not found : "//trim(par_name_new)
-       stop
+        if(present(default)) then
+            value = default
+        else
+           print *, "Parameter not found : "//trim(par_name_new)
+           stop
+        end if
     end if
 
   end subroutine config_int8
@@ -559,8 +579,12 @@ contains
     end do
 
     if(.not.found) then
-       print *, "Parameter not found : "//trim(par_name_new)
-       stop
+        if(present(default)) then
+            value = default
+        else
+           print *, "Parameter not found : "//trim(par_name_new)
+           stop
+        end if
     end if
 
   end subroutine config_int4

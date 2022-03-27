@@ -9,20 +9,16 @@ import re
 import sys
 from filelock import SoftFileLock
 
-from . import hic_analysis as ha
-from . import plot_hic
+from py3dpolys_le import hic_analysis as ha
+from py3dpolys_le import plot_hic
+from py3dpolys_le.job_runner import CfgJobRunner, convert_dat_to_cfg
+
 # from _version import __name__
 
 dummy_sim = False  # set to False; True = dummy simulation mode: echo commands only
 
 
-def main():
-
-    # Initialization
-    logging.basicConfig(level=logging.DEBUG)
-    logging.getLogger("").setLevel(logging.INFO)
-    logger = logging.getLogger('3dpolys_le_stats')
-
+def cli_parser():
     p = argparse.ArgumentParser()
     p.add_argument("-o", "--output_folder", default=".",
                    help=f"Simulation's output folder containing "
@@ -31,14 +27,11 @@ def main():
     p.add_argument("-b", "--boundary", default=None, help="Boundary file in TSV format.")
     p.add_argument("-bd", "--boundary_direction", default=0, help="Impermeability direction applied to all boundaries: "
                                                                   "-1: opposite direction, 0: both, 1: same direction.")
-    p.add_argument("-bf", "--boundary_factor", default=1., help="Impermeability factor applied to all boundaries.")
-    p.add_argument("-bs", "--boundary_score", help="Whether individual boundary scores were applied in a simulation.",
-                   action='store_true')
     p.add_argument("-t", "--tads_boundary", default=None,
                    help="TADs boundary file in CSV format (same as boundary.csv) to be used for calculating chi2-min score. "
                         "Also supported Loops file in .bed.tsv format, with the following columns: "
                         "chromosome  anchor1  anchor2")
-    p.add_argument("-e", "--exp_cool",
+    p.add_argument("-e", "--exp_cool", default="",
                    help="Experimental cool file with which simulation data to be compared.")
     p.add_argument("-l", "--nlef", default="200", help="Nlef value used in a simulation.")  # TODO optional read it form input.dat
     p.add_argument("-m", "--km", default="2.7e-3", help="km value used in a simulation.")  # TODO optional read it form input.dat
@@ -52,41 +45,63 @@ def main():
                                                         "where <max_r> is the value of the --radius_contact parameter."
                    , action='store_true')
     p.add_argument("-f", "--stats_file", default="./sim_stats.csv", help="Simulation statistics' repository file.")
-    p.add_argument("--bin_size", default=1, help="Chip-seq bin size used for plotting. Default: 1 = 2kb.", type=int)
+    p.add_argument("-res", "--resolution", default=ha.SIM_RESOLUTION, type=int,
+                   help=f"Resolution to downscale Chip-seq output data in the .bedGraph format. "
+                        f"Default: {ha.SIM_RESOLUTION} = 2kb.")
     p.add_argument("--replace", help="Whether to replace existing files.", action='store_true')
     p.add_argument("--chi2_mode", default=ha.CHI2_MODE_LINEAR, choices=['log', 'linear'],
                    help="Chi2-min mode for sampling contact distances.")
     p.add_argument("--cmp_chrs", nargs='*', default=None,
                    help="Synonyms of the Hi-C chromosome with which simulation data to be compared. "
                         "Default: hic_analysis.py::CHR_SYNONYMS!")
+    return p
 
-    args = p.parse_args(sys.argv[1:])
+
+def main():
+
+    # Initialization
+    logging.basicConfig(level=logging.DEBUG)
+    logging.getLogger("").setLevel(logging.INFO)
+    logger = logging.getLogger('3dpolys_le_stats')
+
+    args = cli_parser().parse_args(sys.argv[1:])
+
+    input_cfg = args.input_cfg
+    if input_cfg.endswith('.dat'):
+        input_cfg = convert_dat_to_cfg(input_cfg)
+
+    cfg_job_runner = CfgJobRunner(input_cfg=input_cfg)
 
     logger.info(f'start with parameters: {args}')
 
     if args.cmp_chrs is not None:
-        logger.warning(f'Overwriting the default hic_analysis.CHR_SYNONYMS: { ",".join(args.cmp_chrs)} '
+        logger.info(f'Overwriting the default hic_analysis.CHR_SYNONYMS: { ",".join(args.cmp_chrs)} '
                        f'with which HiCs will be compared!')
         ha.CHR_SYNONYMS = args.cmp_chrs
-
-    resolutions = [int(i * ha.EXP_RESOLUTION) for i in ha.EXP_FACTORS]
 
     exp_cool = args.exp_cool
     boundary = args.boundary
     tads_boundary = args.tads_boundary
 
-    cmp_hic_file = re.sub(r'.cool', '', exp_cool)  # hic to compare with
+    cmp_hic_file = re.sub(r'\.cool|\.mcool', '', exp_cool) if exp_cool else None  # hic to compare with
 
     # find last HIC.hdf5 do analysis and store
     sim_hic_file = ha.get_last_hic(args.analyse)
 
-    # need only normed for chi2_log and chi2_linear and for given tads-boundary sites and 1tad(the whole chromosome)
-    (chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS, res=ha.RESOLUTION,
-                                                      tads_boundary=tads_boundary, norm=True,
-                                                      chi2_mode=ha.CHI2_MODE_LINEAR)  # , plot=True)
-    (chi2_log, alpha_log) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS, res=ha.RESOLUTION,
-                                                      tads_boundary=tads_boundary, norm=True, chi2_mode=ha.CHI2_MODE_LOG)
+    hic_folder = os.path.dirname(sim_hic_file)
+    plots_folder = os.path.join(hic_folder, ha.PLOTS_FOLDER)
 
+    # need only normed for chi2_log and chi2_linear and for given tads-boundary sites and 1tad(the whole chromosome)
+    if exp_cool:
+        (chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
+                                                          res=ha.RESOLUTION, tads_boundary=tads_boundary, norm=True,
+                                                          chi2_mode=ha.CHI2_MODE_LINEAR)  # , plot=True)
+        (chi2_log, alpha_log) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
+                                                          res=ha.RESOLUTION, tads_boundary=tads_boundary,
+                                                          plots_folder=plots_folder, norm=True, chi2_mode=ha.CHI2_MODE_LOG)
+    else:
+        (chi2_lin, alpha_lin) = (0, 1)
+        (chi2_log, alpha_log) = (0, 1)
     # import matplotlib.pyplot as plt
     # plt.plot(exp_score, sim_score, '.')  # juts to visualize with what the correlation coefficient has to deal with
 
@@ -101,7 +116,7 @@ def main():
             # !!! it is important the first column to be unique as this will be used by panda as index !!!
             stats_writer.writerow(
                 ['sim_hic_file', 'sim_out_folder', 'exp_cool', 'resolution',
-                 'boundary', 'boundary_direction', 'boundary_factor', 'boundary_score',
+                 'boundary', 'boundary_direction',
                  'tads_boundary', 'input.cfg', 'nlef', 'km', 'radius_contact', 'chi2_log', 'alpha_log',
                  'chi2_lin', 'alpha_lin', 'chr'])
 
@@ -112,13 +127,24 @@ def main():
             radius_p = f'{args.radius_contact}{cp}' if args.radius_contact > 0 else ''
             stats_writer.writerow(
                 [sim_hic_file, args.output_folder, exp_cool, ha.RESOLUTION,
-                 boundary, args.boundary_direction, args.boundary_factor, args.boundary_score,
-                 tads_boundary, args.input_cfg, args.nlef, args.km, radius_p, chi2_log, alpha_log,
-                 chi2_lin, alpha_lin, ha.CHR_SYNONYMS[-1]])
+                 boundary, args.boundary_direction, tads_boundary, args.input_cfg, args.nlef, args.km, radius_p,
+                 chi2_log, alpha_log, chi2_lin, alpha_lin, ha.CHR_SYNONYMS[-1]])
 
     # generate hic_*_hot_r.png plot files if not already done
-    if not os.path.exists(re.sub('.hdf5', '_hot_r.png', sim_hic_file)):
-        plot_hic.run(args.analyse, cmap="hot_r", file_ext="png")
+    plot_cmap = cfg_job_runner.get_property(profile='stats', name='plot_cmap')
+    plot_format = cfg_job_runner.get_property(profile='stats', name='plot_format')
+    hic_plot_file = re.sub('.hdf5', f'_{plot_cmap}.{plot_format}', sim_hic_file)
+    if not os.path.exists(hic_plot_file) or args.replace:
+        plot_hic.run(args.analyse, resolution=ha.SIM_RESOLUTION, cmap=plot_cmap, plot_format=plot_format)
+    else:
+        logger.info(f'Hic plot file already created {hic_plot_file} so skip it')
+
+    # ChIP-seq in bedGraph format
+    chip_out_file = os.path.join(args.analyse, ha.CHIP_OUT)
+    bed_graph_file = os.path.join(args.analyse, ha.CHIP_BED_GRAPH)
+    if os.path.exists(chip_out_file) and (not os.path.exists(bed_graph_file) or args.replace):
+        ha.chip_out_to_bedgraph(chip_out_file, bed_graph_file=bed_graph_file,
+                                chrom=ha.SIM_CHR, resolution=ha.SIM_RESOLUTION)
 
 
 if __name__ == '__main__':

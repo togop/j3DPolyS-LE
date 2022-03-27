@@ -1,4 +1,4 @@
-.PHONY: all build debug env install test
+.PHONY: all build debug env install test doc sif
 
 build:
 	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build -S .
@@ -9,19 +9,28 @@ debug:
 	cmake --build cmake-build-debug --target 3dpolys_le -- -j 6
 
 env:
-	# conda deactivate
-	# conda env remove -n py3dpolys_le
 	conda env create -f environment.yml
-	# conda create -n py3dpolys_le python=3.8
-	# conda activate py3dpolys_le
+
+sif:
+	singularity build --force py3DPolyS-LE.sif Singularity
 
 install:
-	# conda config --add channels bioconda
-	# conda config --add channels conda-forge
-	# conda config --add channels defaults
 	pip install -e .
 
+doc:
+	sphinx-build -b html doc build_doc
+
 test:
-	pytest
+	# under construction
+	conda install pytest
+	conda install pytest-cov
+	pytest --cov=py3dpolys_le test/
+
+uninstall:
+	conda env remove --name py3dpolys_le
+
+clean:
+	cmake --build cmake-build --target clean
+	cmake --build cmake-build-debug --target clean
 
 all: build install

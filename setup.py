@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='py3dpolys_le',
-      version='2021.5.12',
+      version='2022.1.20',
       description='3D Polymer Simulations - Loop Extrusion model',
       url='https://gitlab.com/togop/3DPolyS-LE',
       author='Daniel Jost, Todor Gitchev',
@@ -22,9 +22,10 @@ setup(name='py3dpolys_le',
       # package_data={'bin': ['3dpolys_le'']},
       # package_data={'data': ['input.dat']},
       # package_dir={'py3dpolys_le': 'py3dpolys_le'},
-      # setup_requires=['cython', 'numpy'],
+      setup_requires=['sphinx', 'sphinx-argparse', 'sphinx-argparse-cli'],
       install_requires=[
           'numpy',
+          'cython',
           'pandas',
           'matplotlib',
           'scipy',
@@ -32,13 +33,17 @@ setup(name='py3dpolys_le',
           'h5py',
           'pyranges',
           'dask',
+          'seaborn',
           'cooler'],
       entry_points={
           'console_scripts': [
-              'plot_hic = py3dpolys_le.plot_hic:main',
+              '3dpolys_le = py3dpolys_le.3dpolys_le:main',
               '3dpolys_le_runner = py3dpolys_le.3dpolys_le_runner:main',
               '3dpolys_le_stats = py3dpolys_le.3dpolys_le_stats:main',
-              # 'hdf5_to_cool = py3dpolys_le.hic_converters:hdf5_to_cool', TODO was not ready yet
+              'plot_hic = py3dpolys_le.plot_hic:main',
+              'plot_sim_stats = py3dpolys_le.plot_sim_stats:main',
+              'hdf5_to_cooler = py3dpolys_le.hic_converters:hdf5_to_cooler',
+              'hic_converters = py3dpolys_le.hic_converters:main'
           ],
       },
       zip_safe=False)

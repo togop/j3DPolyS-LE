@@ -1,41 +1,74 @@
 #  gitlab-runner register
-# https://gitlab.com/togop/3DPolyS-LE
+# https://gitlab.com/
 # locally run it with:  gitlab-runner exec docker test
 # how to test locally: https://medium.com/@umutuluer/how-to-test-gitlab-ci-locally-f9e6cef4f054
+
+stages:
+#  - build
+  - test
+  - production
+
 image:
   togop/gcc_gfortran_mpi_hdf5_python:latest
 
 before_script:
-  - echo "PATH=$PATH:/root/miniconda3/bin/" >> ~/.bashrc
-  - source ~/.bashrc
-  - conda init bash
-  - source ~/.bashrc
-  - make env
-  - conda activate py3dpolys_le
-  - make all
-  - echo "conda activate py3dpolys_le" >> ~/.bashrc
-  #- cat ~/.bashrc
-  - source ~/.bashrc
+    - echo "$SYLABS_TOKEN"
+    #- echo "$SYLABS_TOKEN_VAR"
+    #- cat "$SYLABS_TOKEN"
+    - echo "PATH=$PATH:/opt/miniconda3/bin/" >> ~/.bashrc
+    - source ~/.bashrc
+    - conda init bash
+    - source ~/.bashrc
+    - make env
+    - conda activate py3dpolys_le
+    #- apt-get update
+    #- apt-get install --yes python3-pip
+    #- python -m ensurepip --upgrade
+    #- curl https://bootstrap.pypa.io/get-pip.py | python3
+    #- python3 -m pip install -U setuptools
+    - make all
+    - echo "conda activate py3dpolys_le" >> ~/.bashrc
+    - cat ~/.bashrc
+    - source ~/.bashrc
 
 test:
+  stage: test
   script:
     - pwd
-    #- cd bin
     - ls -la
     - 3dpolys_le_runner --help
     - python --version
     - echo 'Start tests ...'
-    - 3dpolys_le_runner run -o ./out_8860 -i ./test/test_shell_input.cfg
-    - ./test/test.sh ./out_8860/config.out
-    - ./test/test.sh ./out_8860/contact-decay_wt_N2_Moushumi2020_HIC1_5000_6_vs_X__hic_002.h5_chi2_lin.10000.svg
-    - ./test/test.sh ./out_8860/contact-decay_wt_N2_Moushumi2020_HIC1_5000_6_vs_X__hic_002.h5_chi2_log.10000.svg
-    - ls -la ./out_8860
-    - ls -la ./out_8860/r2.84
-    - ./test/test.sh ./out_8860/r2.84/Chip.out
-    - ./test/test.sh ./out_8860/r2.84/xyzconfig.out
-    - ./test/test.sh ./out_8860/r2.84/hic_001.hdf5
-    - ./test/test.sh ./out_8860/r2.84/hic_002.hdf5
-    - ./test/test.sh ./out_8860/r2.84/hic_001_hot_r.png
-    - ./test/test.sh ./out_8860/r2.84/hic_002_hot_r.png
-    - ./test/test.sh ./out_8860/r2.84/hic_002.hdf5.10000_decay_probs_lin.txt
-    - ./test/test.sh ./out_8860/r2.84/hic_002.hdf5.10000_decay_probs_log.txt
+    # pytest
+    - make test
+    - ls -la out-Nlef200-km0.0027-bd0_im-z_z-loop
+    - ls -la out-Nlef200-km0.0027-bd0_im-z_z-loop/r2.84
+    # shell test
+    - 3dpolys_le_runner run -o ./out-8860 -i ./test/test_shell_input.cfg --cmd_run_file ./run_test_shell_input.sh
+    - ls -la
+    - ./test/test_cmp.sh ./run_test_shell_input.sh ./test/expected/run_test_shell_input.sh
+    - chmod +x ./run_test_shell_input.sh
+    - ./run_test_shell_input.sh
+    - ./test/test.sh ./out-8860/config.out
+    - ./test/test.sh ./out-8860/contact-decay_wt_N2_Moushumi2020_HIC1_5000_6_vs_X__hic_002.h5_chi2_lin.10000.png
+    - ./test/test.sh ./out-8860/contact-decay_wt_N2_Moushumi2020_HIC1_5000_6_vs_X__hic_002.h5_chi2_log.10000.png
+    - ls -la ./out-8860
+    - ls -la ./out-8860/r2.84
+    - ./test/test.sh ./out-8860/3dpoys_le.cfg
+    - ./test/test.sh ./out-8860/r2.84/Chip.out
+    - ./test/test.sh ./out-8860/r2.84/xyzconfig.out
+    - ./test/test.sh ./out-8860/r2.84/hic_001.hdf5
+    - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5
+    - ./test/test.sh ./out-8860/r2.84/hic_001_hot_r.png
+    - ./test/test.sh ./out-8860/r2.84/hic_002_hot_r.png
+    - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5.10000_decay_probs_lin.txt
+    - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5.10000_decay_probs_log.txt
+
+singularity:
+  stage: production
+  #image: quay.io/singularity/singularity:v3.7.3
+  needs: [test]
+  trigger:
+    include: .singularity-ci.yml
+    strategy: depend
+  resource_group: production

@@ -23,15 +23,13 @@ module PolymerModel_mod
         real, public :: kb, ku, km, Ea
         logical, public :: z_loop = .false.
         logical, public :: unidirectional = .false.
-        integer, public :: binding_sites_count = 0
         ! allocatable
         integer, dimension(:, :), allocatable :: config
         integer, dimension(:, :), allocatable :: bittable
         real, dimension(:, :), allocatable :: dr
         integer, dimension(:, :), allocatable :: contact
         real, dimension(:, :), allocatable :: boundary
-        integer, dimension(:), allocatable :: binding_site_pos
-        real, dimension(:), allocatable :: binding_site_prob
+        real, dimension(:), allocatable :: loading_sites_factor
 
     contains
         procedure, public :: init, do_simulation, trialmoveex, trialmovetad, trialbound, trialunbound, unbound_all, &
@@ -42,12 +40,11 @@ module PolymerModel_mod
 
 contains
 
-    subroutine init(self, boundary, binding_site_pos, binding_site_prob, init_mode)
+    subroutine init(self, boundary, loading_sites_factor, init_mode)
         implicit none
         class (PolymerModel), intent(inout) :: self
         real, dimension(:, :) :: boundary
-        integer, dimension(:) :: binding_site_pos
-        real, dimension(:) :: binding_site_prob
+        real, dimension(:) :: loading_sites_factor
         character(len = 1), intent(in) :: init_mode
 
         call log%set_level(global_log_level)
@@ -55,10 +52,7 @@ contains
         call self%allocate()
 
         self%boundary = boundary
-        if (self%binding_sites_count > 0) then
-            self%binding_site_pos = binding_site_pos
-            self%binding_site_prob = binding_site_prob
-        end if
+        self%loading_sites_factor = loading_sites_factor
         !print*, 'initialize boundary ', shape(boundary), shape(self%boundary)
 
         call self%initbitable()
@@ -89,8 +83,7 @@ contains
 
         bittable_t = 4 * (self%L**3)
 
-        call log%debug('allocate self%Nchain: ' // trim(str(self%Nchain)) // ' bittable_t: ' // trim(str(bittable_t)) &
-                // ' binding_sites_count: ' // trim(str(self%binding_sites_count)))
+        call log%debug('allocate self%Nchain: ' // trim(str(self%Nchain)) // ' bittable_t: ' // trim(str(bittable_t)))
 
         ! call deallocate(self) ! make sure it's free
         allocate (self%config(2, self%Nchain))
@@ -98,10 +91,7 @@ contains
         allocate (self%dr(3, self%Nchain))
         allocate (self%contact(3, self%Nchain))
         allocate (self%boundary(2, self%Nchain))
-        if (self%binding_sites_count > 0) then
-            allocate (self%binding_site_pos( self%binding_sites_count))
-            allocate (self%binding_site_prob( self%binding_sites_count))
-        end if
+        allocate (self%loading_sites_factor( self%Nchain))
 
         return
     end subroutine allocate
@@ -670,24 +660,17 @@ contains
         class (PolymerModel), intent(inout) :: self
 
         integer :: n, id, j, d
+        real :: kbp
         real*8 :: randomnumber
 
         !choose randomly a monomer
-        if (self%binding_sites_count > 0) then
-            ! we have binding sites
-            n = int(self%binding_sites_count * randomnumber()) + 1
-            ! TODO check with Daniel how to use  self%binding_site_prob(n)
-            n = self%binding_site_pos(n)
-            ! call log%debug('Loading LEF at site: binding_site_pos(' // trim(str(n)))
-        else
-            ! no binding sites: the whole polymer is binding sites
-            n = int(self%Nchain * randomnumber()) + 1
-        end if
+        n = int(self%Nchain * randomnumber()) + 1
 
         id = self%contact(1, n)
         if (id==0) then !if the bin is not occupied by a leg, try to randomly insert a LEF to NN sites
+            kbp = self%kb * (  self%loading_sites_factor(n)**(1./real(self%ikb)) )
             do j = 1, self%ikb
-                if (randomnumber()>=self%kb) return
+                if (randomnumber()>=kbp) return
             end do
             d = int(2 * randomnumber()) + 1
             if (d==1) then
@@ -831,17 +814,16 @@ contains
         return
     end subroutine
 
-    subroutine output_parameters(self, fout, init_mode, boundary_file, lef_binding_sites, &
-            boundary_factor, boundary_score, boundary_direction, &
+    subroutine output_parameters(self, fout, init_mode, boundary_file, lef_loading_sites, &
+            basal_loading_factor, boundary_direction, &
             Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
         implicit none
         class (PolymerModel), intent(inout) :: self
         integer, intent(in) :: fout
         character(len = 1), intent(in) :: init_mode
         character(*), intent(in) :: boundary_file
-        character(*), intent(in) :: lef_binding_sites
-        real, intent(in) :: boundary_factor
-        real, intent(in) :: boundary_score
+        character(*), intent(in) :: lef_loading_sites
+        real, intent(in) :: basal_loading_factor
         integer, intent(in) :: boundary_direction
         integer, intent(in) :: Niter
         integer, intent(in) :: Ninter
@@ -866,16 +848,15 @@ contains
         write(fout, '(a)') 'burnout=' // trim(str(burnout))
         write(fout, '(a)') 'burnoutM=' // trim(str(burnoutM))
 
-        write(fout, '(a)') '# Loop-Extrusion factors'
-        write(fout, '(a)') 'kb=' // trim(strf(self%kb))
-        write(fout, '(a)') 'ku=' // trim(strf(self%ku))
-        write(fout, '(a)') 'km=' // trim(strf(self%km))
+        write(fout, '(a)') '# Loop-Extrusion factors: _k? = k?**(1. / real(ik?)) > 0.001'
+        write(fout, '(a)') '_kb=' // trim(strf(self%kb))
+        write(fout, '(a)') '_ku=' // trim(strf(self%ku))
+        write(fout, '(a)') '_km=' // trim(strf(self%km))
         write(fout, '(a)') 'Nlef=' // trim(str(self%Nleffree))
 
         write(fout, '(a)') 'boundary=' // trim(boundary_file)
-        write(fout, '(a)') 'lef_binding_sites=' // trim(lef_binding_sites)
-        write(fout, '(a)') 'boundary_factor=' // trim(strf(boundary_factor))
-        write(fout, '(a)') 'boundary_score=' // trim(strf(boundary_score))
+        write(fout, '(a)') 'lef_loading_sites=' // trim(lef_loading_sites)
+        write(fout, '(a)') 'basal_loading_factor=' // trim(strf(basal_loading_factor))
         write(fout, '(a)') 'boundary_direction=' // trim(str(boundary_direction))
         if (self%z_loop) then
             write(fout, '(a)') 'z_loop=true'
