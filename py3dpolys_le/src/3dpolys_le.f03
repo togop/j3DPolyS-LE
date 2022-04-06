@@ -576,7 +576,7 @@ program mainprogram
                     read(10, *, iostat = rc) loading_site
                     if (rc /= 0) exit
                     do i = (1 + loading_site%position/resolution_factor), &
-                            (loading_site%position/resolution_factor + loading_site%length)
+                            (1 + loading_site%position/resolution_factor + (loading_site%length - 1)/resolution_factor)
                         loading_sites_count = loading_sites_count + 1
                         loading_sites_factor(i) = loading_site%factor
                         kb_factor = kb_factor + loading_site%factor
