@@ -424,7 +424,7 @@ program mainprogram
         call read_config('unidirectional', unidirectional)
     end if
     if (radius_contact == 0.) then
-        call read_config('radius_contact', radius_contact)
+        call read_config('radius_contact', radius_contact, default=1.42)
     end if
 
     ! loaded input parameters:
@@ -760,14 +760,9 @@ program mainprogram
         status = SYSTEM('mkdir -p ' // trim(analyse_folder))
 
         call crono%Tic()
-        if (radius_contact == 0) then
-            call analyse(params = params, Niter = Niter, Nmeas = Nmeas, output_folder = output_folder, &
-                    analyse_folder = analyse_folder)
-        else
-            call analyseradius(radiuscontact = radius_contact, use_contact_probability = use_contact_probability, &
-                    params = params, Niter = Niter, Nmeas = Nmeas, &
-                    output_folder = output_folder, analyse_folder = analyse_folder, hic3d_factor = hic3d_factor)
-        end if
+        call analyseradius(radiuscontact = radius_contact, use_contact_probability = use_contact_probability, &
+                params = params, Niter = Niter, Nmeas = Nmeas, &
+                output_folder = output_folder, analyse_folder = analyse_folder, hic3d_factor = hic3d_factor)
         call log%info(crono%Tac('Finished analyse'))
     end if
 
