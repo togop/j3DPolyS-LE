@@ -557,7 +557,7 @@ contains
 
         open(11, file = trim(analyse_folder) // 'chip_lef.out', action = 'write', status = 'replace', iostat = rc)
         do m = 1, Nmeas
-            write(10, *) chip(m, :)  ! all in one file
+            write(11, *) chip(m, :)  ! all in one file
             ! output in bedGraph format: chrom, start, end, value
             open(10, file = trim(analyse_folder) // 'chip_lef_' // trim(str0(m)) // '.bedGraph', &
                     action = 'write', status = 'replace', iostat = rc)
