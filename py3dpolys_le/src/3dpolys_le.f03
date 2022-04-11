@@ -472,6 +472,7 @@ program mainprogram
             call log%info('unidirectional=false')
         end if
         call log%info('radius_contact=' // trim(strf(radius_contact)))
+        call log%info('chrom=' // trim(chrom))
     end if
 
     !load the local state of the 2kbp-bins
