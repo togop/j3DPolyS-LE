@@ -55,7 +55,7 @@ test:
     - ls -la ./out-8860
     - ls -la ./out-8860/r2.84
     - ./test/test.sh ./out-8860/3dpoys_le.cfg
-    - ./test/test.sh ./out-8860/r2.84/Chip.out
+    - ./test/test.sh ./out-8860/r2.84/chip_lef.out
     - ./test/test.sh ./out-8860/r2.84/xyzconfig.out
     - ./test/test.sh ./out-8860/r2.84/hic_001.hdf5
     - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5

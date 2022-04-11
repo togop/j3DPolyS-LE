@@ -79,6 +79,7 @@ subroutine print_help()
             & 3dpolys_le.cfg file.'
     print*, '   -a|--analyse:<analyse folder> Perform analyse step on an already done simulation&
             & and store results in a given folder.'
+    print*, '   -c|--chrom:Chromosome name.'
     print*, '   -b|--boundary:<boundary sites file> Boundary sites file in a csv format with the following columns:&
             & name,midpoint,impermeability. Default: no bondaries'
     print*, '   -lls|--lef_loading_sites:<loop extrusion loading sites file> LEFs loadding sites file in a csv format&
@@ -111,6 +112,7 @@ subroutine print_help()
     print*, 'km         LEFs rate of movement, aka velocity (2.7e-3 = 50kb/min=833bp/s).'
     print*, 'Ea         Energy of extrusion (passive: Ea=0, facilitated Ea<0).'
     print*, 'Nlef       Maximal number of bound LEFs (average number of bound extruders=Nlef kb/(kb+2ku).'
+    print*, 'chrom      Chromosome name to be used for output files. Default: chrS'
     print*, 'burnin     Number of iterations steps before introducing LEFs = burnin + random(0,1)*burnin.'
     print*, 'burnout    Number of iterations steps after the last simulation measurement with removed LEFs, &
             & aka relaxation time in steps.'
@@ -146,6 +148,7 @@ program mainprogram
     character(1000) :: boundary_file = ''
     character(1000) :: lef_loading_sites = ''
     character(20) :: opt_s = ''
+    character(20) :: chrom = ''
     integer :: ai = 1  ! input argument position the 3dpolys_le.cfg in the CLI, the ai+1 is the output folder
     character(1) :: path_separator, path_sep
     character(1) :: init_mode = ''
@@ -256,6 +259,12 @@ program mainprogram
                 boundary_file = trim(input_options(i + 1:))
                 if (rank == 0) then
                     call log%info('input ' // trim(input_options(:i)) // trim(boundary_file))
+                end if
+            elseif ((index(input_options, '--chrom:') > 0).or.(index(input_options, '-c:') > 0)) then
+                i = index(input_options, ':')
+                chrom = trim(input_options(i + 1:))
+                if (rank == 0) then
+                    call log%info('input ' // trim(input_options(:i)) // trim(chrom))
                 end if
             elseif ((index(input_options, '--lef_loading_sites:') > 0).or.(index(input_options, '-lls:') > 0)) then
                 i = index(input_options, ':')
@@ -408,6 +417,9 @@ program mainprogram
     if (boundary_file == '') then
         call read_config('boundary', boundary_file, default='')
     end if
+    if (chrom == '') then
+        call read_config('chrom', chrom, default='chrS')
+    end if
     if (lef_loading_sites == '') then
         call read_config('lef_loading_sites', lef_loading_sites, default='')
     end if
@@ -424,7 +436,7 @@ program mainprogram
         call read_config('unidirectional', unidirectional)
     end if
     if (radius_contact == 0.) then
-        call read_config('radius_contact', radius_contact)
+        call read_config('radius_contact', radius_contact, default=1.42)
     end if
 
     ! loaded input parameters:
@@ -460,6 +472,7 @@ program mainprogram
             call log%info('unidirectional=false')
         end if
         call log%info('radius_contact=' // trim(strf(radius_contact)))
+        call log%info('chrom=' // trim(chrom))
     end if
 
     !load the local state of the 2kbp-bins
@@ -760,14 +773,10 @@ program mainprogram
         status = SYSTEM('mkdir -p ' // trim(analyse_folder))
 
         call crono%Tic()
-        if (radius_contact == 0) then
-            call analyse(params = params, Niter = Niter, Nmeas = Nmeas, output_folder = output_folder, &
-                    analyse_folder = analyse_folder)
-        else
-            call analyseradius(radiuscontact = radius_contact, use_contact_probability = use_contact_probability, &
-                    params = params, Niter = Niter, Nmeas = Nmeas, &
-                    output_folder = output_folder, analyse_folder = analyse_folder, hic3d_factor = hic3d_factor)
-        end if
+        call analyse(radiuscontact = radius_contact, use_contact_probability = use_contact_probability, &
+                params = params, Niter = Niter, Nmeas = Nmeas, &
+                output_folder = output_folder, analyse_folder = analyse_folder, &
+                hic3d_factor = hic3d_factor, chrom = chrom)
         call log%info(crono%Tac('Finished analyse'))
     end if
 

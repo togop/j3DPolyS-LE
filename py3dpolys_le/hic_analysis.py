@@ -67,8 +67,8 @@ CONFIG_OUT = 'config.out'
 NLEF_OUT = 'Nlef.out'
 PROCESS_OUT = 'process.out'
 # analyse output file
-CHIP_OUT = 'Chip.out'
-CHIP_BED_GRAPH = 'Chip.bedGraph'
+CHIP_OUT = 'chip_lef.out'
+CHIP_BED_GRAPH = 'chip_lef.bedGraph'
 XYZCONFIG_OUT = 'xyzconfig.out'
 
 ALPHA = r'$\alpha$'
@@ -939,7 +939,7 @@ def plot_chip_seq(chip_out_file, exp_chip, boundary, resolution=SIM_RESOLUTION, 
                   replace=True):
     """
     Returns correlation coefficient and optionally produce a comparison plot
-    :param chip_out_file: the original simulation chip.out file
+    :param chip_out_file: the original simulation chip-seq.out file
     :param exp_chip: the experimental Chip-seq file in the same resolution as the simulation (2kb)
     :param boundary: the boundary file used during the simulation
     :param resolution: resolution to downscale the Chip-seq

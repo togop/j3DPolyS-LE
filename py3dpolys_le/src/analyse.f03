@@ -7,165 +7,23 @@ module analyse_mod
     implicit none
 
     private
-    public :: str, analyse, analyseradius
+    public :: str, analyse
     type(Logger) :: log = Logger('analyse_mod', LOG_DEBUG)
 
 contains
 
-    ! deprecated: it produce HiC with probability contact above 1.0 so better used analyseradius(r=1.42=default)
-    subroutine analyse(params, Niter, Nmeas, output_folder, analyse_folder)
-        implicit none
-        class (ModelParameters), intent(in) :: params
-        integer, intent(in) :: Niter, Nmeas
-        character(*), intent(in) :: output_folder
-        character(*), intent(in) :: analyse_folder
-
-        integer :: a, v, b, c, ip, jp, kp, slv, i, j, k, p, Lbox, Nn, sl, ld, bittablebis_size_1, bittablebis_size_2
-        real, TARGET :: hic(Nmeas, params%Nchain, params%Nchain), Chip(Nmeas, params%Nchain), pos(3), drb(3), dr1(3)
-        !real, TARGET :: hic_j(params%Nchain, params%Nchain)
-        !TYPE(C_PTR) :: f_ptr  ! USE ISO_C_BINDING; f_ptr = C_LOC(hic(i, :, :))
-        integer, allocatable :: bittablebis(:, :)
-        real :: x, y, z, xp, yp, zp
-        integer, dimension(:, :), allocatable :: config
-        integer, dimension(:, :), allocatable :: contact
-
-        call log%set_level(global_log_level)
-
-        allocate (config(2, params%Nchain))
-        allocate (contact(3, params%Nchain))
-
-        Lbox = 50 !should be higher than the actual simulation box
-        Nn = 80 !maximal number of Nn
-        slv = 4 !size of the second ring
-        sl = 12
-        bittablebis_size_1 = 12 + Nn + 1
-        bittablebis_size_2 = 4 * Lbox * Lbox * Lbox
-        allocate(bittablebis(bittablebis_size_1, bittablebis_size_2))
-
-        bittablebis = 0
-        do i = 1, Lbox
-            do j = 1, 2 * Lbox
-                do k = 1, 2 * Lbox
-                    a = i + (j - 1) * Lbox + (k - 1) * 2 * Lbox * Lbox
-                    x = (i - 1) + 0.5 * (1 - mod(j + mod(k + 1, 2), 2))
-                    y = (j - 1) * 0.5
-                    z = (k - 1) * 0.5
-                    bittablebis(1, a) = 0
-                    do v = 1, 12
-                        xp = x + voisxyz(1, v + 1)
-                        yp = y + voisxyz(2, v + 1)
-                        zp = z + voisxyz(3, v + 1)
-                        if (xp.ge.Lbox) xp = xp - Lbox
-                        if (xp.lt.0) xp = xp + Lbox
-                        if (yp.ge.Lbox) yp = yp - Lbox
-                        if (yp.lt.0) yp = yp + Lbox
-                        if (zp.ge.Lbox) zp = zp - Lbox
-                        if (zp.lt.0) zp = zp + Lbox
-                        ip = int(xp) + 1
-                        jp = int(2 * yp + 1)
-                        kp = int(2 * zp + 1)
-                        bittablebis(v + 1 + Nn, a) = ip + (jp - 1) * Lbox + (kp - 1) * 2 * Lbox * Lbox
-                    end do
-                end do
-            end do
-        end do
-        hic = 0.
-        Chip = 0.
-        config = 0
-        contact = 0
-
-        open(10, file = trim(output_folder) // 'config.out', action = 'read')
-        open(20, file = trim(output_folder) // 'contact.out', action = 'read')
-        open(30, file = trim(output_folder) // 'dr.out', action = 'read')
-        open(40, file = trim(analyse_folder) // 'xyzconfig.out', action = 'write', status = 'replace')
-        do i = 1, Niter
-            do j = 1, Nmeas
-                ! TODO use MPI but has to take care of read from config, contact, drb
-                do p = 1, params%Nchain
-                    ! TODO maybe possible to read the whole chain in one round
-                    read(10, *) config(:, p)
-                    read(20, *) contact(:, p)
-                    read(30, *) drb
-                    if (p.eq.1) dr1 = drb
-                end do
-                bittablebis(1:(1 + Nn), :) = 0
-                a = config(1, 1)
-                bittablebis(1, a) = 1
-                bittablebis(1 + bittablebis(1, a), a) = 1
-                do v = 1, 12
-                    b = bittablebis(1 + Nn + v, a)
-                    bittablebis(1, b) = bittablebis(1, b) + 1
-                    bittablebis(1 + bittablebis(1, b), b) = 1
-                    if (v.le.sl) then
-                        do ld = 1, slv
-                            if (lv4(v, ld).gt.0) then
-                                c = bittablebis(1 + Nn + lv4(v, ld), b)      ! TODO maybe check out of bound
-                                bittablebis(1, c) = bittablebis(1, c) + 1   ! TODO maybe check out of bound
-                                bittablebis(1 + bittablebis(1, c), c) = 1
-                            end if
-                        end do
-                    end if
-                end do
-                if (contact(1, 1).gt.0) Chip(j, 1) = Chip(j, 1) + 1.
-                pos = dr1
-                write(40, *) pos
-                do p = 2, params%Nchain
-                    ! TODO potential kernelization via CUDA
-                    v = config(2, p - 1) ! TODO maybe check out of bound
-                    pos(1) = pos(1) + voisxyz(1, v)
-                    pos(2) = pos(2) + voisxyz(2, v)
-                    pos(3) = pos(3) + voisxyz(3, v)
-                    write(40, *) pos
-                    if (config(2, p - 1).gt.1) a = bittablebis(1 + Nn + config(2, p - 1) - 1, a)
-                    do v = 1, bittablebis(1, a)    ! TODO check with Daniel: bugfix out of bound (-1)
-                        ld = bittablebis(1 + v, a) ! TODO check with Daniel: bugfix out of bound
-                        hic(j, p, ld) = hic(j, p, ld) + 1.
-                        hic(j, ld, p) = hic(j, ld, p) + 1.
-                    end do
-                    bittablebis(1, a) = bittablebis(1, a) + 1   ! TODO maybe check out of bound
-                    bittablebis(1 + bittablebis(1, a), a) = p   ! TODO maybe check out of bound
-                    do v = 1, 12
-                        b = bittablebis(1 + Nn + v, a)
-                        bittablebis(1, b) = bittablebis(1, b) + 1   ! TODO maybe check out of bound
-                        bittablebis(1 + bittablebis(1, b), b) = p   ! TODO maybe check out of bound
-                        if (v.le.sl) then
-                            do ld = 1, slv
-                                if (lv4(v, ld).gt.0) then
-                                    c = bittablebis(1 + Nn + lv4(v, ld), b)   ! TODO maybe check out of bound
-                                    bittablebis(1, c) = bittablebis(1, c) + 1   ! TODO maybe check out of bound
-                                    bittablebis(1 + bittablebis(1, c), c) = p   ! TODO maybe check out of bound
-                                end if
-                            end do
-                        end if
-                    end do
-                    if (contact(1, p).gt.0) Chip(j, p) = Chip(j, p) + 1.
-                end do
-            end do
-        end do
-
-        close(10)
-        close(20)
-        close(30)
-        close(40)
-
-        Chip = Chip / real(Niter)
-        hic = hic / real(Niter)
-
-        call save_hic_to_hdf5(hic, params, Nmeas, analyse_folder)
-        call save_chip(Chip, params, Nmeas, analyse_folder)
-
-    end subroutine
 
     integer function hic3d_idx(x, y, z, N)
         integer, intent(in) :: x, y, z, N
-        ! call log%info('hic3d_idx: x=' // trim(str(x)) // ', y=' // trim(str(y)) // ', z='// trim(str(z)) // ')')
         hic3d_idx = (x-1)*(N-1)*N - N*(x-1)*x/2 - (x-1)*(N-1)*N/2 + x*(x-1)*(x+1)/6 &  ! sum_xNN
                 + (y-x-1)*N -((y-1)*y - (x+1)*x)/2 &  ! sum_yN
                 + (z-y)  ! sum_z
+        !call log%debug('hic3d_idx: x=' // trim(str(x)) // ', y=' // trim(str(y)) // ', z='// trim(str(z)) // &
+        !       ', N=' // trim(str(N)) // ')=' // trim(str(hic3d_idx)) )
     end function hic3d_idx
 
-    subroutine analyseradius(radiuscontact, use_contact_probability, &
-            params, Niter, Nmeas, output_folder, analyse_folder, hic3d_factor)
+    subroutine analyse(radiuscontact, use_contact_probability, &
+            params, Niter, Nmeas, output_folder, analyse_folder, hic3d_factor, chrom)
 
         !analyse data to estimate the Hi-C map for a given radius of contact and the Chip-profile of LEF legs
         ! also compute the xyz coordinates
@@ -178,6 +36,7 @@ contains
         character(*), intent(in) :: output_folder
         character(*), intent(in) :: analyse_folder
         integer, intent(in) :: hic3d_factor
+        character(*), intent(in) :: chrom
 
         logical :: do_hic3d
         integer :: i, j, k, p, s, p3d, k3d, s3d
@@ -214,7 +73,7 @@ contains
         hic = 0.
         Chip = 0.
 
-        print*, 'analyseradius output_folder=' // trim(output_folder) // ', analyse_folder=' // trim(analyse_folder)
+        print*, 'analyse output_folder=' // trim(output_folder) // ', analyse_folder=' // trim(analyse_folder)
 
         open(10, file = trim(output_folder) // 'config.out', action = 'read')
         open(20, file = trim(output_folder) // 'contact.out', action = 'read')
@@ -277,11 +136,11 @@ contains
                                                     hic3d(hic3d_i,2) = k3d
                                                     hic3d(hic3d_i,3) = s3d
                                                     hic3d(hic3d_i,4) = hic_point
-!                                                    call log%debug('init hic3d(hic3d_i:' // trim(str(hic3d_i)) // &
-!                                                            ')= hic(p):' // trim(str(hic3d(hic3d_i,1))) // &
-!                                                            ', hic(k):' // trim(str(hic3d(hic3d_i,2))) // &
-!                                                            ', hic(s):' // trim(str(hic3d(hic3d_i,3))) // &
-!                                                             ', hic(v):' // trim(str(hic_point)))
+                                                    !call log%debug('init hic3d(hic3d_i:' // trim(str(hic3d_i)) // &
+                                                    !        ')= hic(p):' // trim(str(hic3d(hic3d_i,1))) // &
+                                                    !        ', hic(k):' // trim(str(hic3d(hic3d_i,2))) // &
+                                                    !        ', hic(s):' // trim(str(hic3d(hic3d_i,3))) // &
+                                                    !         ', hic(v):' // trim(str(hic_point)))
                                                 elseif (hic3d(hic3d_i,1)==p3d.and.hic3d(hic3d_i,2)==k3d &
                                                     .and.hic3d(hic3d_i,3)==s3d) then
                                                     hic3d(hic3d_i,4) = hic_point
@@ -294,15 +153,6 @@ contains
                                                             ', hic(s3d):' // trim(str(hic3d(hic3d_i,3))))
                                                     call exit(1)
                                                 end if
-                                                 ! hic3d cube format
-!                                                hic_point = hic3d(p3d, k3d, s3d) + 1.
-!                                                ! simetry
-!                                                hic3d(p3d, k3d, s3d) = hic_point
-!                                                hic3d(k3d, p3d, s3d) = hic_point
-!                                                hic3d(p3d, s3d, k3d) = hic_point
-!                                                hic3d(k3d, s3d, p3d) = hic_point
-!                                                hic3d(s3d, p3d, k3d) = hic_point
-!                                                hic3d(s3d, k3d, p3d) = hic_point
                                             end if
                                         end if
                                     end do
@@ -340,6 +190,11 @@ contains
                                             elseif (hic3d(hic3d_i,1)==p3d.and.hic3d(hic3d_i,2)==k3d &
                                                 .and.hic3d(hic3d_i,3)==s3d) then
                                                 hic3d(hic3d_i,4) = hic_point
+                                                !call log%debug('update hic3d(hic3d_i:' // trim(str(hic3d_i)) // &
+                                                !        ')= hic(p):' // trim(str(hic3d(hic3d_i,1))) // &
+                                                !        ', hic(k):' // trim(str(hic3d(hic3d_i,2))) // &
+                                                !        ', hic(s):' // trim(str(hic3d(hic3d_i,3))) // &
+                                                !        ', hic(v):' // trim(str(hic_point)))
                                             else
                                                 call log%error('not mathching p3d:' // trim(str(p3d)) // &
                                                         ',k3d:' // trim(str(k)) // ', s3d:' // trim(str(s3d)))
@@ -349,15 +204,6 @@ contains
                                                         ', hic(s3d):' // trim(str(hic3d(hic3d_i,3))))
                                                 call exit(1)
                                             end if
-                                            ! hic3d cube format
-!                                            hic_point = hic3d(p3d, k3d, s3d) + 1.
-!                                            ! simetry
-!                                            hic3d(p3d, k3d, s3d) = hic_point
-!                                            hic3d(k3d, p3d, s3d) = hic_point
-!                                            hic3d(p3d, s3d, k3d) = hic_point
-!                                            hic3d(k3d, s3d, p3d) = hic_point
-!                                            hic3d(s3d, p3d, k3d) = hic_point
-!                                            hic3d(s3d, k3d, p3d) = hic_point
                                         end if
                                     end do
                                 end if
@@ -376,23 +222,23 @@ contains
         Chip = Chip / real(Niter)
         hic = hic / real(Niter)
 
-        call save_hic_to_hdf5(hic, params, Nmeas, analyse_folder)
-        call save_chip(Chip, params, Nmeas, analyse_folder)
+        call save_hic_to_hdf5(hic, params, Nmeas, analyse_folder, chrom)
+        call save_chip(Chip, params, Nmeas, analyse_folder, chrom)
 
         if (do_hic3d) then
             ! to Normlize myaybe do this
             ! hic3d(:,4) = hic3d(:,4) / real(Niter * hic3d_factor**2)
-            call save_hic3d_to_hdf5(hic3d, hic3d_factor, params, Nmeas, analyse_folder)
+            call save_hic3d_to_hdf5(hic3d, hic3d_factor, params, Niter, Nmeas, analyse_folder, chrom)
         end if
-    end subroutine analyseradius
+    end subroutine analyse
 
-    subroutine save_hic_to_hdf5(hic, params, Nmeas, analyse_folder)
+    subroutine save_hic_to_hdf5(hic, params, Nmeas, analyse_folder, chrom)
         implicit none
         class (ModelParameters), intent(in) :: params
         real, intent(in), TARGET :: hic(Nmeas, params%Nchain, params%Nchain)    ! or: hic(*)
         integer, intent(in) :: Nmeas
         character(*), intent(in) :: analyse_folder
-
+        character(*), intent(in) :: chrom
         integer :: rc, i
 
         !character(1000) :: filename
@@ -445,6 +291,12 @@ contains
             !f_ptr = C_LOC(hic(i, :, :))
             CALL h5dwrite_f(dset_id, h5kind_to_type(real_kind_7, H5_REAL_KIND), hic(i, :, :), data_dims, error) !, xfer_prp = plist_id)
 
+            CALL h5_add_attr_str(file_id, "chromosome", chrom)
+            CALL h5_add_attr_str(file_id, "format", "HDF5:hic_matrix")
+            CALL h5_add_attr_str(file_id, "format-url", "https://gitlab.com/togop/3DPolyS-LE")
+            CALL h5_add_attr_str(file_id, "format-version", "1")
+            CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2022.1.20")
+
             ! Close the dataset.
             CALL h5dclose_f(dset_id, error)
 
@@ -461,18 +313,113 @@ contains
         CALL h5close_f(error)
     end subroutine save_hic_to_hdf5
 
-    subroutine save_hic3d_to_hdf5(hic3d, factor, params, Nmeas, analyse_folder)
+    subroutine h5_add_attr_int(dest_id, name, value)
+        INTEGER(HID_T) :: dest_id
+        character(*), intent(in) :: name
+        integer, intent(in) :: value
+        INTEGER, PARAMETER :: int_kind_8 = SELECTED_INT_KIND(9)
+        INTEGER :: rank = 1
+        INTEGER(HSIZE_T), DIMENSION(1) :: dimsf = 1
+        INTEGER(HID_T) :: dspace_attr
+        INTEGER(HID_T) :: attr_id
+        INTEGER :: status
+
+        CALL h5screate_simple_f(rank, dimsf, dspace_attr, status)
+        CALL h5screate_f(H5S_SCALAR_F, dspace_attr, status)
+        CALL h5acreate_f(dest_id, name, h5kind_to_type(int_kind_8, H5_INTEGER_KIND), dspace_attr, attr_id, status)
+        CALL h5awrite_f(attr_id, h5kind_to_type(int_kind_8, H5_INTEGER_KIND), value, dimsf, status)
+
+        CALL h5sclose_f(dspace_attr, status)
+        !CALL h5sclose_f(attr_id, status)
+
+    end subroutine h5_add_attr_int
+
+    subroutine h5_add_attr_str(dest_id, name, value)
+        INTEGER(HID_T) :: dest_id
+        character(*), intent(in) :: name
+        character(*), intent(in) :: value
+        INTEGER, PARAMETER :: int_kind_8 = SELECTED_INT_KIND(9)
+        !INTEGER :: rank = 1
+        INTEGER(HSIZE_T), DIMENSION(1) :: dimsf = 1
+        INTEGER(HID_T) :: dspace_attr
+        INTEGER(HID_T) :: attr_id, attr_type
+        INTEGER :: status
+
+        INTEGER          , PARAMETER :: dim0      = 1
+        INTEGER(SIZE_T) :: str_len
+        INTEGER(HID_T)  :: memtype
+
+        str_len = len(value)
+        ! sdim = str_len
+        CALL H5Tcopy_f(H5T_C_S1, attr_type, status)
+        CALL H5Tset_size_f(attr_type, str_len+1, status)
+
+        CALL H5Tcopy_f( H5T_FORTRAN_S1, memtype, status)
+        CALL H5Tset_size_f(memtype, str_len, status)
+
+        CALL H5Screate_f(H5S_NULL_F, dspace_attr, status)
+
+        CALL h5screate_simple_f(1, dimsf, dspace_attr, status)
+        CALL H5Acreate_f(dest_id, name, attr_type, dspace_attr, attr_id, status)
+
+        CALL h5awrite_f(attr_id, memtype, value, dimsf, status)
+
+        CALL h5aclose_f(attr_id, status)
+        CALL h5sclose_f(dspace_attr, status)
+        CALL H5tclose_f(attr_type, status)
+        CALL H5tclose_f(memtype, status)
+
+        ! ALT ....
+!        CALL h5screate_simple_f(rank, dimsf, dspace_attr, status)
+!        CALL h5screate_f(H5S_SCALAR_F, dspace_attr, status)
+!
+!        CALL h5tcopy_f(H5T_NATIVE_CHARACTER, attr_id, status)
+!        !CALL h5tset_size_f(attr_id, str_len, status)
+!        CALL h5tset_strpad_f(attr_id, H5T_STR_NULLTERM_F, status)
+!
+!        CALL h5acreate_f(dest_id, name, h5kind_to_type(int_kind_8, H5T_STR_NULLTERM_F), dspace_attr, attr_id, status)
+!        CALL h5awrite_f(attr_id, h5kind_to_type(int_kind_8, H5T_STR_NULLTERM_F), value, dimsf, status)
+!
+!        !CALL h5acreate_f(dset, UNITS, atype_id, space, attr_id, status)
+!        !CALL h5awrite_f(attr_id, atype_id, "bin-size", dimsf, status)
+!
+!        !CALL h5sclose_f(attr_id, status)
+!        CALL h5sclose_f(dspace_attr, status)
+
+    end subroutine h5_add_attr_str
+
+    subroutine h5_add_dataset_int(dest_id, name, dataset)
+        INTEGER(HID_T) :: dest_id
+        character(*), intent(in) :: name
+        integer, dimension(:), intent(in) :: dataset
+        INTEGER, PARAMETER :: int_kind_8 = SELECTED_INT_KIND(9)
+        INTEGER(HSIZE_T), DIMENSION(1) :: dims
+        INTEGER(HID_T) :: dspace_id
+        INTEGER(HID_T) :: dataset_id
+        INTEGER :: status
+
+        dims = size(dataset)
+
+        CALL h5screate_simple_f(1, dims, dspace_id, status)
+        CALL h5dcreate_f(dest_id, name, h5kind_to_type(int_kind_8, H5_INTEGER_KIND), dspace_id, dataset_id, status)
+        CALL h5dwrite_f(dataset_id, h5kind_to_type(int_kind_8, H5_INTEGER_KIND), dataset, dims, status)
+
+        CALL h5dclose_f(dataset_id, status)
+        CALL h5sclose_f(dspace_id, status)
+    end subroutine h5_add_dataset_int
+
+    subroutine save_hic3d_to_hdf5(hic3d, factor, params, Niter, Nmeas, analyse_folder, chrom)
+        ! https://support.hdfgroup.org/HDF5/examples/api-fortran.html
         implicit none
         class (ModelParameters), intent(in) :: params
         ! real, intent(in), TARGET :: hic3d(:, :, :)
         integer, intent(in), TARGET :: hic3d(:, :)    ! cool like format
-        integer, intent(in) :: factor
-        integer, intent(in) :: Nmeas
+        integer, intent(in) :: factor, Niter, Nmeas
         character(*), intent(in) :: analyse_folder
-
+        character(*), intent(in) :: chrom
         integer :: hic3d_shape(2)
-        integer, parameter :: sim_resolution_kb = 2
-        integer :: resolution_kb
+        integer, parameter :: sim_resolution = 2000
+        integer :: resolution
 
         ! HDF5 support
         integer :: rc
@@ -483,76 +430,147 @@ contains
         INTEGER, PARAMETER :: int_kind_4 = SELECTED_INT_KIND(4)  !should map to INTEGER*2 on most modern processors
         INTEGER, PARAMETER :: int_kind_8 = SELECTED_INT_KIND(9)  !should map to INTEGER*4 on most modern processors
         INTEGER, PARAMETER :: int_kind_16 = SELECTED_INT_KIND(18) !should map to INTEGER*8 on most modern processors
-        CHARACTER(LEN = 10), PARAMETER :: dataset = "hic3d_cool"  ! Dataset name
-        INTEGER(HSIZE_T), DIMENSION(2) :: data_dims   ! Dataset dimensions =  (/params%Nchain, params%Nchain/)
-        INTEGER(HID_T) :: file_id       ! File identifier
-        INTEGER(HID_T) :: dset_id       ! Dataset identifier
-        INTEGER(HID_T) :: dspace_id     ! Dataspace identifier
-        INTEGER :: rank = 2                            ! Dataset rank
+        CHARACTER(LEN = 6), PARAMETER :: group_pixels = "pixels"
+        CHARACTER(LEN = 4), PARAMETER :: group_bins = "bins"
+        CHARACTER(LEN = 6), PARAMETER :: group_chroms = "chroms"
+        INTEGER(HID_T) :: file_id
+        INTEGER(HID_T) :: grp_pixels_id
+        INTEGER(HID_T) :: grp_bins_id
+        INTEGER(HID_T) :: grp_chroms_id
         INTEGER :: error ! Error flag
+        INTEGER :: bins_size, hic3d_len, I
+        logical, dimension(:), allocatable :: mask
+        integer, dimension(:), allocatable :: bin1_id, bin2_id, bin3_id
+        integer, dimension(:), allocatable :: count  ! TODO normalize it real: / Niter
+        integer, dimension(:), allocatable :: chrom_id, start_pos, end_pos
+        integer, dimension(1) :: length
 
         ! HDF5 support
         ! Initialize FORTRAN interface.
         CALL h5open_f(rc)
 
         hic3d_shape = shape(hic3d)
-        data_dims(1) = hic3d_shape(1) ! params%Nchain / factor
-        data_dims(2) = hic3d_shape(2) ! params%Nchain / factor
+        hic3d_len = hic3d_shape(1)
 
-        call log%info('Calling  save_hic3d_to_hdf5: params%Nchain=' // trim(str(params%Nchain)))
-        !data_dims(2) = params%Nchain / factor
-        ! data_dims(3) = params%Nchain / factor
+        call log%info('Calling save_hic3d_to_hdf5: analyse_folder=' // trim(analyse_folder) // &
+                ', Niter=' // trim(str0(Niter)) // ', Nmeas=' // trim(str0(Nmeas)) // ', factor=' // trim(str(factor)))
+        call log%info('in save_hic3d_to_hdf5: hic3d_len=' // trim(str(hic3d_len)))
+        call log%info('in save_hic3d_to_hdf5: params%Nchain=' // trim(str(params%Nchain)))
 
-        resolution_kb = sim_resolution_kb * factor
+        allocate (mask(hic3d_len))
+
+        ! mask = .false.
+        mask = hic3d(:,4) /= 0  ! take only non zero count pixels
+        ! base bind_ids to start_pos from 0: -1
+        bin1_id = pack(hic3d(:,1), mask) - 1
+        call log%info('in  save_hic3d_to_hdf5: pixels_dims=' // trim(str(size(bin1_id))))
+        bin2_id = pack(hic3d(:,2), mask)
+        bin2_id = bin2_id - 1
+        bin3_id = pack(hic3d(:,3), mask)
+        bin3_id = bin3_id - 1
+        count = pack(hic3d(:,4), mask)
+
+        deallocate (mask)
+
+        resolution = sim_resolution * factor
+
+        bins_size = params%Nchain / factor
+
+        allocate(chrom_id(bins_size))
+        allocate(start_pos(bins_size))
+        allocate(end_pos(bins_size))
+
+        chrom_id = 0  ! we have only one chromosome
+        start_pos = [0, (I, I = resolution, (bins_size-1)*resolution, resolution)]
+        end_pos = [resolution, (I, I = 2*resolution, bins_size*resolution, resolution)]
+        length(1) = bins_size*resolution
 
         ! output in HDF5 file
-        filename_h5 = trim(analyse_folder) // 'hic3d' // '_' // trim(str0(Nmeas)) &
-                // '_' // trim(str(resolution_kb)) //'k_cool.hdf5'
+        filename_h5 = trim(analyse_folder) // 'hic3d_' // trim(str0(Nmeas)) // '_' // &
+                trim(str(resolution/1000)) // 'k.cool3d'
 
         ! Create a new file
         CALL h5fcreate_f(filename_h5, H5F_ACC_TRUNC_F, file_id, rc)
 
-        ! Create the dataspace.
-        !
-        CALL h5screate_simple_f(rank, data_dims, dspace_id, error)
+        CALL h5gcreate_f(file_id, group_pixels, grp_pixels_id, rc)
+        CALL h5gcreate_f(file_id, group_bins, grp_bins_id, rc)
+        CALL h5gcreate_f(file_id, group_chroms, grp_chroms_id, rc)
 
-        ! Create the dataset with default properties.
-        CALL h5dcreate_f(file_id, dataset, h5kind_to_type(int_kind_8, H5_INTEGER_KIND), dspace_id, dset_id, error)
+        CALL h5_add_dataset_int(grp_pixels_id, "bin1_id", bin1_id)
+        CALL h5_add_dataset_int(grp_pixels_id, "bin2_id", bin2_id)
+        CALL h5_add_dataset_int(grp_pixels_id, "bin3_id", bin3_id)
+        CALL h5_add_dataset_int(grp_pixels_id, "count", count)
 
-        ! Write data
-        CALL h5dwrite_f(dset_id, h5kind_to_type(int_kind_8, H5_INTEGER_KIND), hic3d(:, :), data_dims, error)
+        CALL h5_add_dataset_int(grp_bins_id, "chrom", chrom_id)
+        CALL h5_add_dataset_int(grp_bins_id, "start", start_pos)
+        CALL h5_add_dataset_int(grp_bins_id, "end", end_pos)
 
-        ! Close the dataset.
-        CALL h5dclose_f(dset_id, error)
+        CALL h5_add_dataset_int(grp_chroms_id, "length", length)
+        !CALL h5_add_dataset_str(grp_chroms_id, "name", chrom)
 
-        ! Terminate access to the data space.
-        CALL h5sclose_f(dspace_id, error)
+        ! add root attributes
+        CALL h5_add_attr_int(file_id, "bin-size", sim_resolution)
+        CALL h5_add_attr_int(file_id, "nbins", bins_size)
+        CALL h5_add_attr_str(file_id, "bin-type", "fixed")
+        !CALL h5_add_attr(file_id, "nchroms", 1)
+        CALL h5_add_attr_str(file_id, "format", "HDF5:Cooler3D")
+        CALL h5_add_attr_str(file_id, "format-url", "https://gitlab.com/togop/3DPolyS-LE")
+        CALL h5_add_attr_str(file_id, "format-version", "1")
+        CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2022.1.20")
+
+        !CALL h5screate_f(H5S_SCALAR_F, dspace_attr, error)
+        !CALL h5tcopy_f(H5T_NATIVE_CHARACTER, did_atype, status)
+        !CALL h5tset_size_f(did_atype, 8, status)
+        !CALL h5tset_strpad_f(atype_id, H5T_STR_NULLTERM_F, status)
+        !CALL h5acreate_f(dset, UNITS, atype_id, space, attr_id, status)
+        !CALL h5awrite_f(attr_id, atype_id, "bin-size", dimsf, status)
+
+        CALL h5gclose_f(grp_pixels_id, error)
+        CALL h5gclose_f(grp_bins_id, error)
+        CALL h5gclose_f(grp_chroms_id, error)
 
         ! Close the file.
         CALL h5fclose_f(file_id, error)
 
-        call log%info('Saved ' // trim(filename_h5))
+        call log%info('in save_hic3d_to_hdf5: Saved ' // trim(filename_h5))
 
         ! Close FORTRAN interface.
         CALL h5close_f(error)
     end subroutine save_hic3d_to_hdf5
 
-    subroutine save_chip(chip, params, Nmeas, analyse_folder)
+    subroutine save_chip(chip, params, Nmeas, analyse_folder, chrom)
         implicit none
         class (ModelParameters), intent(in) :: params
         real :: chip(Nmeas, params%Nchain)
         integer, intent(in) :: Nmeas
         character(*), intent(in) :: analyse_folder
+        character(*), intent(in) :: chrom
+        integer, parameter :: sim_resolution = 2000
+        integer :: rc, m, i
+        character*1 :: tab = char(9)
+        integer, dimension(:), allocatable :: start_pos, end_pos
 
-        integer :: rc, i
+        allocate(start_pos(params%Nchain))
+        allocate(end_pos(params%Nchain))
+        start_pos =  [0, (i, i = sim_resolution, (params%Nchain-1)*sim_resolution, sim_resolution)]
+        end_pos = [sim_resolution, (i, i = 2*sim_resolution, params%Nchain*sim_resolution, sim_resolution)]
 
-        open(10, file = trim(analyse_folder) // 'Chip.out', action = 'write', status = 'replace', iostat = rc)
-        do i = 1, Nmeas
-            write(10, *) chip(i, :)
+        open(11, file = trim(analyse_folder) // 'chip_lef.out', action = 'write', status = 'replace', iostat = rc)
+        do m = 1, Nmeas
+            write(11, *) chip(m, :)  ! all in one file
+            ! output in bedGraph format: chrom, start, end, value
+            open(10, file = trim(analyse_folder) // 'chip_lef_' // trim(str0(m)) // '.bedGraph', &
+                    action = 'write', status = 'replace', iostat = rc)
+                do i = 1, params%Nchain
+                    write(10, *) trim(chrom) // tab // trim(str(start_pos(i))) // tab // trim(str(end_pos(i))) &
+                            // tab // trim(strff(chip(m, i), '(F8.5)'))
+                end do
+            close(10)
+            call log%info('Saved ' // trim(analyse_folder) // 'chip_lef_' // trim(str0(Nmeas)) // '.bedGraph')
         end do
-        close(10)
+        call log%info('Saved ' // trim(analyse_folder) // 'chip_lef.out')
+        close(11)
 
-        call log%info('Saved ' // trim(analyse_folder) // 'Chip.out')
     end subroutine save_chip
 
 end module analyse_mod

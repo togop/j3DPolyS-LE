@@ -26,7 +26,7 @@ module logging_mod
         procedure, public :: log, error, warn, info, debug, set_level
     end type Logger
 
-    public :: str, str0, strf, str2loglevel
+    public :: str, str0, strf, strff, str2loglevel
 
 contains
 
@@ -50,6 +50,14 @@ contains
         write (strf, *) f
         strf = adjustl(strf)
     end function strf
+
+    character(len = 20) function strff(f, format)
+        !   "Convert an float to string."
+        real, intent(in) :: f
+        character(*), intent(in) :: format
+        write (strff, format) f
+        strff = adjustl(strff)
+    end function strff
 
     subroutine set_level(self, level)
         class (Logger), intent(inout) :: self

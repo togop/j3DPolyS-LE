@@ -140,11 +140,11 @@ def main():
         logger.info(f'Hic plot file already created {hic_plot_file} so skip it')
 
     # ChIP-seq in bedGraph format
-    chip_out_file = os.path.join(args.analyse, ha.CHIP_OUT)
-    bed_graph_file = os.path.join(args.analyse, ha.CHIP_BED_GRAPH)
-    if os.path.exists(chip_out_file) and (not os.path.exists(bed_graph_file) or args.replace):
-        ha.chip_out_to_bedgraph(chip_out_file, bed_graph_file=bed_graph_file,
-                                chrom=ha.SIM_CHR, resolution=ha.SIM_RESOLUTION)
+    # chip_out_file = os.path.join(args.analyse, ha.CHIP_OUT)
+    # bed_graph_file = os.path.join(args.analyse, ha.CHIP_BED_GRAPH)
+    # if os.path.exists(chip_out_file) and (not os.path.exists(bed_graph_file) or args.replace):
+    #    ha.chip_out_to_bedgraph(chip_out_file, bed_graph_file=bed_graph_file,
+    #                            chrom=ha.SIM_CHR, resolution=ha.SIM_RESOLUTION)
 
 
 if __name__ == '__main__':
