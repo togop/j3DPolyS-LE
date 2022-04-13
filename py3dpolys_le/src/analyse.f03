@@ -78,7 +78,9 @@ contains
         open(10, file = trim(output_folder) // 'config.out', action = 'read')
         open(20, file = trim(output_folder) // 'contact.out', action = 'read')
         open(30, file = trim(output_folder) // 'dr.out', action = 'read')
-        open(40, file = trim(analyse_folder) // 'xyzconfig.out', action = 'write', status = 'replace')
+        do j = 1, Nmeas
+            open(40+j, file = trim(analyse_folder) // 'xyzconfig_'// trim(str0(j)) //'.out', action = 'write', status = 'replace')
+        end do
         config = 0
         contact = 0
         print*, 'to process total Niter: ' // trim(str(Niter)) // ', Nmeas: ' // trim(str(Nmeas))
@@ -94,12 +96,12 @@ contains
 
                 if (contact(1, 1) > 0) Chip(j, 1) = Chip(j, 1) + 1.
                 pos(:, 1) = dr1
-                write(40, *) pos(:, 1)
+                write(40+j, *) pos(:, 1)
                 do p = 2, params%Nchain
                     pos(1, p) = pos(1, p - 1) + voisxyz(1, config(2, p - 1))
                     pos(2, p) = pos(2, p - 1) + voisxyz(2, config(2, p - 1))
                     pos(3, p) = pos(3, p - 1) + voisxyz(3, config(2, p - 1))
-                    write(40, *) pos(:, p)
+                    write(40+j, *) pos(:, p)
                     if (contact(1, p) > 0) Chip(j, p) = Chip(j, p) + 1.
                 end do
                 do p = 1, params%Nchain
@@ -217,7 +219,9 @@ contains
         close(10)
         close(20)
         close(30)
-        close(40)
+        do j = 1, Nmeas
+            close(40+j)
+        end do
 
         Chip = Chip / real(Niter)
         hic = hic / real(Niter)
@@ -295,7 +299,7 @@ contains
             CALL h5_add_attr_str(file_id, "format", "HDF5:hic_matrix")
             CALL h5_add_attr_str(file_id, "format-url", "https://gitlab.com/togop/3DPolyS-LE")
             CALL h5_add_attr_str(file_id, "format-version", "1")
-            CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2022.1.20")
+            CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2022.4.13")
 
             ! Close the dataset.
             CALL h5dclose_f(dset_id, error)
@@ -516,7 +520,7 @@ contains
         CALL h5_add_attr_str(file_id, "format", "HDF5:Cooler3D")
         CALL h5_add_attr_str(file_id, "format-url", "https://gitlab.com/togop/3DPolyS-LE")
         CALL h5_add_attr_str(file_id, "format-version", "1")
-        CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2022.1.20")
+        CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2022.4.13")
 
         !CALL h5screate_f(H5S_SCALAR_F, dspace_attr, error)
         !CALL h5tcopy_f(H5T_NATIVE_CHARACTER, did_atype, status)

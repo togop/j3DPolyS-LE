@@ -69,7 +69,7 @@ PROCESS_OUT = 'process.out'
 # analyse output file
 CHIP_OUT = 'chip_lef.out'
 CHIP_BED_GRAPH = 'chip_lef.bedGraph'
-XYZCONFIG_OUT = 'xyzconfig.out'
+XYZCONFIG_OUT = 'xyzconfig_001.out'   # at least the first one
 
 ALPHA = r'$\alpha$'
 

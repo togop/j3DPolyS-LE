@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2022.1.20'
+    character(*), parameter :: VERSION = '2022.4.13'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2022.1.20'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2022.4.13'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -425,6 +425,9 @@ program mainprogram
     end if
     if (basal_loading_factor == -1) then
         call read_config('basal_loading_factor', basal_loading_factor, default=1.)
+    end if
+    if (hic3d_factor == 0) then
+        call read_config('hic3d_factor', hic3d_factor, default=0)
     end if
     if (boundary_direction < -1) then
         call read_config('boundary_direction', boundary_direction)
