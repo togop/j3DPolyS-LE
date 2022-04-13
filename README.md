@@ -20,7 +20,20 @@ Packages and libraries:
 
 Make sure you have installed or loaded the required libraries.
 
-For example on a HPC cluster (Slurm) you might need to load the following modules:
+Typically, gfortran is part of gcc.
+If missed, on a HPC cluser you can check if available and load the latest version:
+```
+module avail gcc
+module load gcc/8.2.0
+```
+On a Ubuntu/Debian Linux it can be installed like this:
+```
+sudo apt-get install gfortran
+# or
+sudo apt-get install gcc
+```
+
+For example on an HPC cluster (Slurm) you might need to load the following modules:
 
 ###### Conda (https://conda.io)
 ```
@@ -32,6 +45,10 @@ Alternative could be installation of Miniconda (https://docs.conda.io/en/latest/
 ```
 module load HDF5
 ```
+Alternatively, on a Ubuntu/Debian Linux could be installed like hits:
+```
+conda install hdf5
+```
 
 ###### MPI (Message Passing Interface)
 ```
@@ -42,12 +59,13 @@ module load OpenMPI
 module load mvapich2
 ```
 
-On Ubuntu linus could be installed like hits:
+On a Ubuntu/Debian Linux could be installed like hits:
 ```
 sudo apt-get install mpich
 ```
 
 ###### CMake (https://cmake.org/)
+On an HPC cluster (Slurm) you might need to load like this:
 ```
 module load CMake
 ```
@@ -153,6 +171,9 @@ unidirectional = false
 # analysis: experiments in silico:
 # 1.42 = 100nm
 radius_contact = 2.84
+chrom = chrX
+# optional: if present will trigger hic3d output with the given factor for a resolution reduction 
+# hic3d_factor = 5
 
 # hic-chi2-min:
 cmp_chrs=chrX,X,6
@@ -199,12 +220,21 @@ To see all supported parameters, run the following command:
 
  `3dpolys_le_runner --help`
 
+For using the Python wrapper, triggering data analysis (predicted ChIP, HiC/HiC3D, chi2-min score) steps afterwards.
+Alternatively, the simulation engine directly is also available via:
+
+  `3dpolys_le -h`
+
 Other available commands are:
 
   `3dpolys_le_stats --help`
 
   `plot_hic --help`
 
-  `plot_sijm_stats --help`
+  `plot_sim_stats --help`
+
+  `hdf5_to_cooler --help`
+
+  `hic_converters --help`
 
 
