@@ -223,6 +223,8 @@ class DccExtrusionArgs:
         if not self.cmp_chrs:
             # if nothing else final default: c.elegans chrX
             self.cmp_chrs = ha.CHR_SYNONYMS
+        else:
+            ha.CHR_SYNONYMS = self.cmp_chrs
         # self.simultaneously = simultaneously
         if self.exp_cool:
             if not os.path.exists(self.exp_cool):
@@ -538,7 +540,7 @@ class DccExtrusionRunner:
 
     @staticmethod
     def multi_decay_plot(dcc_args: DccExtrusionArgs, res, replace=False):
-        sub_folders = sorted([f.path for f in os.scandir(dcc_args.output_folder) if f.is_dir()])
+        sub_folders = [dcc_args.analyse] if dcc_args.analyse else sorted([f.path for f in os.scandir(dcc_args.output_folder) if f.is_dir()])
         plots_folder = os.path.join(dcc_args.output_folder, ha.PLOTS_FOLDER)
         if plots_folder in sub_folders:
             sub_folders.remove(plots_folder)

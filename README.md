@@ -178,7 +178,7 @@ chrom = chrX
 # hic-chi2-min:
 cmp_chrs=chrX,X,6
 exp_cool=./test/data/wt_N2_Moushumi2020_HIC1_5000.cool
-tads_boundary=./test/sip_loopanchor_boundaries.csv
+tads_boundary=py3dpolys_le/data/ce/tad_boundaries/N2.chrX.allValidPairs.hic.5-10kbLoops.bed
 ```
 
 Be aware to update properly the *[job_runner]* section according to your system environment.
@@ -202,7 +202,85 @@ cmd_prefix=sbatch --job-name=anl_3dpolys_le --time=1-00:00:00 --mem-per-cpu=16G 
 cmd_prefix=sbatch --job-name=sts_3dpolys_le --time=1-00:00:00 --mem-per-cpu=16G --nodes=1 --ntasks-per-node=1 --cpus-per-task=4 {cmd_job_dependency}
 ```
 
-To start a simulation job just run the following command:
+Configuration file sections:
+
+*3dpolys_le* comprise all parameters for running simulations and data analysis (see above).
+
+*job_runner* comprise general parameters for scheduling simulation pipeline steps:
+
+- _cmd_run_ defines how to treat the generated steps commands with valid values:
+- _shell_ : execute commands
+- _stdout_ : print out commands to the standard output
+- _file:<file_path>_ : save commands into a file. It can be overwritten by a passed 3dpolys_le_runner’s --cmd_run_file argument.
+- _jobid_re_ defines a regular expression to extract a batch job identifier out of an HPC batch runner output.
+- _cmd_job_dependency_ defines a template to add an HPC batch job dependency, where {jobid} is a placeholder for the dependency job extracted by the jobid_re regular expression.
+- _cmd_prefix_ defines the HPC batch command prefix to be used for starting a job, where {cmd_job_dependency} is a placeholder for dependency jobs as built by the cmd_job_dependency parameter.
+
+*job_runner_sim* contains general parameters for scheduling the first model simulation step:
+
+- cmd_prefix same as in the [job_runner] section but specific for this kind of jobs.
+
+*job_runner_analysis* contains general parameters for scheduling simulation output data analysis HPC batch jobs for generating predicted Chip/HiC/HiC3D data:
+
+- _cmd_prefix_ same as in the [job_runner] section but specific for such kind of HPC batch jobs.
+
+*job_runner_stats* contains general parameters for scheduling the simulation output data analysis  HPC batch jobs for calculating hic-hic2-min score and generating additional plots:
+
+- _cmd_prefix_ same as in the [job_runner] section but specific for such kind of HPC batch jobs.
+- _plot_format_ defines plot output format. Possible values supported by Python’s matplotlib like: png, tif, svg.
+- _plot_cmap_ defines plotting color pallet. Possible values supported by Python’s matplotlib like: YlGnBu, cool, hot_r, gist_heat_r, afmhot_r, YlOrRd, Greys, gist_yarg.
+
+To run each step separately on a personal computer without utilizing an HPC batch system, you can use such [job_runner*] configuration:
+
+```
+[job_runner]
+cmd_run=stdout
+
+[job_runner_sim]
+
+[job_runner_analysis]
+
+[job_runner_stats]
+
+```
+
+With such a configuration file, you can run the steps separately like this:
+
+```
+# running a simulation
+3dpolys_le -o:/paht/to/sim_output_folder /path/to/input.cfg
+
+# running analyse step: generating predicted Chip, HiC/HiC3D
+3dpolys_le -o:/paht/to/sim_output_folder -a:/paht/to/analyse_output_folder /path/to/input.cfg
+
+# running predicted data analyse step: calculating hic-chi2-min score and storing it into a file /path/to/sim_stats.csv
+3dpolys_le_stats -o /paht/to/sim_output_folder -a /paht/to/analyse_output_folder -i /path/to/input.cfg -f /path/to/sim_stats.csv
+
+# generating additional plots:  contact-decay  comparing simulation with an experimental HiC data
+3dpolys_le_runner multi_decay_plot -o /paht/to/sim_output_folder -a /paht/to/analyse_output_folder -i /path/to/input.cfg
+
+```
+
+Alternatively, you can use a singularity image https://cloud.sylabs.io/library/todor/default/py3dpolys_le to run the above commands.
+```
+singularity pull library://todor/default/py3dpolys_le:latest
+```
+Afterwards, you can run the above commands using the following prefix:
+```
+singularity exec -H $HOME py3dpolys_le_latest.sif <my 3dpolys_le command>
+```
+
+Additionally, you can add a batch command prefix to run it in your HPC like IBM’s LSF for example:
+
+```
+bsub -n 12 -R "rusage[mem=8192]"
+```
+
+Demo data and example configuration can be found here https://gitlab.com/togop/3DPolyS-LE/-/blob/master/test/demo_run_shell.cfg and the corresponding commands to run the demo https://gitlab.com/togop/3DPolyS-LE/-/blob/master/test/demo_run_commads.txt (update paths accordingly to your environment) with the needed data files in https://gitlab.com/togop/3DPolyS-LE/-/tree/master/test/data .
+Be aware, that only the single steps are supported by the singularity image for now, and NOT the scenario for running a '3dpolys_le_runner run' command (see below).
+
+
+With a properly configured input.cfg file for your HPC (so far tested only on Slurm) you can start a simulation job including all the above steps with the following command:
 
  `3dpolys_le_runner run -i my_sim_input.cfg -o ./my_sim_out`
 

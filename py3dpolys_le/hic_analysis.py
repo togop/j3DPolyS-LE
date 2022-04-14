@@ -256,18 +256,18 @@ def average_contact_prob(prob_mat, dist, plot=False, ax=plt):
 
     # probs_filtered = list(filter(lambda x: x > 0, probs)) if count > 0 and filtered else probs
     # count = len(probs_filtered)
-    avrg_prob = np.mean(probs, dtype=np.float128) if count > 0 else 0
+    avrg_prob = np.mean(probs, dtype=np.longdouble) if count > 0 else 0
     if CHI2_USE_SEM:
         sd_sem = stats.sem(probs) if count > 1 else 0
     else:
-        sd_sem = np.std(probs, dtype=np.float128) if count > 1 else 0  # np.std(probs)**2 == np.var(probs)
+        sd_sem = np.std(probs, dtype=np.longdouble) if count > 1 else 0  # np.std(probs)**2 == np.var(probs)
     if plot:
         ax.plot(x, y)
     # avrg_prob_log = -np.log(max(avrg_prob, 1.e-8)) if avrg_prob < 1. else 0
     # std_prob_log = 0.1 * avrg_prob_log
     # return avrg_prob_log, std_prob_log  # , sem
     # float128: need highest precision
-    return np.float128(avrg_prob), np.float128(sd_sem)  # std_prob  # , sem
+    return np.longdouble(avrg_prob), np.longdouble(sd_sem)  # std_prob  # , sem
 
 
 def get_chi2_dist_range(chi2_mode, res, max=None):

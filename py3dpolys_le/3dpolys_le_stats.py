@@ -78,10 +78,12 @@ def main():
         logger.info(f'Overwriting the default hic_analysis.CHR_SYNONYMS: { ",".join(args.cmp_chrs)} '
                        f'with which HiCs will be compared!')
         ha.CHR_SYNONYMS = args.cmp_chrs
+    else:
+        ha.CHR_SYNONYMS = re.split('\\s*;\\s*|\\s*,\\s*|\\s+', cfg_job_runner.get_sim_property(name='cmp_chrs'))
 
-    exp_cool = args.exp_cool
-    boundary = args.boundary
-    tads_boundary = args.tads_boundary
+    exp_cool = args.exp_cool if args.exp_cool else cfg_job_runner.get_sim_property(name='exp_cool')
+    boundary = args.boundary if args.boundary else cfg_job_runner.get_sim_property(name='boundary')
+    tads_boundary = args.tads_boundary if args.tads_boundary else cfg_job_runner.get_sim_property(name='tads_boundary')
 
     cmp_hic_file = re.sub(r'\.cool|\.mcool', '', exp_cool) if exp_cool else None  # hic to compare with
 

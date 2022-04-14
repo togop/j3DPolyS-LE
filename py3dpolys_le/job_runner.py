@@ -82,6 +82,14 @@ class CfgJobRunner(JobRunner):
         jobid_re = self.get_property(profile, 'jobid_re')
         return re.search(jobid_re, jobout)[0]
 
+    def get_sim_property(self, name):
+        value = ''
+        try:
+            value = self._config.get(CFG_SECTION_3DPOLYS_LE, name)
+        except (configparser.NoOptionError, configparser.NoSectionError) as e:
+            value = ''
+        return value
+
     def get_property(self, profile, name):
         value = ''
         if profile:
@@ -110,7 +118,7 @@ class CfgJobRunner(JobRunner):
         cmd_run = self.get_property(profile, 'cmd_run')
         if cmd_run.startswith('file:'):
             cmd_run_file = cmd_run.split(':')[1]
-            return cmd_run_file.replace('{cmd_run_file}', self.cmd_run_file)
+            return cmd_run_file  #  cmd_run_file.replace('{cmd_run_file}', self.cmd_run_file)
         return ''
 
 
