@@ -259,8 +259,6 @@ contains
         INTEGER :: rank = 2                            ! Dataset rank
         INTEGER :: error ! Error flag
 
-        ! TODO split output in different method
-
         ! HDF5 support
         ! Initialize FORTRAN interface.
         CALL h5open_f(rc)
@@ -373,23 +371,6 @@ contains
         CALL H5tclose_f(attr_type, status)
         CALL H5tclose_f(memtype, status)
 
-        ! ALT ....
-!        CALL h5screate_simple_f(rank, dimsf, dspace_attr, status)
-!        CALL h5screate_f(H5S_SCALAR_F, dspace_attr, status)
-!
-!        CALL h5tcopy_f(H5T_NATIVE_CHARACTER, attr_id, status)
-!        !CALL h5tset_size_f(attr_id, str_len, status)
-!        CALL h5tset_strpad_f(attr_id, H5T_STR_NULLTERM_F, status)
-!
-!        CALL h5acreate_f(dest_id, name, h5kind_to_type(int_kind_8, H5T_STR_NULLTERM_F), dspace_attr, attr_id, status)
-!        CALL h5awrite_f(attr_id, h5kind_to_type(int_kind_8, H5T_STR_NULLTERM_F), value, dimsf, status)
-!
-!        !CALL h5acreate_f(dset, UNITS, atype_id, space, attr_id, status)
-!        !CALL h5awrite_f(attr_id, atype_id, "bin-size", dimsf, status)
-!
-!        !CALL h5sclose_f(attr_id, status)
-!        CALL h5sclose_f(dspace_attr, status)
-
     end subroutine h5_add_attr_str
 
     subroutine h5_add_dataset_int(dest_id, name, dataset)
@@ -412,11 +393,30 @@ contains
         CALL h5sclose_f(dspace_id, status)
     end subroutine h5_add_dataset_int
 
+    subroutine h5_add_dataset_real(dest_id, name, dataset)
+        INTEGER(HID_T) :: dest_id
+        character(*), intent(in) :: name
+        real, dimension(:), intent(in) :: dataset
+        INTEGER, PARAMETER :: real_kind_7 = SELECTED_REAL_KIND(6, 37) !should map to REAL*4 on most modern processors
+        INTEGER(HSIZE_T), DIMENSION(1) :: dims
+        INTEGER(HID_T) :: dspace_id
+        INTEGER(HID_T) :: dataset_id
+        INTEGER :: status
+
+        dims = size(dataset)
+
+        CALL h5screate_simple_f(1, dims, dspace_id, status)
+        CALL h5dcreate_f(dest_id, name, h5kind_to_type(real_kind_7,H5_REAL_KIND), dspace_id, dataset_id, status)
+        CALL h5dwrite_f(dataset_id, h5kind_to_type(real_kind_7,H5_REAL_KIND), dataset, dims, status)
+
+        CALL h5dclose_f(dataset_id, status)
+        CALL h5sclose_f(dspace_id, status)
+    end subroutine h5_add_dataset_real
+
     subroutine save_hic3d_to_hdf5(hic3d, factor, params, Niter, Nmeas, analyse_folder, chrom)
         ! https://support.hdfgroup.org/HDF5/examples/api-fortran.html
         implicit none
         class (ModelParameters), intent(in) :: params
-        ! real, intent(in), TARGET :: hic3d(:, :, :)
         integer, intent(in), TARGET :: hic3d(:, :)    ! cool like format
         integer, intent(in) :: factor, Niter, Nmeas
         character(*), intent(in) :: analyse_folder
@@ -445,7 +445,7 @@ contains
         INTEGER :: bins_size, hic3d_len, I
         logical, dimension(:), allocatable :: mask
         integer, dimension(:), allocatable :: bin1_id, bin2_id, bin3_id
-        integer, dimension(:), allocatable :: count  ! TODO normalize it real: / Niter
+        real, dimension(:), allocatable :: count
         integer, dimension(:), allocatable :: chrom_id, start_pos, end_pos
         integer, dimension(1) :: length
 
@@ -472,7 +472,7 @@ contains
         bin2_id = bin2_id - 1
         bin3_id = pack(hic3d(:,3), mask)
         bin3_id = bin3_id - 1
-        count = pack(hic3d(:,4), mask)
+        count = real(pack(hic3d(:,4), mask)) / real(Niter)
 
         deallocate (mask)
 
@@ -503,14 +503,14 @@ contains
         CALL h5_add_dataset_int(grp_pixels_id, "bin1_id", bin1_id)
         CALL h5_add_dataset_int(grp_pixels_id, "bin2_id", bin2_id)
         CALL h5_add_dataset_int(grp_pixels_id, "bin3_id", bin3_id)
-        CALL h5_add_dataset_int(grp_pixels_id, "count", count)
+        CALL h5_add_dataset_real(grp_pixels_id, "count", count)
 
         CALL h5_add_dataset_int(grp_bins_id, "chrom", chrom_id)
         CALL h5_add_dataset_int(grp_bins_id, "start", start_pos)
         CALL h5_add_dataset_int(grp_bins_id, "end", end_pos)
 
         CALL h5_add_dataset_int(grp_chroms_id, "length", length)
-        !CALL h5_add_dataset_str(grp_chroms_id, "name", chrom)
+        !CALL h5_add_dataset_str(grp_chroms_id, "name", chrom)  ! TODO add chromosome name
 
         ! add root attributes
         CALL h5_add_attr_int(file_id, "bin-size", sim_resolution)
@@ -521,13 +521,6 @@ contains
         CALL h5_add_attr_str(file_id, "format-url", "https://gitlab.com/togop/3DPolyS-LE")
         CALL h5_add_attr_str(file_id, "format-version", "1")
         CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2022.4.14")
-
-        !CALL h5screate_f(H5S_SCALAR_F, dspace_attr, error)
-        !CALL h5tcopy_f(H5T_NATIVE_CHARACTER, did_atype, status)
-        !CALL h5tset_size_f(did_atype, 8, status)
-        !CALL h5tset_strpad_f(atype_id, H5T_STR_NULLTERM_F, status)
-        !CALL h5acreate_f(dset, UNITS, atype_id, space, attr_id, status)
-        !CALL h5awrite_f(attr_id, atype_id, "bin-size", dimsf, status)
 
         CALL h5gclose_f(grp_pixels_id, error)
         CALL h5gclose_f(grp_bins_id, error)
