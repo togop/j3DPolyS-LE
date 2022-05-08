@@ -65,6 +65,7 @@ From: togop/gcc_gfortran_openmpi_hdf5_python:latest
     export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
     export MANPATH=$OMPI_DIR/share/man:$MANPATH
 
+    cd /
     git clone https://gitlab.com/togop/3DPolyS-LE.git -b develop
     cd 3DPolyS-LE
     make build
