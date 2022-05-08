@@ -30,6 +30,8 @@ before_script:
     - echo "conda activate py3dpolys_le" >> ~/.bashrc
     - cat ~/.bashrc
     - source ~/.bashrc
+    - export OMPI_ALLOW_RUN_AS_ROOT=1
+    - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
 
 test:
   stage: test
