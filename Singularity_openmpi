@@ -17,16 +17,13 @@ From: togop/gcc_gfortran_openmpi_hdf5_python:latest
         hic_converters
 
 %environment
-     SINGULARITYENV_APPEND_PATH=/opt/miniconda3/bin:
-     export SINGULARITYENV_APPEND_PATH
-     export PATH=/opt/miniconda3/bin:$PATH
-     # TODO find real location
      export OMPI_ALLOW_RUN_AS_ROOT=1
      export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
      export OMPI_DIR=/opt/ompi
      export SINGULARITY_OMPI_DIR=$OMPI_DIR
-     export SINGULARITYENV_APPEND_PATH=$OMPI_DIR/bin
-     export SINGULAIRTYENV_APPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
+     export SINGULAIRTYENV_PREPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
+     export SINGULARITYENV_PREPEND_PATH=$OMPI_DIR/bin:/opt/miniconda3/bin:
+     # export PATH=$OMPI_DIR/bin:/opt/miniconda3/bin:$PATH
      # if using from the Docke image: not tested
      # export OMPI_DIR=/usr/bin
      # export SINGULARITY_OMPI_DIR=$OMPI_DIR
