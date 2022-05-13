@@ -373,15 +373,12 @@ class DccExtrusionRunner:
 
             if run_sim_or_analysis:
                 # workaround for Slurm: sbatch expect shell script. For other could be unneeded
-                # TODO find better way to separate the Slurm problem
-                cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')
-                container_prefix = self._job_runner.get_property(profile='', name='container_prefix')
-                bin3dpolys_le = pkg_resources.resource_filename(__name__, 'bin/3dpolys_le')
                 # not nice but maybe can be improved later
+                cmd_prefix = self.get_cmd_prefix(dcc_args, mpirun=True)
                 boundary_opt_f = f'-b:{boundary}' if boundary else ''   # fortran
                 lef_loading_sites_opt_f = f'-lls:{dcc_args.lef_loading_sites}' if dcc_args.lef_loading_sites else ''
                 boundary_direction_opt_f = f'-bd:{dcc_args.boundary_direction}' if dcc_args.boundary_direction is not None else ''
-                cmd = f"{cmd_sh} {container_prefix} mpirun {bin3dpolys_le} " \
+                cmd = f"{cmd_prefix} 3dpolys_le " \
                       f"-o:{dcc_args.output_folder} --km:{km} --nlef:{nlef} " \
                       f"{boundary_opt_f} {lef_loading_sites_opt_f} " \
                       f"{boundary_direction_opt_f} " \
@@ -415,9 +412,8 @@ class DccExtrusionRunner:
             boundary_opt_py = f'-b {boundary}' if boundary else ''  # python
             boundary_direction_opt_py = f'-bd {dcc_args.boundary_direction}' if dcc_args.boundary_direction is not None else ''
         # for LOCAL use something like : #
-            cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')
-            container_prefix = self._job_runner.get_property(profile='', name='container_prefix')
-            cmd = f"{cmd_sh} {container_prefix} 3dpolys_le_stats " \
+            cmd_prefix = self.get_cmd_prefix(dcc_args, mpirun=False)
+            cmd = f"{cmd_prefix} 3dpolys_le_stats " \
                   f"-o {dcc_args.output_folder} -a {analyse_folder} --km {km} --nlef {nlef} -e {exp_cool} " \
                   f"{boundary_opt_py} {boundary_direction_opt_py} " \
                   f"{t_opt} {r_opt_py} " \
@@ -426,6 +422,19 @@ class DccExtrusionRunner:
             jobid = self._job_runner.run_cmd(cmd, stats_dep_jobid, profile='stats')  # need to wait for before continue with multi-decay
 
         return jobid
+
+    def get_cmd_prefix(self, dcc_args, mpirun=False):
+        # TODO find better way to separate the Slurm problem
+        cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')  # TODO try 'cmd.sh'(setup.py), maybe not working
+        container_prefix = self._job_runner.get_property(profile='', name='container_prefix')
+        if container_prefix:
+            cmd_sh = os.path.join(dcc_args.output_folder, 'cmd.sh')
+            if not os.path.exists(cmd_sh):
+                with open(cmd_sh, 'w') as f:
+                    f.write('#! /bin/bash\n')
+                    f.write('"$@"\n')
+        cmd_prefix = f"{cmd_sh}{' mpirun' if mpirun else ''} {container_prefix}"
+        return cmd_prefix
 
     def analysis_stats(self, dcc_args: DccExtrusionArgs, new_stats=False, exp_cool=None):
         """ deprecated for new_stats=False, replaced by contact_radius_analysis()
@@ -532,9 +541,8 @@ class DccExtrusionRunner:
 
     def run_multi_decay_plot(self, dcc_args: DccExtrusionArgs, dep_jobid):
         s_cmp_chrs = f'--cmp_chrs {" ".join(dcc_args.cmp_chrs)}' if dcc_args.cmp_chrs is not None else ''
-        cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')
-        container_prefix = self._job_runner.get_property(profile='', name='container_prefix')
-        cmd = f"{cmd_sh} {container_prefix} 3dpolys_le_runner multi_decay_plot -o {dcc_args.output_folder} -i {dcc_args.input_cfg} -e {dcc_args.exp_cool}" \
+        cmd_prefix = self.get_cmd_prefix(dcc_args, mpirun=False)
+        cmd = f"{cmd_prefix} 3dpolys_le_runner multi_decay_plot -o {dcc_args.output_folder} -i {dcc_args.input_cfg} -e {dcc_args.exp_cool}" \
               f" {s_cmp_chrs}"
         return self._job_runner.run_cmd(cmd, dep_jobid)
 

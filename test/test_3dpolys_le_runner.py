@@ -84,9 +84,10 @@ def test_shell_container():
     shel_script = "./run_test_shell_container_input.sh"
     if os.path.exists(shel_script):
         os.remove(shel_script)
-    if os.path.isdir('out_test_shell_container'):
-        shutil.rmtree('out_test_shell_container')
-    cmd = "3dpolys_le_runner run -i ./test/test_shell_container_input.cfg -o out_test_shell_container " \
+    if os.path.isdir('out/test_shell_container'):
+        shutil.rmtree('out/test_shell_container')
+    os.mkdir('out/test_shell_container')  # create new
+    cmd = "3dpolys_le_runner run -i ./test/test_shell_container_input.cfg -o out/test_shell_container " \
           f"--cmd_run_file {shel_script}"
     print(f"call: {cmd}")
     subprocess.run(cmd, shell=True, check=True)
