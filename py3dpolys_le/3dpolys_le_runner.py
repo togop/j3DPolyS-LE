@@ -428,6 +428,8 @@ class DccExtrusionRunner:
         cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')  # TODO try 'cmd.sh'(setup.py), maybe not working
         container_prefix = self._job_runner.get_property(profile='', name='container_prefix')
         if container_prefix:
+            if not os.path.exists(cmd_sh):
+                os.mkdir(dcc_args.output_folder)
             cmd_sh = os.path.join(dcc_args.output_folder, 'cmd.sh')
             if not os.path.exists(cmd_sh):
                 with open(cmd_sh, 'w') as f:
