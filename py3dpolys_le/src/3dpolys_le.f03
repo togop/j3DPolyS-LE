@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2022.5'
+    character(*), parameter :: VERSION = '2022.7'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2022.5'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2022.7'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -101,7 +101,8 @@ subroutine print_help()
     print*, '<name>=<value>'
     print*, 'parameters in a configuration file (3dpolys_le.cfg):'
     print*, 'Nchain     Polymer chain length in monomers of 2kb.'
-    print*, 'L          Polymer compartment box size L (choose L so that Nchain/(4*L^3) ~ 0.5).'
+    print*, 'L          Polymer compartment box size L (choose L so that Nchain/(4*L^3) ~ 0.5), &
+            & or L=round(nthroot(Nchain, 3))'
     print*, 'Niter      Number of iterations, aka number of independent trajectories as polymer replicas.'
     print*, 'Nmeas      Number of measures >=3 (initial, burin-in, n*simulation steps, burn-out), aka number of snapshots.'
     print*, 'Ninter     Interval between measures, aka number of Monte Carlo steps (MCS) between two snapshots. &

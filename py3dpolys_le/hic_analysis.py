@@ -380,7 +380,10 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
             ax2.set_title(f'{h2_title}: \n p_i: {f_i}, \n tot_FS={tot_FS}')
             #plt.show()
             if not os.path.exists(plots_folder):
-                os.mkdir(plots_folder)
+                try:
+                    os.mkdir(plots_folder)
+                except:
+                    logger.warning(f'Meanwhile folder {plots_folder} was created, skip creating it!')
             fig_filename = os.path.join(plots_folder, f'{comp_filename}_{chi2_mode}_tad_{tad_start}-{tad_end}.png')
             logger.info(f'Save figure in file: {fig_filename}')
             fig.savefig(fig_filename)
@@ -531,7 +534,10 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
 
         # plt.show()
         if not os.path.exists(plots_folder):
-            os.mkdir(plots_folder)
+            try:
+                os.mkdir(plots_folder)
+            except:
+                logger.warning(f'Meanwhile folder {plots_folder} was created, skip creating it!')
         fig_filename = os.path.join(plots_folder, f'{comp_filename}_{"balanced" if hic_balance else ""}_{chi2_mode}.{PLOT_FORMAT}')
         logger.info(f'Save figure in file: {fig_filename}')
         fig.savefig(fig_filename, dpi=1000, format=PLOT_FORMAT)

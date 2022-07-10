@@ -36,7 +36,7 @@ class JobRunner(ABC):
             if cmd_run_file:
                 if not os.path.isfile(cmd_run_file):
                     with open(cmd_run_file, 'w') as f:
-                        print('', file=f)
+                        print('#! /bin/bash', file=f)  # TODO make ! /bin/bash directive parameterized
                 with open(cmd_run_file, 'a') as f:
                     print(full_cmd, file=f)
         return jobid

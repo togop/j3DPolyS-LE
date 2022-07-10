@@ -1,4 +1,4 @@
-
+#! /bin/bash
 sbatch --job-name=sim_3dpolys_le  out/test_shell_container/cmd.sh mpirun singularity exec -H $HOME -B .:/opt/wd $HOME/img/py3dpolys_le.sif 3dpolys_le -o:out/test_shell_container --km:0.0027 --nlef:200 -b:py3dpolys_le/data/ce/dcc_mex-sites_boundaries.csv  -bd:0 -z  -im:z  -r:2.84  ./test/test_shell_container_input.cfg
 sbatch --job-name=anl_3dpolys_le  out/test_shell_container/cmd.sh mpirun singularity exec -H $HOME -B .:/opt/wd $HOME/img/py3dpolys_le.sif 3dpolys_le -o:out/test_shell_container --km:0.0027 --nlef:200 -b:py3dpolys_le/data/ce/dcc_mex-sites_boundaries.csv  -bd:0 -z  -im:z -a:out/test_shell_container/r2.84 -r:2.84  ./test/test_shell_container_input.cfg
 sbatch --job-name=sts_3dpolys_le  out/test_shell_container/cmd.sh singularity exec -H $HOME -B .:/opt/wd $HOME/img/py3dpolys_le.sif 3dpolys_le_stats -o out/test_shell_container -a out/test_shell_container/r2.84 --km 0.0027 --nlef 200 -e ./test/data/wt_N2_Moushumi2020_HIC1_5000.cool -b py3dpolys_le/data/ce/dcc_mex-sites_boundaries.csv -bd 0  -r 2.84  -i ./test/test_shell_container_input.cfg -f ./sim_stats.csv --cmp_chrs chrX X 6

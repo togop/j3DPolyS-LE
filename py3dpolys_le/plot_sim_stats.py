@@ -119,7 +119,7 @@ def loop_radii(radii, list_nlef, color_shift, legend, subplot, z_col):
 
 
 sim_stats_all_pd = pd.read_csv(args.stats_file, delimiter=',', encoding='utf-8', header=0,
-                               dtype={'radius_contact': np.str})
+                               dtype={'radius_contact': str})
 # if you want to compare:
 # sim_stats_all_pd_2 = pd.read_csv('./sim_stats_lyon_chi2-sem.csv', delimiter=',', encoding='utf-8', header=0)
 

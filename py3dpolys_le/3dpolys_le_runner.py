@@ -435,7 +435,7 @@ class DccExtrusionRunner:
                 with open(cmd_sh, 'w') as f:
                     f.write('#! /bin/bash\n')
                     f.write('"$@"\n')
-        cmd_prefix = f"{cmd_sh}{' mpirun' if mpirun else ''} {container_prefix}"
+        cmd_prefix = f"{cmd_sh}{' mpirun' if mpirun else ''} {container_prefix}"  # TODO make 'mpirun ' parameterized
         return cmd_prefix
 
     def analysis_stats(self, dcc_args: DccExtrusionArgs, new_stats=False, exp_cool=None):

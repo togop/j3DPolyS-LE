@@ -1,4 +1,4 @@
-
+#! /bin/bash
  /builds/togop/3DPolyS-LE/py3dpolys_le/bin/cmd.sh  mpirun 3dpolys_le -o:out/test3 --km:0.0017 --nlef:100 -b:py3dpolys_le/data/ce/dcc_mex-sites_boundaries.csv  -bd:1 -z -u -im:h  -r:2.84  ./test/test_tads_shell_input.cfg
  /builds/togop/3DPolyS-LE/py3dpolys_le/bin/cmd.sh  mpirun 3dpolys_le -o:out/test3 --km:0.0017 --nlef:100 -b:py3dpolys_le/data/ce/dcc_mex-sites_boundaries.csv  -bd:1 -z -u -im:h -a:out/test3/r3.55 -r:3.55  ./test/test_tads_shell_input.cfg
  /builds/togop/3DPolyS-LE/py3dpolys_le/bin/cmd.sh  3dpolys_le_stats -o out/test3 -a out/test3/r3.55 --km 0.0017 --nlef 100 -e ./test/data/wt_N2_Moushumi2020_HIC1_5000.cool -b py3dpolys_le/data/ce/dcc_mex-sites_boundaries.csv -bd 1 -t ./test/data/N2.allValidPairs.hic.5-10kbLoops_chrX.bed -r 3.55  -i ./test/test_tads_shell_input.cfg -f ./sim_stats.csv --cmp_chrs chrX X 6 
