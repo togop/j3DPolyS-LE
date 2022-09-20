@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2022.7'
+    character(*), parameter :: VERSION = '2022.9'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2022.7'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2022.9'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -156,7 +156,7 @@ program mainprogram
 
     integer :: L, Nchain, Niter, Nmeas, Ninter, iku, ikm, ikb, Nlef = 0, burnin = 0, burnout = 0, burnoutM = 0
     !integer :: simburnin = 0, burn_Nmeas = 0
-    real :: kint, kb, ku, km = 0., Ea, kb_factor
+    real :: kint = 1.17, kb, ku, km = 0., Ea, kb_factor
 
     integer :: i, time
     !real :: pt
@@ -399,7 +399,7 @@ program mainprogram
     call read_config('Niter',    Niter)
     call read_config('Nmeas',    Nmeas)
     call read_config('Ninter',   Ninter)
-    ! call read_config('kint',     kint) ! not used
+    call read_config('kint',     kint, default=1.17)
     call read_config('kb',       kb)
     call read_config('ku',       ku)
     if (km == 0.) then
@@ -687,7 +687,7 @@ program mainprogram
     call log%info('Running simulations for rank:' // trim(str(rank)) // ' #trajectories:' // trim(str(rank_Niter)) // ' ...')
 
     params = ModelParameters(L = L, Nchain = Nchain, iku = iku, ikm = ikm, ikb = ikb, Nleffree = Nlef, &
-            kb = kb, ku = ku, km = km, Ea = Ea)
+            kb = kb, ku = ku, km = km, Ea = Ea, kint = kint)
 
     if ((rank_Niter > 0).and.(.not.do_analyse)) then
         status = SYSTEM('mkdir -p ' // trim(output_folder))

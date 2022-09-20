@@ -20,7 +20,7 @@ module PolymerModel_mod
     type PolymerModel
         private
         integer, public :: L, Nchain, iku, ikm, ikb, Nleffree
-        real, public :: kb, ku, km, Ea
+        real, public :: kb, ku, km, Ea, kint
         logical, public :: z_loop = .false.
         logical, public :: unidirectional = .false.
         ! allocatable
@@ -848,6 +848,7 @@ contains
         write(fout, '(a)') 'burnout=' // trim(str(burnout))
         write(fout, '(a)') 'burnoutM=' // trim(str(burnoutM))
 
+        write(fout, '(a)') 'kint=' // trim(strf(self%kint))
         write(fout, '(a)') '# Loop-Extrusion factors: _k? = k?**(1. / real(ik?)) > 0.001'
         write(fout, '(a)') '_kb=' // trim(strf(self%kb))
         write(fout, '(a)') '_ku=' // trim(strf(self%ku))
