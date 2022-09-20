@@ -20,7 +20,7 @@ module PolymerModel_mod
     type PolymerModel
         private
         integer, public :: L, Nchain, iku, ikm, ikb, Nleffree
-        real, public :: kb, ku, km, Ea, kint
+        real, public :: kb, ku, km, Ea, kint = 1.17
         logical, public :: z_loop = .false.
         logical, public :: unidirectional = .false.
         ! allocatable

@@ -687,7 +687,7 @@ program mainprogram
     call log%info('Running simulations for rank:' // trim(str(rank)) // ' #trajectories:' // trim(str(rank_Niter)) // ' ...')
 
     params = ModelParameters(L = L, Nchain = Nchain, iku = iku, ikm = ikm, ikb = ikb, Nleffree = Nlef, &
-            kb = kb, ku = ku, km = km, Ea = Ea, kint = kint)
+            kb = kb, ku = ku, km = km, Ea = Ea)
 
     if ((rank_Niter > 0).and.(.not.do_analyse)) then
         status = SYSTEM('mkdir -p ' // trim(output_folder))
@@ -714,7 +714,7 @@ program mainprogram
 
             !generate initial configuration
             model = PolymerModel(L = L, Nchain = Nchain, iku = iku, ikm = ikm, ikb = ikb, Nleffree = Nlef, &
-                    kb = kb, ku = ku, km = km, Ea = Ea, z_loop = z_loop, unidirectional = unidirectional)
+                    kb = kb, ku = ku, km = km, Ea = Ea, z_loop = z_loop, unidirectional = unidirectional, kint = kint)
 
             if ((rank == 0).and.(i == 1)) then                ! do it only once
                 save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')
