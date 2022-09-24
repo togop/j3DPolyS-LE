@@ -157,6 +157,7 @@ program mainprogram
     integer :: L, Nchain, Niter, Nmeas, Ninter, iku, ikm, ikb, Nlef = 0, burnin = 0, burnout = 0, burnoutM = 0
     !integer :: simburnin = 0, burn_Nmeas = 0
     real :: kint = 1.17, kb, ku, km = 0., Ea, kb_factor
+    real :: kb_a, ku_a, km_a ! keep the arguments value for logging
 
     integer :: i, time
     !real :: pt
@@ -664,6 +665,9 @@ program mainprogram
             iku = iku + 1
         end do
     end if
+    km_a = km
+    ku_a = ku
+    kb_a = kb
     km = km**(1. / real(ikm))
     ku = ku**(1. / real(iku))
     kb = kb**(1. / real(ikb))
@@ -723,7 +727,8 @@ program mainprogram
                 open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
                 call model%output_parameters(20, init_mode, boundary_file, lef_loading_sites, &
                         basal_loading_factor, boundary_direction, &
-                        Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
+                        Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact,  &
+                        km_a = km_a, ku_a = ku_a, kb_a = kb_a)
                 close(20)
             end if
 
