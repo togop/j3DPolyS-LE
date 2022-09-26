@@ -284,7 +284,8 @@ def get_chi2_dist_range(chi2_mode, res, max=None):
 
 
 def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, plots_folder, norm=True,
-                      chi2_mode=CHI2_MODE_LINEAR, hic_balance=CHI2_USE_BALANCED):
+                      chi2_mode=CHI2_MODE_LINEAR, hic_balance=CHI2_USE_BALANCED,
+                      plot_cmap=CMAP, plot_format=PLOT_FORMAT):
     h1_title = 'simulation HiC'  # hic1cooler.info
     h2_title = 'experimental HiC'  # hic1cooler.info
 
@@ -319,8 +320,8 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
             if plots_folder:
                 fig, (ax1, ax2) = plt.subplots(1, 2)
                 try:
-                    ax1.imshow(np.log10(tadi_mat1), cmap=CMAP, interpolation='nearest')
-                    ax2.imshow(np.log10(tadi_mat2), cmap=CMAP, interpolation='nearest')
+                    ax1.imshow(np.log10(tadi_mat1), cmap=plot_cmap, interpolation='nearest')
+                    ax2.imshow(np.log10(tadi_mat2), cmap=plot_cmap, interpolation='nearest')
                 except:
                     logger.warning(f'Problem to plot TAD: {tad_start}-{tad_end}')
             else:
@@ -384,9 +385,9 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
                     os.mkdir(plots_folder)
                 except:
                     logger.warning(f'Meanwhile folder {plots_folder} was created, skip creating it!')
-            fig_filename = os.path.join(plots_folder, f'{comp_filename}_{chi2_mode}_tad_{tad_start}-{tad_end}.png')
+            fig_filename = os.path.join(plots_folder, f'{comp_filename}_{chi2_mode}_tad_{tad_start}-{tad_end}.{plot_format}')
             logger.info(f'Save figure in file: {fig_filename}')
-            fig.savefig(fig_filename)
+            fig.savefig(fig_filename, format=plot_format)
             plt.close()
 
     tads_chi2_min_gr = pr.PyRanges(tads_chi2_min_df)
@@ -406,7 +407,8 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
 
 
 def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, res=RESOLUTION, tads_boundary=None,
-                           plots_folder=None, norm=True, chi2_mode=CHI2_MODE_LOG, hic_balance=CHI2_USE_BALANCED):
+                           plots_folder=None, norm=True, chi2_mode=CHI2_MODE_LOG, hic_balance=CHI2_USE_BALANCED,
+                           plot_cmap=CMAP, plot_format=PLOT_FORMAT):
     """
         Compare a simulation HiC with the first HiC from a list of experimental HiCs.
         The list experimental HiCs is used to calculate the standard deviation of the average contact probability
@@ -474,7 +476,7 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
 
     (chi2_min, alpha_min) = chi2_minimization(hic_mat1, hic2cooler, chrs, res, tads, comp_filename,
                                               plots_folder=plots_folder, norm=norm, chi2_mode=chi2_mode,
-                                              hic_balance=hic_balance)
+                                              hic_balance=hic_balance, plot_cmap=plot_cmap, plot_format=plot_format)
 
     if plots_folder:
         hic_mat1_log = np.log10(hic_mat1 * alpha_min)
@@ -505,7 +507,7 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
         plt.gca().get_xaxis().set_major_formatter(FuncFormatter(lambda x, p: int(x*res_kb)))
         plt.gca().get_yaxis().set_major_formatter(FuncFormatter(lambda y, p: int(y*res_kb)))
 
-        plt.imshow(hic_merged, cmap=CMAP, interpolation='nearest')
+        plt.imshow(hic_merged, cmap=plot_cmap, interpolation='nearest')
         plt.title(f'{h1}/{hic1_chr} vs {h2}/{exp_chr}:\n\t chi2-min={chi2_min:7.2f}, {ALPHA}={alpha_min:7.2f}')
 
         if DEFAULT_CLIM:
@@ -538,9 +540,9 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
                 os.mkdir(plots_folder)
             except:
                 logger.warning(f'Meanwhile folder {plots_folder} was created, skip creating it!')
-        fig_filename = os.path.join(plots_folder, f'{comp_filename}_{"balanced" if hic_balance else ""}_{chi2_mode}.{PLOT_FORMAT}')
+        fig_filename = os.path.join(plots_folder, f'{comp_filename}_{"balanced" if hic_balance else ""}_{chi2_mode}.{plot_format}')
         logger.info(f'Save figure in file: {fig_filename}')
-        fig.savefig(fig_filename, dpi=1000, format=PLOT_FORMAT)
+        fig.savefig(fig_filename, dpi=1000, format=plot_format)
         plt.close()
 
     logger.info(f'chi2_minimization score for {h1} and {h2} (resolution: {res}): {chi2_min},{alpha_min} on TADs: {tads_boundary}')
