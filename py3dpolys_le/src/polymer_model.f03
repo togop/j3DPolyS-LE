@@ -20,7 +20,7 @@ module PolymerModel_mod
     type PolymerModel
         private
         integer, public :: L, Nchain, iku, ikm, ikb, Nleffree
-        real, public :: kb, ku, km, Ea
+        real, public :: kb, ku, km, Ea, kint = 1.17
         logical, public :: z_loop = .false.
         logical, public :: unidirectional = .false.
         ! allocatable
@@ -816,7 +816,8 @@ contains
 
     subroutine output_parameters(self, fout, init_mode, boundary_file, lef_loading_sites, &
             basal_loading_factor, boundary_direction, &
-            Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
+            Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact, &
+            kb_a, ku_a, km_a)
         implicit none
         class (PolymerModel), intent(inout) :: self
         integer, intent(in) :: fout
@@ -832,6 +833,7 @@ contains
         integer, intent(in) :: burnout
         integer, intent(in) :: burnoutM
         real, intent(in) :: radius_contact
+        real, intent(in) :: kb_a, ku_a, km_a ! original argument's values for logging
 
         write(fout, '(a)') '[3dpolys_le]'
         write(fout, '(a)') '# polymer characteristics'
@@ -848,10 +850,15 @@ contains
         write(fout, '(a)') 'burnout=' // trim(str(burnout))
         write(fout, '(a)') 'burnoutM=' // trim(str(burnoutM))
 
-        write(fout, '(a)') '# Loop-Extrusion factors: _k? = k?**(1. / real(ik?)) > 0.001'
-        write(fout, '(a)') '_kb=' // trim(strf(self%kb))
-        write(fout, '(a)') '_ku=' // trim(strf(self%ku))
-        write(fout, '(a)') '_km=' // trim(strf(self%km))
+        write(fout, '(a)') '# Loop-Extrusion factors:'
+        write(fout, '(a)') 'kint=' // trim(strf(self%kint))
+        write(fout, '(a)') 'kb=' // trim(strf(kb_a))
+        write(fout, '(a)') 'ku=' // trim(strf(ku_a))
+        write(fout, '(a)') 'km=' // trim(strf(km_a))
+        ! write(fout, '(a)') '# _k? = k?**(1. / real(ik?)) > 0.001' ! if needed to log for debug purpose
+        ! write(fout, '(a)') '_kb=' // trim(strf(self%kb))
+        ! write(fout, '(a)') '_ku=' // trim(strf(self%ku))
+        ! write(fout, '(a)') '_km=' // trim(strf(self%km))
         write(fout, '(a)') 'Nlef=' // trim(str(self%Nleffree))
 
         write(fout, '(a)') 'boundary=' // trim(boundary_file)

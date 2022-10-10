@@ -93,14 +93,20 @@ def main():
     hic_folder = os.path.dirname(sim_hic_file)
     plots_folder = os.path.join(hic_folder, ha.PLOTS_FOLDER)
 
+    plot_cmap = cfg_job_runner.get_property(profile='stats', name='plot_cmap')
+    plot_format = cfg_job_runner.get_property(profile='stats', name='plot_format')
+
     # need only normed for chi2_log and chi2_linear and for given tads-boundary sites and 1tad(the whole chromosome)
     if exp_cool:
         (chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
                                                           res=ha.RESOLUTION, tads_boundary=tads_boundary, norm=True,
-                                                          chi2_mode=ha.CHI2_MODE_LINEAR)  # , plot=True)
+                                                          chi2_mode=ha.CHI2_MODE_LINEAR,
+                                                          plot_cmap=plot_cmap, plot_format=plot_format)
         (chi2_log, alpha_log) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
                                                           res=ha.RESOLUTION, tads_boundary=tads_boundary,
-                                                          plots_folder=plots_folder, norm=True, chi2_mode=ha.CHI2_MODE_LOG)
+                                                          plots_folder=plots_folder, norm=True,
+                                                          chi2_mode=ha.CHI2_MODE_LOG,
+                                                          plot_cmap=plot_cmap, plot_format=plot_format)
     else:
         (chi2_lin, alpha_lin) = (0, 1)
         (chi2_log, alpha_log) = (0, 1)
@@ -133,8 +139,6 @@ def main():
                  chi2_log, alpha_log, chi2_lin, alpha_lin, ha.CHR_SYNONYMS[-1]])
 
     # generate hic_*_hot_r.png plot files if not already done
-    plot_cmap = cfg_job_runner.get_property(profile='stats', name='plot_cmap')
-    plot_format = cfg_job_runner.get_property(profile='stats', name='plot_format')
     hic_plot_file = re.sub('.hdf5', f'_{plot_cmap}.{plot_format}', sim_hic_file)
     if not os.path.exists(hic_plot_file) or args.replace:
         plot_hic.run(args.analyse, resolution=ha.SIM_RESOLUTION, cmap=plot_cmap, plot_format=plot_format)

@@ -247,16 +247,19 @@ cmd_run=stdout
 With such a configuration file, you can run the steps separately like this:
 
 ```
-# running a simulation
+# 1) running a simulation
 3dpolys_le -o:/paht/to/sim_output_folder /path/to/input.cfg
 
-# running analyse step: generating predicted Chip, HiC/HiC3D
+# To get advantage of multiprocessing and parallelizing trajectory simulations, it is recommended to run this command with an MPI runner:
+mpirun 3dpolys_le -o:/path/to/sim_output_folder /path/to/input.cfg 
+
+# 2) running analyse step: generating predicted Chip, HiC/HiC3D
 3dpolys_le -o:/paht/to/sim_output_folder -a:/paht/to/analyse_output_folder /path/to/input.cfg
 
-# running predicted data analyse step: calculating hic-chi2-min score and storing it into a file /path/to/sim_stats.csv
+# 3) running predicted data analyse step: calculating hic-chi2-min score and storing it into a file /path/to/sim_stats.csv
 3dpolys_le_stats -o /paht/to/sim_output_folder -a /paht/to/analyse_output_folder -i /path/to/input.cfg -f /path/to/sim_stats.csv
 
-# generating additional plots:  contact-decay  comparing simulation with an experimental HiC data
+# 4) generating additional plots:  contact-decay  comparing simulation with an experimental HiC data
 3dpolys_le_runner multi_decay_plot -o /paht/to/sim_output_folder -a /paht/to/analyse_output_folder -i /path/to/input.cfg
 
 ```
@@ -267,17 +270,31 @@ singularity pull library://todor/default/py3dpolys_le:latest
 ```
 Afterwards, you can run the above commands using the following prefix:
 ```
-singularity exec -H $HOME py3dpolys_le_latest.sif <my 3dpolys_le command>
+singularity exec -H $HOME -B $PWD py3dpolys_le_latest.sif <my 3dpolys_le command>
 ```
+
+You might need to adjust the -B parameter to specify bind paths used in the command or the configuration.
 
 Additionally, you can add a batch command prefix to run it in your HPC like IBM’s LSF for example:
 
 ```
-bsub -n 12 -R "rusage[mem=8192]"
+bsub -n 12 -R "rusage[mem=8192]" mpirun "<my singularity 3dpolys_le command>"
+```
+
+For a SLURM HPC system, the batch command prefix could be like this:
+
+`sbatch --mem-per-cpu=8G --nodes=1 --ntasks-per-node=12 cmd.sh mpirun <my singularity 3dpolys_le command>`
+
+Where the content of the cmd.sh file, needed to overcome some SLURM constrains, is simply:
+
+```
+#! /bin/bash
+"$@"
 ```
 
 Demo data and example configuration can be found here https://gitlab.com/togop/3DPolyS-LE/-/blob/master/test/demo_run_shell.cfg and the corresponding commands to run the demo https://gitlab.com/togop/3DPolyS-LE/-/blob/master/test/demo_run_commads.txt (update paths accordingly to your environment) with the needed data files in https://gitlab.com/togop/3DPolyS-LE/-/tree/master/test/data .
-Be aware, that only the single steps are supported by the singularity image for now, and NOT the scenario for running a '3dpolys_le_runner run' command (see below).
+
+Be aware, that only the single steps are supported by the singularity image for now, and NOT all  3dpolys_le_runner’s sub-commands (i.e. '3dpolys_le_runner run|grid_nlef_km|new_stats|contact_radius_analysis'). For the unsupported commands you can use the ‘cmd_run’ option in the configuration file (cmd_run=stdout or cmd_run=file:<file_path>) to generate all step commands and execute them manually afterwards. The singularity image supports and has been tested only for OpenMPI, which needs to be available on the host machine.
 
 
 With a properly configured input.cfg file for your HPC (so far tested only on Slurm) you can start a simulation job including all the above steps with the following command:
@@ -299,6 +316,7 @@ To see all supported parameters, run the following command:
  `3dpolys_le_runner --help`
 
 For using the Python wrapper, triggering data analysis (predicted ChIP, HiC/HiC3D, chi2-min score) steps afterwards.
+
 Alternatively, the simulation engine directly is also available via:
 
   `3dpolys_le -h`

@@ -6,6 +6,7 @@ import pytest
 from py3dpolys_le import hic_analysis as ha
 
 
+# @pytest.mark.trylast
 # @pytest.mark.skip
 def test_chip_out_to_bedgraph():
     chip_out_file = './test/data/sim/Chip.out'
@@ -16,6 +17,7 @@ def test_chip_out_to_bedgraph():
     assert filecmp.cmp(chip_bedgraph_file, expected, shallow=False)
 
 
+# @pytest.mark.skip
 def test_chip_out_to_bedgraph_10kb():
     chip_out_file = './test/data/sim/Chip.out'
     chip_bedgraph_file = './out/Chip_10kb.bedGraph'

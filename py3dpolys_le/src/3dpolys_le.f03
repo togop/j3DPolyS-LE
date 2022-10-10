@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2022.4.14'
+    character(*), parameter :: VERSION = '2022.9'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2022.4.14'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2022.9'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -101,7 +101,8 @@ subroutine print_help()
     print*, '<name>=<value>'
     print*, 'parameters in a configuration file (3dpolys_le.cfg):'
     print*, 'Nchain     Polymer chain length in monomers of 2kb.'
-    print*, 'L          Polymer compartment box size L (choose L so that Nchain/(4*L^3) ~ 0.5).'
+    print*, 'L          Polymer compartment box size L (choose L so that Nchain/(4*L^3) ~ 0.5), &
+            & or L=round(nthroot(Nchain, 3))'
     print*, 'Niter      Number of iterations, aka number of independent trajectories as polymer replicas.'
     print*, 'Nmeas      Number of measures >=3 (initial, burin-in, n*simulation steps, burn-out), aka number of snapshots.'
     print*, 'Ninter     Interval between measures, aka number of Monte Carlo steps (MCS) between two snapshots. &
@@ -155,7 +156,8 @@ program mainprogram
 
     integer :: L, Nchain, Niter, Nmeas, Ninter, iku, ikm, ikb, Nlef = 0, burnin = 0, burnout = 0, burnoutM = 0
     !integer :: simburnin = 0, burn_Nmeas = 0
-    real :: kint, kb, ku, km = 0., Ea, kb_factor
+    real :: kint = 1.17, kb, ku, km = 0., Ea, kb_factor
+    real :: kb_a, ku_a, km_a ! keep the arguments value for logging
 
     integer :: i, time
     !real :: pt
@@ -398,7 +400,7 @@ program mainprogram
     call read_config('Niter',    Niter)
     call read_config('Nmeas',    Nmeas)
     call read_config('Ninter',   Ninter)
-    ! call read_config('kint',     kint) ! not used
+    call read_config('kint',     kint, default=1.17)
     call read_config('kb',       kb)
     call read_config('ku',       ku)
     if (km == 0.) then
@@ -663,6 +665,9 @@ program mainprogram
             iku = iku + 1
         end do
     end if
+    km_a = km
+    ku_a = ku
+    kb_a = kb
     km = km**(1. / real(ikm))
     ku = ku**(1. / real(iku))
     kb = kb**(1. / real(ikb))
@@ -713,7 +718,7 @@ program mainprogram
 
             !generate initial configuration
             model = PolymerModel(L = L, Nchain = Nchain, iku = iku, ikm = ikm, ikb = ikb, Nleffree = Nlef, &
-                    kb = kb, ku = ku, km = km, Ea = Ea, z_loop = z_loop, unidirectional = unidirectional)
+                    kb = kb, ku = ku, km = km, Ea = Ea, z_loop = z_loop, unidirectional = unidirectional, kint = kint)
 
             if ((rank == 0).and.(i == 1)) then                ! do it only once
                 save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')
@@ -722,7 +727,8 @@ program mainprogram
                 open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
                 call model%output_parameters(20, init_mode, boundary_file, lef_loading_sites, &
                         basal_loading_factor, boundary_direction, &
-                        Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact)
+                        Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact,  &
+                        km_a = km_a, ku_a = ku_a, kb_a = kb_a)
                 close(20)
             end if
 
