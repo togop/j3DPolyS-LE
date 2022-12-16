@@ -2,6 +2,9 @@
 
 3D Polymer Simulation of chromosome folding by modeled loop extrusion, boundary elements and loading sites.
 
+## Citing
+
+Todor Gitchev, Gabriel Zala, Peter Meister, Daniel Jost, 3DPolyS-LE: an accessible simulation framework to model the interplay between chromatin and loop extrusion, Bioinformatics, Volume 38, Issue 24, 15 December 2022, Pages 5454–5456, https://doi.org/10.1093/bioinformatics/btac705
 # Installation
 
 ### Requirements
@@ -12,10 +15,10 @@ Packages and libraries:
 - **gcc** compiler version 7.5.0 or higher;
 - **gfortran** compiler version 7.5.0 or higher;
 - **MPI** implementation like MPICH and libmpich-dev (Debian/Ubuntu) or openMPI;
-- **HDF5** libraries. Debian/Ubuntu: libhdf5-103 libhdf5-cpp-103 libhdf5-dev libhdf5-mpich-dev;
+- **HDF5** libraries. Debian/Ubuntu: libhdf5-serial-dev or libhdf5-103 libhdf5-cpp-103 libhdf5-dev libhdf5-mpich-dev;
 - **GNU make** version 3.81 or higher;
 - **CMake** version 3.15.0 or higher;
-- **Python** 3.7, all required packages are listed in the requirements.txt file and alternatively in the environment.yml file;
+- **Python** 3.7, 3.8. 3.9, all required packages are listed in the requirements.txt file and alternatively in the environment.yml file;
 - **Conda** version 4.8.2 or higher.
 
 Make sure you have installed or loaded the required libraries.
@@ -332,5 +335,11 @@ Other available commands are:
   `hdf5_to_cooler --help`
 
   `hic_converters --help`
+
+## Presentation
+
+Todor Gitchev: "Dynamic modelling of chromosome folding in C. elegans suggests in vivo z-loops formation" - INC consortium
+
+https://youtu.be/GtcMC4QTvSo
 
 
