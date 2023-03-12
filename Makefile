@@ -15,8 +15,10 @@ sif:
 	singularity build --force py3DPolyS-LE.sif Singularity
 
 install:
+	pip install -e .
+
+package:
 	python -m build
-	# pip install -e .
 
 package:
 	python -m build
