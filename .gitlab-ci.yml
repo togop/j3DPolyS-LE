@@ -101,4 +101,6 @@ singularity:
   trigger:
     include: .singularity-ci.yml
     strategy: depend
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
   resource_group: production
