@@ -91,7 +91,7 @@ chr_size = chr_x_size
 DEFAULT_CHIP_CORRELATION = 'spearmanr'
 
 PLOTS_FOLDER = 'plots'
-DEMO_CLIM = [-1, 3]
+DEMO_CLIM = [-1, 3]   # -2.75, 0]  #
 DEFAULT_CLIM = DEMO_CLIM  # just from the DEMO: TODO set DEFAULT_CLIM=None
 PLOT_COMP_TADS = False
 
@@ -365,11 +365,12 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
         tadi_chi2_min = (toti_FS - (toti_PFS ** 2 / toti_PS)) / 2 if toti_PS > 0 else -1
         if norm and tadi_norm_term:
             tadi_chi2_min = tadi_chi2_min/tadi_norm_term
-        tads_chi2_min_df = tads_chi2_min_df.append({tads_chi2_min_df.columns[0]: comp_chr,
-                                                    tads_chi2_min_df.columns[1]: tad_start,
-                                                    tads_chi2_min_df.columns[2]: tad_end,
-                                                    tads_chi2_min_df.columns[3]: tadi_chi2_min},
-                                                   ignore_index=True)
+        tads_chi2_min_df = pd.concat([tads_chi2_min_df,
+                                      pd.DataFrame({tads_chi2_min_df.columns[0]: [comp_chr],
+                                       tads_chi2_min_df.columns[1]: [tad_start],
+                                       tads_chi2_min_df.columns[2]: [tad_end],
+                                       tads_chi2_min_df.columns[3]: [tadi_chi2_min]})
+                                     ])
 
         if plots_folder and (toti_PS > 0):
             logger.info(f' tadi_chi2_min={tadi_chi2_min}')
@@ -408,7 +409,9 @@ def chi2_minimization(hic1_mat, cmp_hic_cooler, chrs, res, tads, comp_filename, 
 
 def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, res=RESOLUTION, tads_boundary=None,
                            plots_folder=None, norm=True, chi2_mode=CHI2_MODE_LOG, hic_balance=CHI2_USE_BALANCED,
-                           plot_cmap=CMAP, plot_format=PLOT_FORMAT):
+                           plot_cmap=CMAP, plot_format=PLOT_FORMAT, interaction_sites=None, lef_loading_sites=None,
+                           basal_loading_factor=None,
+                           lef_boundaries=None):
     """
         Compare a simulation HiC with the first HiC from a list of experimental HiCs.
         The list experimental HiCs is used to calculate the standard deviation of the average contact probability
@@ -512,7 +515,7 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
 
         if DEFAULT_CLIM:
             plt.clim(DEFAULT_CLIM[0], DEFAULT_CLIM[1])  # for the demo_hic # -2.75, 0) # best found for simulations
-        # cbar_h = plt.colorbar()
+        cbar_h = plt.colorbar()
 
         # hic1cooler.info['nbins'] * hic1cooler.info['bin-size']
         # chr_end = min(hic_mat1.shape[0], hic_mat2.shape[0])  # * res
@@ -533,6 +536,32 @@ def compare_hic_chromosome(hic_file, cmp_hic, hic_chrs=None, chrs=CHR_SYNONYMS, 
             if PLOT_COMP_TADS:
                 plt.plot([tad_start, tad_end, tad_end, tad_start, tad_start],
                          [tad_start, tad_start, tad_end, tad_end, tad_start], 'b--', linewidth=1, alpha=0.25)
+        x_min, x_max = plt.xlim()
+        # plot X-axis:boundaries; Y-axis: interaction sites, loading sites
+        if interaction_sites and os.path.isfile(interaction_sites):
+            int_sites_pd = pd.read_table(interaction_sites, delimiter='[,\t ;|:]', index_col=0, comment='#')
+            for index, site in int_sites_pd.iterrows():
+                position = site['position']//RESOLUTION
+                site_len = site['length']//RESOLUTION
+                plt.plot(0, position, '>', clip_on=False, color='darkgreen', markersize=1+site_len, zorder=10)
+
+        if lef_loading_sites and os.path.isfile(lef_loading_sites):
+            loading_sites_pd = pd.read_table(lef_loading_sites, delimiter='[,\t ;|:]', index_col=0, comment='#')
+            for index, site in loading_sites_pd.iterrows():
+                position = site['position']//RESOLUTION
+                site_len = site['length']//RESOLUTION
+                plt.plot(x_max, position, 'D', clip_on=False, color='cyan', markersize=1+site_len, zorder=10)
+            if basal_loading_factor:
+                basal_loading_factor = float(basal_loading_factor)
+                if basal_loading_factor > 0.:
+                    plt.vlines(x=x_max, ymin=0, ymax=x_max, color='cyan', linestyle='solid',
+                               linewidth=5*basal_loading_factor)
+
+        if lef_boundaries and os.path.isfile(lef_boundaries):
+            boundaries_pd = pd.read_table(lef_boundaries, delimiter='[,\t ;|:]', index_col=0, comment='#')
+            for index, site in boundaries_pd.iterrows():
+                position = site['midpoint']//RESOLUTION
+                plt.plot(position, 0, 'd', clip_on=False, color='slateblue', markersize=2, zorder=10)
 
         # plt.show()
         if not os.path.exists(plots_folder):

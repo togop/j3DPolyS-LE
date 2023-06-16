@@ -12,7 +12,7 @@ import re
 import numpy as np
 import pandas as pd
 import sys
-import pkg_resources
+from importlib import resources
 
 from py3dpolys_le import hic_analysis as ha
 from py3dpolys_le.job_runner import CfgJobRunner, CFG_SECTION_3DPOLYS_LE
@@ -425,7 +425,7 @@ class DccExtrusionRunner:
 
     def get_cmd_prefix(self, dcc_args, mpirun=False):
         # TODO find better way to separate the Slurm problem
-        cmd_sh = pkg_resources.resource_filename(__name__, 'bin/cmd.sh')  # TODO try 'cmd.sh'(setup.py), maybe not working
+        cmd_sh = resources.path('py3dpolys_le.bin', 'cmd.sh')  # TODO try 'cmd.sh'(setup.py), maybe not working
         container_prefix = self._job_runner.get_property(profile='', name='container_prefix')
         if container_prefix:
             cmd_sh = os.path.join(dcc_args.output_folder, 'cmd.sh')
@@ -549,7 +549,7 @@ class DccExtrusionRunner:
         return self._job_runner.run_cmd(cmd, dep_jobid)
 
     @staticmethod
-    def multi_decay_plot(dcc_args: DccExtrusionArgs, res, replace=False):
+    def multi_decay_plot(dcc_args: DccExtrusionArgs, replace=False):
         sub_folders = [dcc_args.analyse] if dcc_args.analyse else sorted([f.path for f in os.scandir(dcc_args.output_folder) if f.is_dir()])
         plots_folder = os.path.join(dcc_args.output_folder, ha.PLOTS_FOLDER)
         if plots_folder in sub_folders:
@@ -560,27 +560,32 @@ class DccExtrusionRunner:
             hic_h5_list.append(ha.get_last_hic(analysis_folder))
         hic_multi_decay_plot_log = ha.plot_distance_contact_prob_decay(hic_h5_list, exp_cool=dcc_args.exp_cool,
                                                                        output_folder=dcc_args.output_folder,
-                                                                       res=res, confidence=0., replace=replace,
+                                                                       res=dcc_args.resolution, confidence=0., replace=replace,
                                                                        chi2_mode=ha.CHI2_MODE_LOG)
         hic_multi_decay_plot_lin = ha.plot_distance_contact_prob_decay(hic_h5_list, exp_cool=dcc_args.exp_cool,
                                                                        output_folder=dcc_args.output_folder,
-                                                                       res=res, confidence=0., replace=replace,
+                                                                       res=dcc_args.resolution, confidence=0., replace=replace,
                                                                        chi2_mode=ha.CHI2_MODE_LINEAR)
 
     @staticmethod
-    def multi_decay_exps_plot(exp_cools, output_folder, res, hic_chrs=None, tads=None, plot_format=ha.PLOT_FORMAT,
-                              replace=False):
+    def multi_decay_exps_plot(dcc_args: DccExtrusionArgs, exp_cools, hic_chrs=None,
+                              plot_format=ha.PLOT_FORMAT, replace=False):
+        output_folder = dcc_args.output_folder
         if output_folder and not os.path.exists(output_folder):
             os.mkdir(output_folder)
         hic_multi_decay_plot_log = ha.plot_distance_contact_prob_decay(exp_cools[1:], hic_chrs=hic_chrs,
-                                                                       exp_cool=exp_cools[0], tads=tads,
-                                                                       output_folder=output_folder, res=res,
+                                                                       exp_cool=exp_cools[0],
+                                                                       tads=dcc_args.tads_boundary,
+                                                                       output_folder=output_folder,
+                                                                       res=dcc_args.resolution,
                                                                        confidence=0., replace=replace,
                                                                        chi2_mode=ha.CHI2_MODE_LOG,
                                                                        format=plot_format)
         hic_multi_decay_plot_lin = ha.plot_distance_contact_prob_decay(exp_cools[1:], hic_chrs=hic_chrs,
-                                                                       exp_cool=exp_cools[0], tads=tads,
-                                                                       output_folder=output_folder, res=res,
+                                                                       exp_cool=exp_cools[0],
+                                                                       tads=dcc_args.tads_boundary,
+                                                                       output_folder=output_folder,
+                                                                       res=dcc_args.resolution,
                                                                        confidence=0., replace=replace,
                                                                        chi2_mode=ha.CHI2_MODE_LINEAR,
                                                                        format=plot_format)
@@ -622,7 +627,7 @@ class DccExtrusionRunner:
                                                                           format=plot_format)
 
     @staticmethod
-    def chip_seq_plots(dcc_args: DccExtrusionArgs, resolution, correlation=ha.DEFAULT_CHIP_CORRELATION, replace=True):
+    def chip_seq_plots(dcc_args: DccExtrusionArgs, correlation=ha.DEFAULT_CHIP_CORRELATION, replace=True):
         sim_stats_pd = DccExtrusionRunner.read_stats_file(dcc_args.stats_file)
         exp_chip = dcc_args.exp_chip
         for index, sim in sim_stats_pd.iterrows():
@@ -633,6 +638,7 @@ class DccExtrusionRunner:
             dcc_args.output_folder = os.path.dirname(hic_h5)  # output_folder = sim['output_folder']  # maybe this way
             chip_out_file = os.path.join(dcc_args.output_folder, ha.CHIP_OUT)
             boundary = dcc_args.boundary
+            resolution =dcc_args.resolution
 
             if not os.path.exists(chip_out_file):
                 logger.error(f'Output simulation data file {chip_out_file} is missing so skip it!')
@@ -688,15 +694,14 @@ def main():
     elif args.run_command == 'decay_plots':
         dcc_run.decay_plots(dcc_args, res=args.resolution, plot_format=plot_format, replace=args.replace, use_threading=args.threading)
     elif args.run_command == 'chip_seq_plots':
-        dcc_run.chip_seq_plots(dcc_args, resolution=args.resolution, correlation=args.correlation, replace=args.replace)
+        dcc_run.chip_seq_plots(dcc_args, correlation=args.correlation, replace=args.replace)
     elif args.run_command == 'contact_radius_analysis':
         dcc_run.contact_radius_analysis(dcc_args, radii=args.list_contact_radii)
     elif args.run_command == 'multi_decay_plot':
-        dcc_run.multi_decay_plot(dcc_args, res=args.resolution, replace=args.replace)
+        dcc_run.multi_decay_plot(dcc_args, replace=args.replace)
     elif args.run_command == 'multi_decay_exps_plot':
-        dcc_run.multi_decay_exps_plot(args.exp_cools, args.output_folder, hic_chrs=args.hic_chrs,
-                                      tads=args.tads_boundary, res=args.resolution, plot_format=plot_format,
-                                      replace=args.replace)
+        dcc_run.multi_decay_exps_plot(dcc_args, args.exp_cools, hic_chrs=args.hic_chrs,
+                                      plot_format=plot_format, replace=args.replace)
     elif args.run_command == 'run':
         dcc_run.run(dcc_args, radii=args.list_contact_radii, replace=args.replace)
 

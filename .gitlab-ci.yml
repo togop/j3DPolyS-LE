@@ -1,35 +1,37 @@
 #  gitlab-runner register
 # https://gitlab.com/
 # locally run it with:  gitlab-runner exec docker test
+#   troubleshooting: sudo ln -s "$HOME/.docker/run/docker.sock" /var/run/docker.sock
+# docker run -d --name gitlab-runner --restart always -v /srv/gitlab-runner/config:/etc/gitlab-runner -v /var/run/docker.sock:/var/run/docker.sock gitlab/gitlab-runner:latest
 # how to test locally: https://medium.com/@umutuluer/how-to-test-gitlab-ci-locally-f9e6cef4f054
 
 stages:
 #  - build
   - test
+  - publish
   - production
 
 image:
-  togop/gcc_gfortran_openmpi_hdf5_python:latest
+  togop/gcc_gfortran_openmpi_hdf5_python_mamba:2023-06-16
 
 before_script:
+    # - apt-get update
     - echo "$SYLABS_TOKEN"
-    #- echo "$SYLABS_TOKEN_VAR"
-    #- cat "$SYLABS_TOKEN"
-    - echo "PATH=$PATH:/opt/miniconda3/bin/" >> ~/.bashrc
+    - echo "PATH=$PATH:/opt/mambaforge/bin/" >> ~/.bashrc
     - source ~/.bashrc
-    - conda init bash
+    - mamba update -n base mamba
+    - mamba init bash
     - source ~/.bashrc
-    - make env
-    - conda activate py3dpolys_le
-    #- apt-get update
-    #- apt-get install --yes python3-pip
+    - python --version
+    - pip --version
+    - mamba --version
+    #- make env
+    - mamba install -y -q cooler pyranges -c bioconda
+    - mamba install -y -q numpy pandas matplotlib scipy dask h5py filelock seaborn -c conda-forge
+    - mamba install -y -q build
+    - mamba install -y -q cmake
     #- python -m ensurepip --upgrade
-    #- curl https://bootstrap.pypa.io/get-pip.py | python3
-    #- python3 -m pip install -U setuptools
     - make all
-    - echo "conda activate py3dpolys_le" >> ~/.bashrc
-    - cat ~/.bashrc
-    - source ~/.bashrc
     - export OMPI_ALLOW_RUN_AS_ROOT=1
     - export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
 
@@ -66,6 +68,31 @@ test:
     - ./test/test.sh ./out-8860/r2.84/hic_002_hot_r.png
     - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5.10000_decay_probs_lin.txt
     - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5.10000_decay_probs_log.txt
+
+publish_pypi_develop:
+  stage: publish
+  needs: [test]
+  script:
+    - pip install build twine
+    - cat "${PYPIRC}" > ~/.pypirc
+    - python -m build
+    - python setup.py bdist_wheel --plat-name manylinux1-x86_64
+    - twine upload --repository testpypi dist/* --skip-existing --verbose --config-file ~/.pypirc
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
+
+# not yet ready
+#publish_pypi_master:
+#  stage: publish
+#  needs: [test]
+#  script:
+#    - pip install build twine
+#    - cat "${PYPIRC}" > ~/.pypirc
+#    - python -m build
+#    - python setup.py bdist_wheel --plat-name manylinux1-x86_64
+#    - twine upload dist/* --skip-existing --verbose --config-file ~/.pypirc
+#  rules:
+#    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 singularity:
   stage: production

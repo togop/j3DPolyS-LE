@@ -1,3 +1,78 @@
 [build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ['setuptools', 'sphinx', 'sphinx-argparse', 'sphinx-argparse-cli']   # , "wheel"]
+build-backend = 'setuptools.build_meta'
+#build-backend = "hatchling.build"
+
+[project]
+name = 'py3dpolys_le'
+version = '2023.5'
+description = '3D Polymer Simulations - Loop Extrusion model'
+readme = "README.md"
+requires-python = '>=3.10'
+license = {text = 'MIT'}
+authors = [
+    {name = 'Todor Gitchev' ,  email = 'todor.gitchev@gmail.com'},
+    {name = 'Daniel Jost', email = 'daniel.jost@ens-lyon.fr'},
+]
+keywords = [ 'polymer', 'chromosome', '3D', 'dynamics', 'simulations', 'loop-extrusion']
+classifiers = [
+    'Development Status :: 5 - Production/Stable',
+    'License :: OSI Approved :: MIT License',
+    'Programming Language :: Fortran',
+    'Programming Language :: Python :: 3.10',
+    'Intended Audience :: Science/Research',
+    'Topic :: Scientific/Engineering :: Bio-Informatics',
+    'Operating System :: MacOS',   # --plat-name macosx-11-arm64 macosx_10_9_arm64
+    'Operating System :: POSIX :: Linux'  # --plat-name manylinux1_x86_64
+   # 'Environment :: MacOS X'
+]
+dependencies = [
+    'cooler',
+    'pyranges',
+    'dask',
+    'numpy',
+    'cython',
+    'pandas',
+    'matplotlib',
+    'scipy',
+    'filelock',
+    'h5py',
+    'seaborn',
+]
+
+[tool.setuptools]
+include-package-data = true
+zip-safe = true
+
+[tool.setuptools.dynamic]
+version = {attr = 'py3dpolys_le._version.__version__'}
+readme = {file = ['README.md'], content-type = 'text/markdown'}
+dependencies = {file = ['requirements_dev.txt']}
+
+[tool.setuptools.packages.find]
+#where = ["."]  # ["."] by default
+#include = ["py3dpolys_le*"]  # ["*"] by default
+exclude = ["test*"]  # em
+namespaces = false
+
+[project.optional-dependencies]
+dev = ["pip-tools", "pytest", "pytest-flake8", "pytest-cov"]
+
+[project.scripts]
+3dpolys_le = "py3dpolys_le._3dpolys_le:main"
+3dpolys_le_runner = 'py3dpolys_le._3dpolys_le_runner:main'
+3dpolys_le_stats = 'py3dpolys_le._3dpolys_le_stats:main'
+plot_hic = 'py3dpolys_le.plot_hic:main'
+plot_sim_stats = 'py3dpolys_le.plot_sim_stats:main'
+hdf5_to_cooler = 'py3dpolys_le.hic_converters:hdf5_to_cooler'
+hic_converters = 'py3dpolys_le.hic_converters:main'
+
+[project.urls]
+repository = "https://gitlab.com/togop/3DPolyS-LE"
+Homepage = "https://gitlab.com/togop/3DPolyS-LE"
+
+[tool.distutils.bdist_wheel]
+#universal = true
+
+[tool.isort]
+

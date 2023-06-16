@@ -9,7 +9,7 @@ debug:
 	cmake --build cmake-build-debug --target 3dpolys_le -- -j 6
 
 env:
-	conda env create -f environment.yml
+	mamba env create -f environment.yml
 
 sif:
 	singularity build --force py3DPolyS-LE.sif Singularity
@@ -17,13 +17,16 @@ sif:
 install:
 	pip install -e .
 
+package:
+	python -m build
+
 doc:
 	sphinx-build -b html doc build_doc
 
 test:
 	# under construction
-	conda install pytest
-	conda install pytest-cov
+	mamba install -y -q pytest
+	mamba install -y -q pytest-cov
 	pytest --cov=py3dpolys_le test/
 
 uninstall:

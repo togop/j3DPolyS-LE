@@ -82,6 +82,9 @@ def main():
         ha.CHR_SYNONYMS = re.split('\\s*;\\s*|\\s*,\\s*|\\s+', cfg_job_runner.get_sim_property(name='cmp_chrs'))
 
     exp_cool = args.exp_cool if args.exp_cool else cfg_job_runner.get_sim_property(name='exp_cool')
+    interaction_sites = cfg_job_runner.get_sim_property(name='interaction_sites')
+    lef_loading_sites = cfg_job_runner.get_sim_property(name='lef_loading_sites')
+    basal_loading_factor = cfg_job_runner.get_sim_property(name='basal_loading_factor')
     boundary = args.boundary if args.boundary else cfg_job_runner.get_sim_property(name='boundary')
     tads_boundary = args.tads_boundary if args.tads_boundary else cfg_job_runner.get_sim_property(name='tads_boundary')
 
@@ -101,12 +104,20 @@ def main():
         (chi2_lin, alpha_lin) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
                                                           res=ha.RESOLUTION, tads_boundary=tads_boundary, norm=True,
                                                           chi2_mode=ha.CHI2_MODE_LINEAR,
-                                                          plot_cmap=plot_cmap, plot_format=plot_format)
+                                                          plot_cmap=plot_cmap, plot_format=plot_format,
+                                                          interaction_sites=interaction_sites,
+                                                          lef_loading_sites=lef_loading_sites,
+                                                          basal_loading_factor=basal_loading_factor,
+                                                          lef_boundaries=boundary)
         (chi2_log, alpha_log) = ha.compare_hic_chromosome(sim_hic_file, cmp_hic_file, chrs=ha.CHR_SYNONYMS,
                                                           res=ha.RESOLUTION, tads_boundary=tads_boundary,
                                                           plots_folder=plots_folder, norm=True,
                                                           chi2_mode=ha.CHI2_MODE_LOG,
-                                                          plot_cmap=plot_cmap, plot_format=plot_format)
+                                                          plot_cmap=plot_cmap, plot_format=plot_format,
+                                                          interaction_sites=interaction_sites,
+                                                          lef_loading_sites=lef_loading_sites,
+                                                          basal_loading_factor=basal_loading_factor,
+                                                          lef_boundaries=boundary)
     else:
         (chi2_lin, alpha_lin) = (0, 1)
         (chi2_log, alpha_log) = (0, 1)

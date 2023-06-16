@@ -1,12 +1,14 @@
 import os
-import pkg_resources
+from importlib import resources
 # import subprocess
 import sys
 
 
 def main():
-    bin_3dpolys_le = pkg_resources.resource_filename(__name__, 'bin/3dpolys_le')
-    os.system(bin_3dpolys_le + " " + " ".join(sys.argv[1:]))
+    bin_3dpolys_le = resources.path('py3dpolys_le.bin', '3dpolys_le')
+    cmd = str(bin_3dpolys_le) + " " + " ".join(sys.argv[1:])
+    print(f'cmd:{cmd}')
+    os.system(cmd)
     # status, jobout = subprocess.getstatusoutput(bin_3dpolys_le + " ".join(sys.argv[1:]))
     # print(jobout)
 

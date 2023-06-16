@@ -13,14 +13,14 @@ module PolymerModel_mod
     type ModelParameters
         private
         integer, public :: L, Nchain, iku, ikm, ikb, Nleffree
-        real, public :: kb, ku, km, Ea
+        real, public :: kb, ku, km, Ea, Ei
         ! integer, public :: Niter, Nmeas, Ninter, kint  ! not used
     end type ModelParameters
 
     type PolymerModel
         private
         integer, public :: L, Nchain, iku, ikm, ikb, Nleffree
-        real, public :: kb, ku, km, Ea, kint = 1.17
+        real, public :: kb, ku, km, Ea, Ei, kint = 1.17
         logical, public :: z_loop = .false.
         logical, public :: unidirectional = .false.
         ! allocatable
@@ -30,6 +30,7 @@ module PolymerModel_mod
         integer, dimension(:, :), allocatable :: contact
         real, dimension(:, :), allocatable :: boundary
         real, dimension(:), allocatable :: loading_sites_factor
+        integer, dimension(:), allocatable :: interaction_sites_state
 
     contains
         procedure, public :: init, do_simulation, trialmoveex, trialmovetad, trialbound, trialunbound, unbound_all, &
@@ -40,12 +41,14 @@ module PolymerModel_mod
 
 contains
 
-    subroutine init(self, boundary, loading_sites_factor, init_mode)
+    subroutine init(self, boundary, loading_sites_factor, interaction_sites_state, init_mode)
         implicit none
         class (PolymerModel), intent(inout) :: self
         real, dimension(:, :) :: boundary
         real, dimension(:) :: loading_sites_factor
+        integer, dimension(:) :: interaction_sites_state
         character(len = 1), intent(in) :: init_mode
+        !integer :: i
 
         call log%set_level(global_log_level)
 
@@ -53,7 +56,15 @@ contains
 
         self%boundary = boundary
         self%loading_sites_factor = loading_sites_factor
+        self%interaction_sites_state = interaction_sites_state
         !print*, 'initialize boundary ', shape(boundary), shape(self%boundary)
+
+        !display interaction states
+        !do i = 1, self%Nchain
+        !    if (self%interaction_sites_state(i) > 0) then
+        !        call log%info('interaction_site['// trim(str(i)) // ']='// trim(str(self%interaction_sites_state(i))))
+        !    end if
+        !end do
 
         call self%initbitable()
         call log%info('init_mode ' // init_mode)
@@ -87,11 +98,12 @@ contains
 
         ! call deallocate(self) ! make sure it's free
         allocate (self%config(2, self%Nchain))
-        allocate (self%bittable(13, bittable_t))
+        allocate (self%bittable(14, bittable_t))
         allocate (self%dr(3, self%Nchain))
         allocate (self%contact(3, self%Nchain))
         allocate (self%boundary(2, self%Nchain))
         allocate (self%loading_sites_factor( self%Nchain))
+        allocate (self%interaction_sites_state( self%Nchain))
 
         return
     end subroutine allocate
@@ -105,6 +117,8 @@ contains
         if (allocated(self%dr)) deallocate(self%dr)
         if (allocated(self%contact)) deallocate(self%contact)
         if (allocated(self%boundary)) deallocate(self%boundary)
+        if (allocated(self%loading_sites_factor)) deallocate(self%loading_sites_factor)
+        if (allocated(self%interaction_sites_state)) deallocate(self%interaction_sites_state)
     end subroutine deallocate
 
     subroutine initbitable(self)
@@ -117,6 +131,7 @@ contains
         ! include 'global.f03'
 
         !initialize the bittable (periodic boundary conditions) bittable(1,a)=number of monomers on lattice node a, bittable(2:13,a)=adresses of the 12 NN
+        self%bittable = 0
         L2 = self%L ** 2
         call log%debug('initialize the bittable (periodic boundary conditions) for L: ' // trim(str(self%L)))
         call crono%Tic()
@@ -132,12 +147,12 @@ contains
                 xp = x + voisxyz(1, v + 1)
                 yp = y + voisxyz(2, v + 1)
                 zp = z + voisxyz(3, v + 1)
-                if (xp.ge.self%L) xp = xp - self%L
-                if (xp.lt.0) xp = xp + self%L
-                if (yp.ge.self%L) yp = yp - self%L
-                if (yp.lt.0) yp = yp + self%L
-                if (zp.ge.self%L) zp = zp - self%L
-                if (zp.lt.0) zp = zp + self%L
+                if (xp >= self%L) xp = xp - self%L
+                if (xp < 0) xp = xp + self%L
+                if (yp >= self%L) yp = yp - self%L
+                if (yp < 0) yp = yp + self%L
+                if (zp >= self%L) zp = zp - self%L
+                if (zp < 0) zp = zp + self%L
                 ip = int(xp) + 1
                 jp = int(2 * yp + 1)
                 kp = int(2 * zp + 1)
@@ -212,6 +227,20 @@ contains
                 n = n + 1
             end if
         end do
+
+        !!! NEW: Interaction state
+        self%bittable(14,:)=0
+        do n=1, self%Nchain
+            if (self%interaction_sites_state(n).gt.0) then
+                a=self%config(1,n)
+                self%bittable(14,a)=self%bittable(14,a)+1
+                do v=1,12
+                    b=self%bittable(v+1,a)
+                    self%bittable(14,b)=self%bittable(14,b)+1
+                end do
+            end if
+        end do
+        !!!!!!!!!!!!!!!!!!!!!!!!!
 
         return
 
@@ -305,6 +334,20 @@ contains
                 n = n + 1
             end if
         end do
+
+        !!! NEW: Interaction state
+        self%bittable(14,:)=0
+        do n=1, self%Nchain
+            if (self%interaction_sites_state(n).gt.0) then
+                a=self%config(1,n)
+                self%bittable(14,a)=self%bittable(14,a)+1
+                do v=1,12
+                    b=self%bittable(v+1,a)
+                    self%bittable(14,b)=self%bittable(14,b)+1
+                end do
+            end if
+        end do
+        !!!!!!!!!!!!!!!!!!!!!!!!!
 
         return
 
@@ -436,13 +479,23 @@ contains
 
         ! include 'global.f03'
 
-        integer :: n, iv, v, b, nv1, nv2, nm2, np1, en, cn2, cn3, cm2, en2, id, cc
+        integer :: n, iv, v, b, j, nv1, nv2, nm2, np1, en, cn2, cn3, cm2, en2, id, cc, a
         real :: dE
         real*8 :: randomnumber
 
         !choose randomly a monomer
         n = int(self%Nchain * randomnumber()) + 1
         en = self%config(1, n)
+
+        !display interaction states
+        !do iv = 1, self%Nchain
+        !    if (self%interaction_sites_state(iv) > 0) then
+        !        call log%info('interaction_site['// trim(str(iv)) // ']='// trim(str(self%interaction_sites_state(iv))))
+        !    end if
+        !end do
+        !if (self%interaction_sites_state(n) > 0) then
+        !    call log%info('interaction_site['// trim(str(n)) // ']='// trim(str(self%interaction_sites_state(n))))
+        !end if
 
         !test if allowed moved and move
         if (n.eq.1) then
@@ -469,7 +522,6 @@ contains
                 id = self%contact(1, n)
                 cn2 = self%config(2, 1)
                 cn3 = self%contact(2, n)
-                ! TODO ckeck with Daniel if this is a propper bugfix
                 if (cn3.eq.0) then
                     cc = 0
                 else
@@ -477,6 +529,16 @@ contains
                 end if
                 if ((id.ne.0).and.(cc.eq.0)) return
                 dE = costhet(opp(iv), self%config(2, 2)) - costhet(cn2, self%config(2, 2))
+
+                !!! NEW: Interaction state
+                if (self%interaction_sites_state(n).gt.0) then
+                    dE = dE + self%Ei*(self%bittable(14, v) - self%bittable(14, en))
+                    !call log%info('NEW: Interaction state[' // trim(str(n)) // ']: Ei: ' // trim(strf(real(self%Ei))) &
+                    !        // ', dE: ' // trim(strf(dE)))
+                !else
+                !    call log%info('NO: Interaction state[' // trim(str(n)) // ']')
+                end if
+                !!!!!!!!!!!!
 
                 if ((self%contact(3, n).eq.-1).and.(id.lt.self%Nchain)) then
                     if (connec(opp(self%contact(2, n)), self%config(2, id), 1).ne.0) dE = dE - self%Ea
@@ -490,8 +552,18 @@ contains
 
                 if (randomnumber().lt.exp(-dE)) then
                     self%bittable(1, en) = self%bittable(1, en) - 1
-
                     self%bittable(1, v) = self%bittable(1, v) + 1
+
+                    !!! NEW: Interaction state
+                    self%bittable(14, en) = self%bittable(14, en) - 1
+                    self%bittable(14, v) = self%bittable(14, v) + 1
+                    do j=2,13
+                        a=self%bittable(j, en)
+                        self%bittable(14, a) = self%bittable(14, a) - 1
+                        a=self%bittable(j, v)
+                        self%bittable(14, a) = self%bittable(14, a) + 1
+                    end do
+                    !!!!!!!!!!!!
 
                     self%config(1, 1) = v
                     self%config(2, 1) = opp(iv)
@@ -541,6 +613,16 @@ contains
                 if ((id.ne.0).and.(cc.eq.0)) return
                 dE = costhet(self%config(2, self%Nchain - 2), iv) - costhet(self%config(2, self%Nchain - 2), cn2)
 
+                !!! NEW: Interaction state
+                if (self%interaction_sites_state(n).gt.0) then
+                    dE = dE + self%Ei*(self%bittable(14, v) - self%bittable(14, en))
+                    !call log%info('NEW2: Interaction state[' // trim(str(n)) // ']: Ei: ' // trim(strf(real(self%Ei))) &
+                    !        // ', dE: ' // trim(strf(dE)))
+                !else
+                !    call log%info('NO: Interaction state[' // trim(str(n)) // ']')
+                end if
+                !!!!!!!!!!!!
+
                 if ((self%contact(3, n).eq.1).and.(id.gt.1)) then
                     if (connec(self%contact(2, n), opp(self%config(2, id - 1)), 1).ne.0) dE = dE - self%Ea
                     if (connec(cc, opp(self%config(2, id - 1)), 1).ne.0) dE = dE + self%Ea
@@ -553,8 +635,18 @@ contains
 
                 if (randomnumber().lt.exp(-dE)) then
                     self%bittable(1, en) = self%bittable(1, en) - 1
-
                     self%bittable(1, v) = self%bittable(1, v) + 1
+
+                    !!! NEW: Interaction state
+                    self%bittable(14, en) = self%bittable(14, en) - 1
+                    self%bittable(14, v) = self%bittable(14, v) + 1
+                    do j=2,13
+                        a = self%bittable(j, en)
+                        self%bittable(14, a) = self%bittable(14, a) - 1
+                        a = self%bittable(j, v)
+                        self%bittable(14, a) = self%bittable(14, a) + 1
+                    end do
+                    !!!!!!!!!!!!
 
                     self%config(1, self%Nchain) = v
                     self%config(2, self%Nchain - 1) = iv
@@ -593,7 +685,6 @@ contains
                     !print*, 'id, n, nv1, cm2, contact(2, n): ', id, n, nv1, cm2, cn3
                     !print*, 'shape(connec): ', shape(connec)
                     ! why self%contact(2, n)=0 and is a problem: only if you add -fbounds-check
-                    ! TODO ckeck with Daniel if this is a propper bugfix
                     if (cn3.eq.0) then
                         cc = 0
                     else
@@ -611,6 +702,14 @@ contains
                         dE = costhet(self%config(2, nm2), nv1) + costhet(nv1, nv2) + costhet(nv2, self%config(2, np1)) &
                                 - costhet(self%config(2, nm2), cm2) - costhet(cm2, cn2) - costhet(cn2, self%config(2, np1))
                     end if
+
+                    !!! NEW: Interaction state
+                    if (self%interaction_sites_state(n).gt.0) then
+                        dE = dE + self%Ei*(self%bittable(14, v) - self%bittable(14, en))
+                        !call log%info('NEW3: Interaction state[' // trim(str(n)) // ']Ei:' // trim(strf(real(self%Ei))) &
+                        !        // ', dE: ' // trim(strf(dE)))
+                    end if
+                    !!!!!!!!!!!!
 
                     if ((self%contact(3, n).eq.-1).and.(id.lt.self%Nchain)) then
                         if (connec(opp(self%contact(2, n)), self%config(2, id), 1).ne.0) dE = dE - self%Ea
@@ -631,8 +730,18 @@ contains
 
                     if (randomnumber().lt.exp(-dE)) then
                         self%bittable(1, en) = self%bittable(1, en) - 1
-
                         self%bittable(1, v) = self%bittable(1, v) + 1
+
+                        !!! NEW: Interaction state
+                        self%bittable(14, en) = self%bittable(14, en) - 1
+                        self%bittable(14, v) = self%bittable(14, v) + 1
+                        do j=2,13
+                            a = self%bittable(j, en)
+                            self%bittable(14, a) = self%bittable(14, a) - 1
+                            a = self%bittable(j, v)
+                            self%bittable(14, a) = self%bittable(14, a) + 1
+                        end do
+                        !!!!!!!!!!!!
 
                         self%config(1, n) = v
                         self%config(2, n - 1) = nv1
@@ -814,7 +923,7 @@ contains
         return
     end subroutine
 
-    subroutine output_parameters(self, fout, init_mode, boundary_file, lef_loading_sites, &
+    subroutine output_parameters(self, fout, init_mode, interaction_sites, boundary_file, lef_loading_sites, &
             basal_loading_factor, boundary_direction, &
             Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact, &
             kb_a, ku_a, km_a)
@@ -822,6 +931,7 @@ contains
         class (PolymerModel), intent(inout) :: self
         integer, intent(in) :: fout
         character(len = 1), intent(in) :: init_mode
+        character(*), intent(in) :: interaction_sites
         character(*), intent(in) :: boundary_file
         character(*), intent(in) :: lef_loading_sites
         real, intent(in) :: basal_loading_factor
@@ -840,6 +950,8 @@ contains
         write(fout, '(a)') 'Nchain=' // trim(str(self%Nchain))
         write(fout, '(a)') 'L=' // trim(str(self%L))
         write(fout, '(a)') 'Ea=' // trim(strf(self%Ea))
+        write(fout, '(a)') 'Ei=' // trim(strf(self%Ei))
+        write(fout, '(a)') 'interaction_sites=' // trim(interaction_sites)
         write(fout, '(a)') 'init_mode=' // trim(init_mode)
 
         write(fout, '(a)') '# measurements'
@@ -955,7 +1067,7 @@ contains
             call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', Measurement:' // trim(str(j)))
             call flush(6)
             call self%output()
-            flush(13)
+            call flush(13)
         end do
 
         ! do burn-out included as extra measurement
@@ -968,7 +1080,7 @@ contains
             end do
             call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', fix burn-out Measurement')
             call self%output()
-            flush(13)
+            call flush(13)
         end if
 
         if (burnoutM > 0) then
@@ -981,7 +1093,7 @@ contains
                 end do
                 call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', burn-out Measurement: ' // trim(str(j)))
                 call self%output()
-                flush(13)
+                call flush(13)
             end do
         end if
 

@@ -26,7 +26,7 @@ module logging_mod
         procedure, public :: log, error, warn, info, debug, set_level
     end type Logger
 
-    public :: str, str0, strf, strff, str2loglevel
+    public :: str, stri8, str0, strf, strff, str2loglevel
 
 contains
 
@@ -36,6 +36,13 @@ contains
         write (str, *) k
         str = adjustl(str)
     end function str
+
+    character(len = 22) function stri8(k)
+        !   "Convert an integer to string."
+        integer(kind = 8), intent(in) :: k
+        write (stri8, *) k
+        stri8 = adjustl(stri8)
+    end function stri8
 
     character(len = 20) function str0(k)
         !   "Convert an integer to string."

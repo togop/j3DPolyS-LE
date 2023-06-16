@@ -1,3 +1,5 @@
+cooler
+pyranges
 numpy
 cython
 pandas
@@ -6,9 +8,8 @@ scipy
 filelock
 h5py
 dask
-cooler
-pyranges
 seaborn
+build
 # -r requirements.txt
 pytest
 pytest-flake8

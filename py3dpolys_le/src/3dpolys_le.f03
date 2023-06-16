@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2022.9'
+    character(*), parameter :: VERSION = '2023.5'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2022.9'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2023.5'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -83,7 +83,9 @@ subroutine print_help()
     print*, '   -b|--boundary:<boundary sites file> Boundary sites file in a csv format with the following columns:&
             & name,midpoint,impermeability. Default: no bondaries'
     print*, '   -lls|--lef_loading_sites:<loop extrusion loading sites file> LEFs loadding sites file in a csv format&
-            & with the following columns: name,position,length,probability. Default: if not given, the whole polymer'
+            & with the following columns: name,position,length,factor. Default: if not given, the whole polymer'
+    print*, '   -is|--interaction_sites:<monomers interations sites file> Monomers interaction sites file in a csv format&
+            & with the following columns: name,position,length,state. Default: if not given, no such sites.'
     print*, '   -r|--radius_contact:<radius> contact radius in lattice unit (1=70nm) for extracting Hi-C matrixes, Default: 1.42'
     print*, '   -cp|--contact_probability Together with the contact radius use contact probability with the formula&
             & (1 - <actual_radius_contact>^2 / <radius_contact param>^2),&
@@ -112,6 +114,7 @@ subroutine print_help()
     print*, 'ku         LEFs half-unbinding rate (do not change).'
     print*, 'km         LEFs rate of movement, aka velocity (2.7e-3 = 50kb/min=833bp/s).'
     print*, 'Ea         Energy of extrusion (passive: Ea=0, facilitated Ea<0).'
+    print*, 'Ei         energy of interaction (in kT) between specific monomers.'
     print*, 'Nlef       Maximal number of bound LEFs (average number of bound extruders=Nlef kb/(kb+2ku).'
     print*, 'chrom      Chromosome name to be used for output files. Default: chrS'
     print*, 'burnin     Number of iterations steps before introducing LEFs = burnin + random(0,1)*burnin.'
@@ -148,6 +151,7 @@ program mainprogram
     character(1000) :: output_folder = ''
     character(1000) :: boundary_file = ''
     character(1000) :: lef_loading_sites = ''
+    character(1000) :: interaction_sites = ''
     character(20) :: opt_s = ''
     character(20) :: chrom = ''
     integer :: ai = 1  ! input argument position the 3dpolys_le.cfg in the CLI, the ai+1 is the output folder
@@ -156,7 +160,7 @@ program mainprogram
 
     integer :: L, Nchain, Niter, Nmeas, Ninter, iku, ikm, ikb, Nlef = 0, burnin = 0, burnout = 0, burnoutM = 0
     !integer :: simburnin = 0, burn_Nmeas = 0
-    real :: kint = 1.17, kb, ku, km = 0., Ea, kb_factor
+    real :: kint = 1.17, kb, ku, km = 0., Ea, Ei, kb_factor
     real :: kb_a, ku_a, km_a ! keep the arguments value for logging
 
     integer :: i, time
@@ -166,7 +170,9 @@ program mainprogram
     type(Timer) :: crono
     real, dimension(:, :), allocatable :: boundary  ! (strand -/+, permeability)
     real, dimension(:), allocatable :: loading_sites_factor
-    integer :: loading_sites_count = 0 ! deafault: there is no lef_loading_site file so the whole polymer is loading site
+    integer, dimension(:), allocatable :: interaction_sites_state
+    integer :: interaction_state_init = 0 ! deafault:
+    integer ::  start_site = 0, sites_count = 0 ! deafault: there is no lef_loading_site file so the whole polymer is loading site
     real :: basal_loading_factor = -1. ! not defined
     integer :: boundary_direction = -9 ! not defned direction
     integer, parameter :: resolution_factor = 2000
@@ -196,6 +202,14 @@ program mainprogram
         real :: impermeability
     end type BoundarySite
     type(BoundarySite) :: boundary_site
+
+    type :: InteractionState
+        character(len = 20) :: name
+        integer :: position
+        integer :: length
+        integer :: state
+    end type InteractionState
+    type(InteractionState) :: interaction_state
 
     type :: LoadingSite
         character(len = 20) :: name
@@ -273,6 +287,12 @@ program mainprogram
                 lef_loading_sites = trim(input_options(i + 1:))
                 if (rank == 0) then
                     call log%info('input ' // trim(input_options(:i)) // trim(lef_loading_sites))
+                end if
+            elseif ((index(input_options, '--interaction_sites:') > 0).or.(index(input_options, '-is:') > 0)) then
+                i = index(input_options, ':')
+                interaction_sites = trim(input_options(i + 1:))
+                if (rank == 0) then
+                    call log%info('input ' // trim(input_options(:i)) // trim(interaction_sites))
                 end if
             elseif ((index(input_options, '--radius_contact:') > 0).or.(index(input_options, '-r:') > 0)) then
                 i = index(input_options, ':')
@@ -407,6 +427,7 @@ program mainprogram
         call read_config('km',   km)
     end if
     call read_config('Ea',       Ea)
+    call read_config('Ei',       Ei, default=0.)
     if (Nlef == 0.) then
         call read_config('Nlef', Nlef)
     end if
@@ -424,6 +445,9 @@ program mainprogram
     end if
     if (lef_loading_sites == '') then
         call read_config('lef_loading_sites', lef_loading_sites, default='')
+    end if
+    if (interaction_sites == '') then
+        call read_config('interaction_sites', interaction_sites, default='')
     end if
     if (basal_loading_factor == -1) then
         call read_config('basal_loading_factor', basal_loading_factor, default=1.)
@@ -456,12 +480,14 @@ program mainprogram
         call log%info('ku=' // trim(strf(ku)     ))
         call log%info('km=' // trim(strf(km)     ))
         call log%info('Ea=' // trim(strf(Ea)     ))
+        call log%info('Ei=' // trim(strf(Ei)     ))
         call log%info('Nlef=' // trim(str(Nlef)   ))
         call log%info('burnin=' // trim(str(burnin) ))
         call log%info('burnout=' // trim(str(burnout)))
         call log%info('burnoutM=' // trim(str(burnoutM)))
 
         call log%info('init_mode=' // trim(init_mode))
+        call log%info('interaction_sites=' // trim(interaction_sites))
         call log%info('boundary=' // trim(boundary_file))
         call log%info('lef_loading_sites=' // trim(lef_loading_sites))
         call log%info('basal_loading_factor=' // trim(strf(basal_loading_factor)))
@@ -568,6 +594,66 @@ program mainprogram
         close(10)
     end if
 
+    allocate (interaction_sites_state(Nchain))
+    interaction_sites_state = interaction_state_init
+
+    if (trim(interaction_sites) /= '') then
+        open(10, file = trim(interaction_sites), action = 'read', iostat = rc)
+        if (rc == 0) then
+            if (rank == 0) then
+                call log%info('Load interaction_sites file ' // trim(interaction_sites) // ' ...')
+            end if
+            col1 = ''
+            col2 = ''
+            col3 = ''
+            col4 = ''
+            read(10, *) col1, col2, col3, col4
+            ! print "(A, A, A)", 'col1[', trim(col1), ']'
+            if ((trim(col2)=="position").and.(trim(col3)=="length")) then
+                !&
+                !.and.(trim(col4)=='factor')) then
+
+                sites_count = 0
+                do
+                    read(10, *, iostat = rc) interaction_state !  // trim(interaction_state%name)
+                    ! call log%info('interaction site: ' &
+                    !        // trim(str(interaction_state%position)) // trim(str(interaction_state%length)) &
+                    !        // trim(str(interaction_state%state)))
+                    if (rc /= 0) exit
+                    start_site = 1 + interaction_state%position/resolution_factor
+                    do i = (1 + interaction_state%position/resolution_factor), &
+                            (1 + interaction_state%position/resolution_factor + (interaction_state%length - 1)/resolution_factor)
+                        sites_count = sites_count + 1
+                        interaction_sites_state(i) = interaction_state%state
+                    end do
+                end do
+                if (rank == 0) then
+                    call log%info('Added ' // trim(str(sites_count)) // ' monomer interaction sites ')
+                end if
+            else
+                if (rank == 0) then
+                    call log%error('wrong format for monomer interaction sites: ' // col1 // col2 // col3 // col4 // &
+                            ' but expected: name position length probability. STOP PROCEEDING.' // &
+                            ' Please provide a correct interaction_sites.csv file.')
+
+                end if
+                call MPI_FINALIZE(ierr)
+                if (ierr /= 0) error stop 'mpi finalize error'
+
+                call exit(1)
+            end if
+        else
+            if (rank == 0) then
+                call log%error('Cound not find ' // trim(interaction_sites) // ' file!')
+            end if
+            call MPI_FINALIZE(ierr)
+            if (ierr /= 0) error stop 'mpi finalize error'
+
+            call exit(1)
+        end if
+        close(10)
+    end if
+
     allocate (loading_sites_factor(Nchain))
     loading_sites_factor = basal_loading_factor
 
@@ -588,14 +674,14 @@ program mainprogram
                 !&
                 !.and.(trim(col4)=='factor')) then
 
-                loading_sites_count = 0
+                sites_count = 0
                 kb_factor = 0
                 do
                     read(10, *, iostat = rc) loading_site
                     if (rc /= 0) exit
                     do i = (1 + loading_site%position/resolution_factor), &
                             (1 + loading_site%position/resolution_factor + (loading_site%length - 1)/resolution_factor)
-                        loading_sites_count = loading_sites_count + 1
+                        sites_count = sites_count + 1
                         loading_sites_factor(i) = loading_site%factor
                         kb_factor = kb_factor + loading_site%factor
                         if (rank == 0) then
@@ -605,11 +691,11 @@ program mainprogram
                     end do
                 end do
                 ! correct kb
-                kb_factor = real(Nchain) / (kb_factor + real(Nchain-loading_sites_count)*basal_loading_factor)
+                kb_factor = real(Nchain) / (kb_factor + real(Nchain-sites_count)*basal_loading_factor)
                 ! should be same == real(Nchain) / SUM(loading_sites_factor)
                 kb = kb * kb_factor
                 if (rank == 0) then
-                    call log%info('Added ' // trim(str(loading_sites_count)) // ' LEFs binding sites.')
+                    call log%info('Added ' // trim(str(sites_count)) // ' LEFs binding sites.')
                     call log%info('Loading kb_factor= ' // trim(strf(kb_factor)))
                     call log%info('New kb= ' // trim(strf(kb)))
                 end if
@@ -691,7 +777,7 @@ program mainprogram
     call log%info('Running simulations for rank:' // trim(str(rank)) // ' #trajectories:' // trim(str(rank_Niter)) // ' ...')
 
     params = ModelParameters(L = L, Nchain = Nchain, iku = iku, ikm = ikm, ikb = ikb, Nleffree = Nlef, &
-            kb = kb, ku = ku, km = km, Ea = Ea)
+            kb = kb, ku = ku, km = km, Ea = Ea, Ei = Ei)
 
     if ((rank_Niter > 0).and.(.not.do_analyse)) then
         status = SYSTEM('mkdir -p ' // trim(output_folder))
@@ -718,21 +804,21 @@ program mainprogram
 
             !generate initial configuration
             model = PolymerModel(L = L, Nchain = Nchain, iku = iku, ikm = ikm, ikb = ikb, Nleffree = Nlef, &
-                    kb = kb, ku = ku, km = km, Ea = Ea, z_loop = z_loop, unidirectional = unidirectional, kint = kint)
+                    kb = kb, ku = ku, km = km, Ea = Ea, Ei = Ei, z_loop = z_loop, unidirectional = unidirectional, kint = kint)
 
             if ((rank == 0).and.(i == 1)) then                ! do it only once
                 save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')
                 call log%info('Save parameters in file: ' // save_input_cfg_file)
 
                 open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
-                call model%output_parameters(20, init_mode, boundary_file, lef_loading_sites, &
+                call model%output_parameters(20, init_mode, interaction_sites, boundary_file, lef_loading_sites, &
                         basal_loading_factor, boundary_direction, &
                         Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact,  &
                         km_a = km_a, ku_a = ku_a, kb_a = kb_a)
                 close(20)
             end if
 
-            call model%init(boundary, loading_sites_factor, init_mode)
+            call model%init(boundary, loading_sites_factor, interaction_sites_state, init_mode)
 
             call model%do_simulation(trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
 

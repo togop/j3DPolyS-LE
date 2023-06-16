@@ -4,17 +4,20 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.9
-  - pip=21.2.4
+#  - python=3.9
+  - pip
+# <=21.2.4
+  - cooler
+  - pyranges
   - numpy
+# <=1.23.5
   - pandas
   - matplotlib
   - scipy
   - filelock
   - h5py
   - dask
-  - cooler
-  - pyranges
   - seaborn
-  #- pip:
+  - build
+  # - pip:
   #    - Cython
