@@ -1,9 +1,9 @@
 Bootstrap: docker
-From: togop/gcc_gfortran_openmpi_hdf5_python:latest
+From:   togop/gcc_gfortran_openmpi_hdf5_python_mamba:2023-06-16
 
 %labels
     Author todor.gitchev@gmail.com
-    Version v2022.9
+    Version v2023.5
 
 %help
     3D Polymer Simulation of chromosome folding by modeled loop extrusion
@@ -31,26 +31,23 @@ From: togop/gcc_gfortran_openmpi_hdf5_python:latest
      # export SINGULAIRTYENV_APPEND_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/openmpi/lib/
 
 %post
-    apt-get update
+    # apt-get update # just updated bootstrap
     # Install py3dpolys_le package
-    PATH=/opt/miniconda3/bin:$PATH
+    PATH=/opt/mambaforge/bin:$PATH
     export PATH=$PATH
-    echo 'export PATH=/opt/miniconda3/bin:$PATH' >> $SINGULARITY_ENVIRONMENT
+    echo 'export PATH=/opt/mambaforge/bin:$PATH' >> $SINGULARITY_ENVIRONMENT
     # conda update -q conda # could be cause of the setup package problem
-    conda config --add channels bioconda
-    conda config --add channels conda-forge
-    conda config --add channels defaults
-    # conda install -y -q --file requirements_dev.txt python=3.8
-    conda install -y -q numpy cython pandas matplotlib scipy filelock h5py dask cooler pyranges seaborn python=3.9
-    conda install -y -q cmake
-    # pip install Cython
-    # apt-get update && apt-get install -y git
-    # skip update: sometimes cause problems
+    mamba update -n base mamba
+    mamba init bash
+    mamba install -y -q cooler pyranges -c bioconda
+    mamba install -y -q numpy pandas matplotlib scipy dask h5py filelock seaborn -c conda-forge
+    mamba install -y -q build
+    mamba install -y -q cmake
     apt-get install -y git bash wget
 
     echo "Installing Open MPI"
     export OMPI_DIR=/opt/ompi
-    export OMPI_VERSION=4.1.3
+    export OMPI_VERSION=4.1.4
     export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-$OMPI_VERSION.tar.bz2"
     mkdir -p /tmp/ompi
     mkdir -p /opt

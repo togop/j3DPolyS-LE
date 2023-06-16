@@ -5,6 +5,11 @@
 ## Citing
 
 Todor Gitchev, Gabriel Zala, Peter Meister, Daniel Jost, 3DPolyS-LE: an accessible simulation framework to model the interplay between chromatin and loop extrusion, Bioinformatics, Volume 38, Issue 24, 15 December 2022, Pages 5454–5456, https://doi.org/10.1093/bioinformatics/btac705
+
+![Figure_1.png](Figure_1.png)
+Figure 1. Features provided by 3DPolyS-LE. (A) Input parameters for the simulation framework. For the polymer, its length, as well as the location and permeability of individual loading sites and boundary elements for the loop extrusion factors (LEFs) can be defined. The properties of the LEFs include their mode of extrusion (symmetrical/asymmetrical), the extrusion speed, the number of LEFs per polymer and the capacity of LEFs to cross each other (Z-loop formation). (B) Typical outputs of the simulations: virtual Hi-C data (top) and ChIP-Seq profile (bottom) of loop extruders
+
+
 # Installation
 
 ### Requirements
@@ -18,18 +23,22 @@ Packages and libraries:
 - **HDF5** libraries. Debian/Ubuntu: libhdf5-serial-dev or libhdf5-103 libhdf5-cpp-103 libhdf5-dev libhdf5-mpich-dev;
 - **GNU make** version 3.81 or higher;
 - **CMake** version 3.15.0 or higher;
-- **Python** 3.7, 3.8. 3.9, all required packages are listed in the requirements.txt file and alternatively in the environment.yml file;
-- **Conda** version 4.8.2 or higher.
+- **Python** 3.10, all required packages are listed in the requirements.txt file and alternatively in the environment.yml file;
+- **Mamba** version 1.1.0 or higher.
+
+for previous version v2022.9:
+ - **Python** 3.7, 3.8. 3.9;
+ - **Conda** version 4.8.2 or higher.
 
 Make sure you have installed or loaded the required libraries.
 
 Typically, gfortran is part of gcc.
-If missed, on a HPC cluser you can check if available and load the latest version:
+If missed, on an HPC cluster you can check if available and load the latest version:
 ```
 module avail gcc
 module load gcc/8.2.0
 ```
-On a Ubuntu/Debian Linux it can be installed like this:
+On an Ubuntu/Debian Linux it can be installed like this:
 ```
 sudo apt-get install gfortran
 # or
@@ -42,13 +51,15 @@ For example on an HPC cluster (Slurm) you might need to load the following modul
 ```
 module load Anaconda3
 ```
+Alternative could be installation of Mambaforge (https://docs.conda.io/en/latest/miniconda.html)
+
 Alternative could be installation of Miniconda (https://docs.conda.io/en/latest/miniconda.html)
 
 ###### HDF5 (https://www.hdfgroup.org/solutions/hdf5/)
 ```
 module load HDF5
 ```
-Alternatively, on a Ubuntu/Debian Linux could be installed like hits:
+Alternatively, on an Ubuntu/Debian Linux could be installed like hits:
 ```
 conda install hdf5
 ```
@@ -62,7 +73,7 @@ module load OpenMPI
 module load mvapich2
 ```
 
-On a Ubuntu/Debian Linux could be installed like hits:
+On an Ubuntu/Debian Linux could be installed like hits:
 ```
 sudo apt-get install mpich
 ```
@@ -99,7 +110,34 @@ cd 3DPolyS-LE
 make all
 ```
 
-### Troubleshooting
+### 3. Test installation
+
+Check commands help with the following commands:
+
+```
+3dpolys_le -h
+3dpolys_le_runner -h
+3dpolys_le_stats -h
+plot_hic -h
+plot_sim_stats -h
+```
+
+If everything was installed properly the complete help should be printed out, otherwise check the '6.Troubleshooting' section bellow.
+
+### 4. Additional outputs
+
+![Figure_2.png](Figure_2.png)
+Figure 2. (A) Grid-simulations run with a `3dpolys_le_runner grid_nlef_km --nlef_list --km_list` command and plotted with 
+a `plot_sim_stats --stats_file` command to find the best set of parameters that fit a target data. For each parameter set, a Chi2-score is estimated. Example of optimization by varying the
+LEF density and extruding speed with synthetic human Hi-C data as target (see Paper's Supp. Methods). (B) Best Hi-C map model predictions from the simulations in (A) (lower part) compared to
+target Hi-C data (upper part).
+
+### 5. Example scenarios
+
+![Figure_3.png](Figure_3.png)
+Figure 3. Examples of simulated Hi-C maps for several loop extrusion scenarios.
+
+### 6. Troubleshooting
 Depending on your installation environment, you might want to create a dedicated Python environment.
 
 Go to the cloned repository project's folder:
@@ -114,14 +152,17 @@ make env
 If your default Python version is a bit old you might need to specify a newer version.
 In this case, you can install the *py3dpolys_le* like that:
 ```
-conda env create -f environment.yml python=3.9
-# or 
-conda env create -f requirements_dev.txt python=3.8
+mamba env create -f environment.yml python=3.10
+# or
+mamba create -n py3dpolys_le python=3.10
+mamba activate py3dpolys_le
+mamba install -y -q numpy pandas matplotlib scipy dask h5py filelock seaborn build cmake -c conda-forge
+mamba install -y -q cooler pyranges -c bioconda
 ```
 
 Active your *py3dpolys_le* environment:
 ```
-conda activate py3dpolys_le
+mamba activate py3dpolys_le
 # or
 source activate py3dpolys_le
 ```
@@ -129,6 +170,45 @@ Finally, build and install:
 ```
 make all
 ```
+
+Check you installation as shown in the 'Test installation' section above. 
+
+- In case of such an error:
+```
+    from py3dpolys_le.3dpolys_le import main
+                     ^
+SyntaxError: invalid syntax
+```
+A possible reason could be incompatibility of Python and Pip versions.
+We recommend *Pip* 21.2.4 as prove to be compatible version with the current .
+You can install desired *Pip* version like that:
+```
+python -m pip install pip==21.2.4
+```
+If this doesn't help, consider upgrading to Python 3.10.
+
+
+- In case of such an error:
+
+```
+AttributeError: module 'numpy' has no attribute 'object'. Did you mean: 'object_'?
+```
+
+Try downgrading the *numpy* package to a version bellow 1.24 like _numpy=1.23.5_
+
+- In case of such an error, and you are on a linux terminal:
+
+```
+qt.qpa.plugin: Could not load the Qt platform plugin "xcb" in "" even though it was found.
+```
+
+Try the following command, that also could be included in your ~/.bashrc file:
+
+```
+export QT_QPA_PLATFORM=offscreen
+```
+
+- Cleaning your build `cmake-build`or any other temporary folders can also help:
 
 
 # Usage
@@ -162,10 +242,14 @@ kb = 2.8e-6
 ku = 2e-6
 km = 2.7e-3
 Nlef = 200
-# optional lef_loading_sites.csv: name,position,length,factor
+# optional interaction_sites.csv/tsv: name,position,length,state(1)
+#interaction_sites=
+# optional: interaction enegry (<0.) used by interaction_sites
+# Ei = -1.
+# optional lef_loading_sites.csv/tsv: name,position,length,factor
 lef_loading_sites = py3dpolys_le/data/ce/dcc_rex-sites_Crane2015_bindings.csv
 basal_loading_factor = 0.
-# optional boundaries.csv: name,midpoint,impermeability,score,b-position,strand
+# optional boundaries.csv/tsv: name,midpoint,impermeability,score,b-position,strand
 boundary = py3dpolys_le/data/ce/dcc_mex-sites_boundaries.csv
 boundary_direction = 0
 z_loop = true

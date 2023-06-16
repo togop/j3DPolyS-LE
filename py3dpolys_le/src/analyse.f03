@@ -13,13 +13,24 @@ module analyse_mod
 contains
 
 
-    integer function hic3d_idx(x, y, z, N)
+    integer(kind = 8) function hic3d_idx(x, y, z, N)
         integer, intent(in) :: x, y, z, N
-        hic3d_idx = (x-1)*(N-1)*N - N*(x-1)*x/2 - (x-1)*(N-1)*N/2 + x*(x-1)*(x+1)/6 &  ! sum_xNN
-                + (y-x-1)*N -((y-1)*y - (x+1)*x)/2 &  ! sum_yN
-                + (z-y)  ! sum_z
+        integer(kind = 8) :: x8, y8, z8, N8
+        integer(kind = 8) :: sum_xNN, sum_yN, sum_z
+        !call log%debug('x=' // trim(str(x)) // ', y=' // trim(str(y)) // &
+        !        ', z='// trim(str(z)) // ', N='// trim(str(N)))
+        x8 = int(x, kind=8)
+        y8 = int(y, kind=8)
+        z8 = int(z, kind=8)
+        N8 = int(N, kind=8)
+        sum_xNN = (x8-1)*(N8-1)*N8 - N8*(x8-1)*x8/2 - (x8-1)*(N8-1)*N8/2 + x8*(x8-1)*(x8+1)/6  ! &  ! sum_xNN
+        sum_yN = (y8-x8-1)*N8 -((y8-1)*y8 - (x8+1)*x8)/2 ! &  ! sum_yN
+        sum_z = (z8-y8)  ! sum_z
+        !call log%debug('sum_xNN=' // trim(stri8(sum_xNN)) // ', sum_yN=' // trim(stri8(sum_yN)) // &
+        !        ', sum_z='// trim(stri8(sum_z)) )
+        hic3d_idx = sum_xNN + sum_yN + sum_z
         !call log%debug('hic3d_idx: x=' // trim(str(x)) // ', y=' // trim(str(y)) // ', z='// trim(str(z)) // &
-        !       ', N=' // trim(str(N)) // ')=' // trim(str(hic3d_idx)) )
+        !       ', N=' // trim(str(N)) // ')=' // trim(stri8(hic3d_idx)) )
     end function hic3d_idx
 
     subroutine analyse(radiuscontact, use_contact_probability, &
@@ -45,7 +56,8 @@ contains
         integer :: hic_point
         real*8 :: randomnumber, contact_prob, contact_prob_yz, contact_prob_xz
         integer, dimension(:, :), allocatable :: hic3d  ! TODO mybe use integer and if want normalized do it when saving
-        integer :: hic3d_dim_size, hic3d_len, hic3d_i
+        integer :: hic3d_dim_size
+        integer(kind = 8) :: hic3d_len, hic3d_i
 
         integer, dimension(:, :), allocatable :: config
         integer, dimension(:, :), allocatable :: contact
@@ -62,7 +74,7 @@ contains
             hic3d_dim_size = params%Nchain / hic3d_factor
             hic3d_len = hic3d_idx(hic3d_dim_size-2, hic3d_dim_size-1, hic3d_dim_size, hic3d_dim_size)  ! hic3d_dim_size * (hic3d_dim_size + 1) * (hic3d_dim_size + 2) / 6
             call log%info('allocate for hic3d with dim=' // trim(str(hic3d_dim_size)) // &
-                    '^3 array(hic3d_len=' // trim(str(hic3d_len)) // ', 4)')
+                    '^3 array(hic3d_len=' // trim(stri8(hic3d_len)) // ', 4)')
             allocate (hic3d(hic3d_len, 4))
             hic3d = 0
             ! allocate (hic3d(hic3d_dim_size, hic3d_dim_size, hic3d_dim_size))
@@ -149,7 +161,7 @@ contains
                                                 else
                                                     call log%error('not mathching p3d:' // trim(str(p3d)) // &
                                                             ',k3d:' // trim(str(k3d)) // ', s3d:' // trim(str(s3d)))
-                                                    call log%error('with hic3d(hic3d_i:' // trim(str(hic3d_i)) // &
+                                                    call log%error('with hic3d(hic3d_i:' // trim(stri8(hic3d_i)) // &
                                                             ')= hic(p3d):' // trim(str(hic3d(hic3d_i,1))) // &
                                                             ', hic(k3d):' // trim(str(hic3d(hic3d_i,2))) // &
                                                             ', hic(s3d):' // trim(str(hic3d(hic3d_i,3))))
@@ -200,7 +212,7 @@ contains
                                             else
                                                 call log%error('not mathching p3d:' // trim(str(p3d)) // &
                                                         ',k3d:' // trim(str(k)) // ', s3d:' // trim(str(s3d)))
-                                                call log%error('with hic3d(hic3d_i:' // trim(str(hic3d_i)) // &
+                                                call log%error('with hic3d(hic3d_i:' // trim(stri8(hic3d_i)) // &
                                                         ')= hic(p3d):' // trim(str(hic3d(hic3d_i,1))) // &
                                                         ', hic(k3d):' // trim(str(hic3d(hic3d_i,2))) // &
                                                         ', hic(s3d):' // trim(str(hic3d(hic3d_i,3))))
@@ -297,7 +309,7 @@ contains
             CALL h5_add_attr_str(file_id, "format", "HDF5:hic_matrix")
             CALL h5_add_attr_str(file_id, "format-url", "https://gitlab.com/togop/3DPolyS-LE")
             CALL h5_add_attr_str(file_id, "format-version", "1")
-            CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2022.9")
+            CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2023.5")
 
             ! Close the dataset.
             CALL h5dclose_f(dset_id, error)
@@ -520,7 +532,7 @@ contains
         CALL h5_add_attr_str(file_id, "format", "HDF5:Cooler3D")
         CALL h5_add_attr_str(file_id, "format-url", "https://gitlab.com/togop/3DPolyS-LE")
         CALL h5_add_attr_str(file_id, "format-version", "1")
-        CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2022.9")
+        CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2023.5")
 
         CALL h5gclose_f(grp_pixels_id, error)
         CALL h5gclose_f(grp_bins_id, error)

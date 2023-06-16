@@ -23,11 +23,11 @@ def cli_parser():
     p.add_argument("-i", "--input_file",
                    help="input file name. Supported file types: .hdf5 (3DPolyS_LE format), .mat (MATLAB 2D matrix)")
     p.add_argument("-o", "--output_file", help="output file name. Allowed file types: .cool, .mcool")
-    p.add_argument("-chr", help="Chromosome name to be used for")
+    p.add_argument("-chr", help="Chromosome name to be used for. Default: chrS", default="chrS")
     p.add_argument("-r", "--resolutions", nargs='+', default=[2000], type=int,
                    help="List of resolutions for .mcool output file. "
                         "Default: 2000, for a .cool file in a simulation's resolution.")
-    p.add_argument("-f", "--foctors", help="Chromosome name to be used for")
+    # p.add_argument("-f", "--foctors", help="Chromosome name to be used for")
     return p
 
 

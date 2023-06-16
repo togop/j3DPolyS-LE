@@ -4,7 +4,15 @@ cmake-build
 cmake-build-debug
 polys3d_le.egg-info/
 out/
+dist/
+build/
+build_doc/
+demo_run/
 py3dpolys_le.egg-info/
 /py3dpolys_le/bin/3dpolys_le
 /build_doc/
 /builds/
+.Rproj.user
+.Rproj
+.RData
+.Rhistory

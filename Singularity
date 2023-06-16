@@ -3,7 +3,7 @@ From: togop/gcc_gfortran_mpi_hdf5_python:latest
 
 %labels
     Author todor.gitchev@gmail.com
-    Version v2022.9
+    Version v2023.5
 
 %help
     3D Polymer Simulation of chromosome folding by modeled loop extrusion
