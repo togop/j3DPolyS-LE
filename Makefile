@@ -20,9 +20,6 @@ install:
 package:
 	python -m build
 
-package:
-	python -m build
-
 doc:
 	sphinx-build -b html doc build_doc
 
