@@ -95,6 +95,32 @@ def test_shell_container():
     expected_shel_script = "./test/expected/run_test_shell_container_input.sh"
     assert cmp_file_txt(expected_shel_script, shel_script), f"Shell script {shel_script} is not as expected: "
 
+def test_tads_init_continue():
+    # init
+    if os.path.isdir('out/test_init'):
+        shutil.rmtree('out/test_init')
+    cmd = f"mpirun 3dpolys_le -o:out/test_init ./test/test_tads_init.cfg"
+    print(f"call: {cmd}")
+    subprocess.run(cmd, shell=True, check=True)
+    assert is_file_created(f'out/test_init/3dpoys_le.cfg'), \
+        f"File out/test_init/3dpoys_le.cfg is missing"
+    assert is_file_created(f'out/test_init/config.out'), \
+        f"File out/test_init/config.out is missing"
+    assert is_file_created(f'out/test_init/contact.out'), \
+        f"File out/test_init/contact.out is missing"
+    # continue
+    if os.path.isdir('out/test_continue'):
+        shutil.rmtree('out/test_continue')
+    cmd = f"mpirun 3dpolys_le -o:out/test_continue -im:s=out/test_init ./test/test_tads_continue.cfg"
+    print(f"call: {cmd}")
+    subprocess.run(cmd, shell=True, check=True)
+    assert is_file_created(f'out/test_continue/3dpoys_le.cfg'), \
+        f"File out/test_continue/3dpoys_le.cfg is missing"
+    assert is_file_created(f'out/test_continue/config.out'), \
+        f"File out/test_continue/config.out is missing"
+    assert is_file_created(f'out/test_continue/contact.out'), \
+        f"File out/test_continue/contact.out is missing"
+
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)
@@ -103,4 +129,5 @@ if __name__ == '__main__':
     test_tads_shell_input()
     test_no_tads_shell()
     test_shell_container()
+    test_tads_init_continue()
 
