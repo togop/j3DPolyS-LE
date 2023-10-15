@@ -110,6 +110,31 @@ cd 3DPolyS-LE
 make all
 ```
 
+#### Alternative installation from the Python Package Index (PyPi) repository.
+With prebuild binaries for some Linux and macOS system environments.
+
+If you already use Conda as a package manager, switching to alternative more efficient Mamba package manager is recommended.
+```
+conda install -c conda-forge mamba
+```
+
+Creating a dedicated Python environment is also recommended:
+```
+mamba create -n py3dpolys_le python=3.10
+mamba activate py3dpolys_le
+```
+
+Installing dependencies (tested on _mamba_ v1.4.1):
+```
+mamba install cooler pyranges -c bioconda
+mamba install numpy pandas matplotlib scipy dask h5py filelock seaborn -c conda-forge
+```
+
+Installing 3DPolyS-LE using pip (experimental):
+```
+pip install py3dpolys-le
+```
+
 ### 3. Test installation
 
 Check commands help with the following commands:
@@ -136,6 +161,29 @@ target Hi-C data (upper part).
 
 ![Figure_3.png](Figure_3.png)
 Figure 3. Examples of simulated Hi-C maps for several loop extrusion scenarios.
+
+Any simulation's configuration can be continued with different configuration scenario for polymer with the same length (parameter *Nchain*) 
+by using the *init_mode* parameter (*im:s=<sim_output_folder>*).
+Where the <sim_output_folder> is the output folder of the simulation which will be used as initializing polymer configuration.
+
+Example in a configuration file (**.cfg**):
+
+```
+[3dpolys_le]
+...
+init_mode = s=./out/test_init
+...
+```
+
+Passing a parameter directly to the *3dpolys_le*, overwriting the configuration file's value:
+```
+mpirun 3dpolys_le -im:s=./out/test_init -o:./out/test_continue test_continue.cfg 
+```
+
+Passing a parameter over *3dpolys_le_runner* to the *3dpolys_le*, overwriting the configuration file's value:
+```
+3dpolys_le_runner -im s=./out/test_init -o ./out/test_continue -i test_continue.cfg 
+```
 
 ### 6. Troubleshooting
 Depending on your installation environment, you might want to create a dedicated Python environment.

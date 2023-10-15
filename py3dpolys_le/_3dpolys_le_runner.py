@@ -82,7 +82,8 @@ def cli_parser():
     p.add_argument("-u", "--unidirectional", action='store_true',
                    help="Unidirectional mode for LEFs move otherwise bidirectional.")
     p.add_argument("-im", "--init_mode", default='',
-                   help="Initial folding mode: h for helices like, z for zigzag like polymer state. "
+                   help="Initial folding mode: h for helices like, z for zigzag like polymer state"
+                        ", s=<sim_out_folder> to continue from a finished simulation output folder. "
                         "Default: z.")
     p.add_argument("-t", "--tads_boundary", default="",
                    help="TADs boundary file used to calculate the chi-2-min score in the same format as the "
@@ -261,7 +262,7 @@ class DccExtrusionArgs:
         """
         z_opt = '_z-loop' if self.z_loop else ''
         u_opt = '_unidir' if self.unidirectional else ''
-        im_opt = f'_im-{self.init_mode}' if self.init_mode else ''
+        im_opt = f'_im-{self.init_mode[0:1]}' if self.init_mode else ''
         return os.path.join('', f'out-Nlef{self.nlef}-km{self.km:g}-bd{self.boundary_direction}{im_opt}{z_opt}{u_opt}')
 
 

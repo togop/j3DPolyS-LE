@@ -130,7 +130,7 @@ target_link_libraries(${LATTICE_DATA})
 
 SET(POLYMER_MODEL polymer_model)
 ADD_LIBRARY(${POLYMER_MODEL} STATIC ${SOURCE_FOLDER}/polymer_model.f03)
-target_link_libraries(${POLYMER_MODEL} ${LOGGING} ${RANDOMNUMBER} ${TIMERS} ${KINDS})
+target_link_libraries(${POLYMER_MODEL} ${LOGGING} ${RANDOMNUMBER} ${TIMERS} ${KINDS} ${LIB_CONF})
 
 SET(ANALYSE analyse)
 ADD_LIBRARY(${ANALYSE} STATIC ${SOURCE_FOLDER}/analyse.f03)

@@ -4,10 +4,11 @@ module PolymerModel_mod
     use Timers
     use lattice_data_mod
     use logging_mod
+    use lib_conf
 
     implicit none
     private
-    public :: PolymerModel, ModelParameters
+    public :: PolymerModel, ModelParameters, MonomerConfig
     type(Logger) :: log = Logger('PolymerModel_mod', LOG_INFO)
 
     type ModelParameters
@@ -16,6 +17,11 @@ module PolymerModel_mod
         real, public :: kb, ku, km, Ea, Ei
         ! integer, public :: Niter, Nmeas, Ninter, kint  ! not used
     end type ModelParameters
+
+    type MonomerConfig
+        integer :: laticeAddr
+        integer :: nextTurn  ! TODO rename: link
+    end type MonomerConfig
 
     type PolymerModel
         private
@@ -35,20 +41,21 @@ module PolymerModel_mod
     contains
         procedure, public :: init, do_simulation, trialmoveex, trialmovetad, trialbound, trialunbound, unbound_all, &
                 erase, output, output_parameters
-        procedure :: allocate, initbitable, initconfig4, initconfig4_zigzag
+        procedure :: allocate, initbitable, initconfig4, initconfig4_zigzag, initconfig_sim_out
         final :: deallocate
     end type PolymerModel
 
 contains
 
-    subroutine init(self, boundary, loading_sites_factor, interaction_sites_state, init_mode)
+    subroutine init(self, boundary, loading_sites_factor, interaction_sites_state, init_mode, trajectory_i)
         implicit none
         class (PolymerModel), intent(inout) :: self
         real, dimension(:, :) :: boundary
         real, dimension(:) :: loading_sites_factor
         integer, dimension(:) :: interaction_sites_state
-        character(len = 1), intent(in) :: init_mode
-        !integer :: i
+        character(len = 1000), intent(in) :: init_mode
+        integer, intent(in) :: trajectory_i
+        character(len = 1000) :: init_sim_folder
 
         call log%set_level(global_log_level)
 
@@ -73,9 +80,16 @@ contains
             call self%initconfig4()
         case('z')
             call self%initconfig4_zigzag()
-        case default   ! h: helices
-            call log%warn('unknown init_mode ' // init_mode // ' , it will be used the default: helices !')
-            call self%initconfig4()
+        case default   ! s=<init_sim_folder>
+            if ( index(init_mode, 's=') > 0 ) then
+                init_sim_folder = trim(init_mode(3:))
+                call log%info('Init folding mode: ' // init_sim_folder)
+                call self%initconfig_sim_out(init_sim_folder, trajectory_i)
+            else
+                call log%error('unknown init_mode ' // init_mode // ' , it will be used the default: helices !')
+                ! call self%initconfig4()
+                call exit(1)
+            end if
         end select
 
         !make simulations
@@ -352,6 +366,83 @@ contains
         return
 
     end subroutine initconfig4_zigzag
+
+    subroutine initconfig_sim_out(self, sim_out_dir, trajectory_i)
+        implicit none
+        class (PolymerModel), intent(inout) :: self
+        character(*), intent(in) :: sim_out_dir
+        integer, intent(in) :: trajectory_i
+        character(1000) :: config_3dpoys_le_file
+        character(1000) :: config_out_file
+        integer :: initNchain, initNiter, initNmeas, initNinter, skip_monomers
+        type(MonomerConfig) :: monomer_config
+        integer :: rc
+        integer :: a, n, v, b, lim, v1
+
+        config_3dpoys_le_file = trim(sim_out_dir) // '/3dpoys_le.cfg'
+        config_out_file = trim(sim_out_dir) // '/config.out'
+
+        call load_config_file(config_3dpoys_le_file, iostat=rc)
+        if (rc /= 0) then
+            call log%error('Could not find or open input configuration file: ' // trim(config_out_file))
+            call print_help()
+            call exit(1)
+        end if
+        call read_config('Nchain',   initNchain)
+        call read_config('Niter',    initNiter)
+        call read_config('Nmeas',    initNmeas)
+        call read_config('Ninter',   initNinter)
+
+        if ( .not. initNchain == self%Nchain ) then
+            call log%error('Not compatible intialazing Nchain ' // trim(str(initNchain)) &
+                    // ' expected ' // trim(str(self%Nchain)))
+            call exit(1)
+        end if
+
+        lim = 2 * self%L - 2
+        self%config = 0
+
+        open(30, file = trim(config_out_file), action = 'read', iostat = rc)
+        if (rc == 0) then
+            ! jump to the last measure, shift by trajectory index
+            skip_monomers =  ((mod(trajectory_i-1, initNiter)+1) * (initNmeas-1) * initNchain)
+            call log%info('Load config_out_file file ' // trim(config_out_file) &
+                    // ' and for trajectory ' // trim(str(trajectory_i)) // ' skip ' // trim(str(skip_monomers)))
+
+            do n=1, skip_monomers
+                read(30, *, iostat = rc) monomer_config
+                if (rc /= 0) exit
+            end do
+
+            do n=1, self%Nchain
+                read(30, *, iostat = rc) monomer_config
+                if (rc /= 0) exit
+                a = monomer_config%laticeAddr
+                v1 = monomer_config%nextTurn
+                self%config(1, n) = a
+                self%config(2, n) = v1
+                self%bittable(1, a) = self%bittable(1, a) + 1
+            end do
+
+            !!! NEW: Interaction state
+            self%bittable(14,:)=0
+            do n=1, self%Nchain
+                if (self%interaction_sites_state(n).gt.0) then
+                    a=self%config(1,n)
+                    self%bittable(14,a)=self%bittable(14,a)+1
+                    do v=1,12
+                        b=self%bittable(v+1,a)
+                        self%bittable(14,b)=self%bittable(14,b)+1
+                    end do
+                end if
+            end do
+            !!!!!!!!!!!!!!!!!!!!!!!!!
+        end if
+        close(30)
+
+        return
+
+    end subroutine initconfig_sim_out
 
     subroutine trialmoveex(self)
         ! trial move to move a LEF leg
@@ -1023,7 +1114,7 @@ contains
         if (burnin > 0) then
             burn_Nmeas = burn_Nmeas + 1
 
-            ! choose rondome simulation burn-in timw = initial_burnin + random_fraction * initial_burnin
+            ! choose rondome simulation burn-in time = initial_burnin + random_fraction * initial_burnin
             ! add random time (a fraction) after the initial burn-in time
             r = randomnumber()
             simburnin = burnin + int(r * burnin)
