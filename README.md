@@ -162,6 +162,8 @@ target Hi-C data (upper part).
 ![Figure_3.png](Figure_3.png)
 Figure 3. Examples of simulated Hi-C maps for several loop extrusion scenarios.
 
+#### 5.1. Continue option
+
 Any simulation's configuration can be continued with different configuration scenario for polymer with the same length (parameter *Nchain*) 
 by using the *init_mode* parameter (*im:s=<sim_output_folder>*).
 Where the <sim_output_folder> is the output folder of the simulation which will be used as initializing polymer configuration.
