@@ -1,6 +1,11 @@
 # Release notes #
 
-## 2023.5
+## 2024.1
+
+### Added
+- Continue option: continue simulation with different configuration scenario
+
+## 2024.1
 
 ### Added 
 - interaction sites to simulate liquid-liquid phase separation

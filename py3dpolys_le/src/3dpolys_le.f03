@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2023.5'
+    character(*), parameter :: VERSION = '2024.1'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2023.5'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2024.1'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -94,7 +94,8 @@ subroutine print_help()
     print*, '   -m|--km:<km_val>: km value, overwriting the one from the inpiut.dat'
     print*, '   -bd|--boundary_direction:<boundary_direction>: impermeability direction applied to all boundaries:&
             & -1:opposite direction, 0:both, 1:same direction. Default: 0'
-    print*, '   -im|--init_mode:<init_mode>: Initial folding mode: h for helices-like, z for zigzag-like polymer state.'
+    print*, '   -im|--init_mode:<init_mode>: Initial folding mode: h for helices-like, z for zigzag-like polymer state &
+            & , s=<sim_out_folder> to continue from a finished simulation output folder.'
     print*, '   -z|--z_loop : Allow z_loop for LEFs move, where LEFs can traverse one another. Default: false'
     print*, '   -u|--unidirectional : Unidirectional mode for LEFs move otherwise bidirectional. Default: false=bidirectional'
     print*, '<3dpolys_le.cfg file>: path to the inpit.dat file. Default: ./3dpolys_le.cfg'
@@ -156,7 +157,7 @@ program mainprogram
     character(20) :: chrom = ''
     integer :: ai = 1  ! input argument position the 3dpolys_le.cfg in the CLI, the ai+1 is the output folder
     character(1) :: path_separator, path_sep
-    character(1) :: init_mode = ''
+    character(1000) :: init_mode = ''
 
     integer :: L, Nchain, Niter, Nmeas, Ninter, iku, ikm, ikb, Nlef = 0, burnin = 0, burnout = 0, burnoutM = 0
     !integer :: simburnin = 0, burn_Nmeas = 0
@@ -349,7 +350,7 @@ program mainprogram
                 end if
             elseif ((index(input_options, '--init_mode') > 0).or.(index(input_options, '-im') > 0)) then
                 i = index(input_options, ':')
-                init_mode = trim(input_options(i + 1:i + 2))
+                init_mode = trim(input_options(i + 1:))
                 if (rank == 0) then
                     call log%info('Init folding mode: ' // init_mode)
                 end if
@@ -818,7 +819,7 @@ program mainprogram
                 close(20)
             end if
 
-            call model%init(boundary, loading_sites_factor, interaction_sites_state, init_mode)
+            call model%init(boundary, loading_sites_factor, interaction_sites_state, init_mode, trajectory_i)
 
             call model%do_simulation(trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
 
