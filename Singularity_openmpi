@@ -37,7 +37,7 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_mamba:2024-01-12
     export PATH=$PATH
     echo 'export PATH=/opt/mambaforge/bin:$PATH' >> $SINGULARITY_ENVIRONMENT
     # conda update -q conda # could be cause of the setup package problem
-    mamba update -n base mamba
+    # mamba update -n base mamba # not needed when using a fresh bootstrap image
     mamba init bash
     mamba install -y -q cooler pyranges -c bioconda
     mamba install -y -q numpy pandas matplotlib scipy dask h5py filelock seaborn -c conda-forge
@@ -47,7 +47,7 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_mamba:2024-01-12
 
     echo "Installing Open MPI"
     export OMPI_DIR=/opt/ompi
-    export OMPI_VERSION=4.1.4
+    export OMPI_VERSION=4.1.6
     export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-$OMPI_VERSION.tar.bz2"
     mkdir -p /tmp/ompi
     mkdir -p /opt
