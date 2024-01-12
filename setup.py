@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='py3dpolys_le',
-      version='2023.5',
+      version='2024.1',
       description='3D Polymer Simulations - Loop Extrusion model',
       url='https://gitlab.com/togop/3DPolyS-LE',
       author='Daniel Jost, Todor Gitchev',

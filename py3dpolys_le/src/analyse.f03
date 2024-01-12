@@ -309,7 +309,7 @@ contains
             CALL h5_add_attr_str(file_id, "format", "HDF5:hic_matrix")
             CALL h5_add_attr_str(file_id, "format-url", "https://gitlab.com/togop/3DPolyS-LE")
             CALL h5_add_attr_str(file_id, "format-version", "1")
-            CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2023.5")
+            CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2024.1")
 
             ! Close the dataset.
             CALL h5dclose_f(dset_id, error)
@@ -532,7 +532,7 @@ contains
         CALL h5_add_attr_str(file_id, "format", "HDF5:Cooler3D")
         CALL h5_add_attr_str(file_id, "format-url", "https://gitlab.com/togop/3DPolyS-LE")
         CALL h5_add_attr_str(file_id, "format-version", "1")
-        CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2023.5")
+        CALL h5_add_attr_str(file_id, "generated", "3DPolyS-LEv2024.1")
 
         CALL h5gclose_f(grp_pixels_id, error)
         CALL h5gclose_f(grp_bins_id, error)
