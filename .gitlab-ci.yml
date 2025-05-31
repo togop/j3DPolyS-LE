@@ -78,6 +78,7 @@ publish_pypi_develop:
   stage: publish
   needs: [test]
   script:
+    - source .venv/bin/activate
     - export UV_LINK_MODE=copy
     - uv pip install build twine
     - cat "${PYPIRC}" > ~/.pypirc
