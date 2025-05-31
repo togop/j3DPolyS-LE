@@ -12,7 +12,7 @@ import re
 import numpy as np
 import pandas as pd
 import sys
-from importlib import resources
+from importlib.resources import files, as_file
 
 from py3dpolys_le import hic_analysis as ha
 from py3dpolys_le.job_runner import CfgJobRunner, CFG_SECTION_3DPOLYS_LE
@@ -425,9 +425,11 @@ class DccExtrusionRunner:
         return jobid
 
     def get_cmd_prefix(self, dcc_args, mpirun=False):
-        # TODO find better way to separate the Slurm problem
-        cmd_sh = resources.path('py3dpolys_le.bin', 'cmd.sh')  # TODO try 'cmd.sh'(setup.py), maybe not working
-        container_prefix = self._job_runner.get_property(profile='', name='container_prefix')
+        # TODO find a better way to separate the Slurm problem
+        # cmd_sh = resources.path('py3dpolys_le.bin', 'cmd.sh')  # TODO try 'cmd.sh'(setup.py), maybe not working
+        with as_file(files('py3dpolys_le.bin') / 'cmd.sh') as cmd_sh_path:
+            cmd_sh = str(cmd_sh_path)
+            container_prefix = self._job_runner.get_property(profile='', name='container_prefix')
         if container_prefix:
             cmd_sh = os.path.join(dcc_args.output_folder, 'cmd.sh')
             if not os.path.exists(cmd_sh):

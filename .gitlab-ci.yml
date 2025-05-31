@@ -12,24 +12,27 @@ stages:
   - production
 
 image:
-  togop/gcc_gfortran_openmpi_hdf5_python_mamba:2023-06-16
+  togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-05-31
+#  togop/gcc_gfortran_openmpi_hdf5_python_mamba:2023-06-16
+#  debian:stable-slim
 
 before_script:
     # - apt-get update
     - echo "$SYLABS_TOKEN"
-    - echo "PATH=$PATH:/opt/mambaforge/bin/" >> ~/.bashrc
-    - source ~/.bashrc
-    - mamba update -n base mamba
-    - mamba init bash
-    - source ~/.bashrc
+#    - echo "PATH=$PATH:/opt/mambaforge/bin/" >> ~/.bashrc
+#    - source ~/.bashrc
+#    - mamba update -n base mamba
+#    - mamba init bash
+#    - source ~/.bashrc
     - python --version
-    - pip --version
-    - mamba --version
-    #- make env
-    - mamba install -y -q cooler pyranges -c bioconda
-    - mamba install -y -q numpy pandas matplotlib scipy dask h5py filelock seaborn -c conda-forge
-    - mamba install -y -q build
-    - mamba install -y -q cmake
+    - uv --version
+#    - pip --version
+#    - mamba --version
+    - make venv
+#    - mamba install -y -q cooler pyranges -c bioconda
+#    - mamba install -y -q numpy pandas matplotlib scipy dask h5py filelock seaborn -c conda-forge
+#    - mamba install -y -q build
+#    - mamba install -y -q cmake
     #- python -m ensurepip --upgrade
     - make all
     - export OMPI_ALLOW_RUN_AS_ROOT=1

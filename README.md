@@ -45,6 +45,11 @@ sudo apt-get install gfortran
 sudo apt-get install gcc
 ```
 
+On MacOs, you can use:
+```
+brew install gcc
+```
+
 For example on an HPC cluster (Slurm) you might need to load the following modules:
 
 ###### Conda (https://conda.io)
@@ -64,6 +69,11 @@ Alternatively, on an Ubuntu/Debian Linux could be installed like hits:
 conda install hdf5
 ```
 
+On MacOs, you can use:
+```
+brew install hdf5
+```
+
 ###### MPI (Message Passing Interface)
 ```
 # https://www.open-mpi.org/
@@ -78,6 +88,11 @@ On an Ubuntu/Debian Linux could be installed like hits:
 sudo apt-get install mpich
 ```
 
+On MacOs, you can use:
+```
+brew install mpich
+```
+
 ###### CMake (https://cmake.org/)
 On an HPC cluster (Slurm) you might need to load like this:
 ```
@@ -86,6 +101,11 @@ module load CMake
 Alternatively, you can install it using Conda:
 ```
 conda install cmake
+```
+
+On MacOs, you can use:
+```
+brew install cmake
 ```
 
 This module is required only when you build and install the py3DPlyS-LE package. 

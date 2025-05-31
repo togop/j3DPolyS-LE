@@ -1,0 +1,11 @@
+cooler
+pyranges
+numpy
+pandas
+matplotlib
+scipy
+filelock
+h5py
+dask
+seaborn
+build

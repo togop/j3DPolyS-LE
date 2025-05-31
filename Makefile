@@ -11,6 +11,11 @@ debug:
 env:
 	mamba env create -f environment.yml
 
+venv:
+	uv venv
+	uv add -r requirements.txt
+#	source .venv/bin/activate
+
 sif:
 	singularity build --force py3DPolyS-LE.sif Singularity
 

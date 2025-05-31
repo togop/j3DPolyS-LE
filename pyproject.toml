@@ -5,7 +5,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'py3dpolys_le'
-version = '2024.1'
+version = '2025.1'
 description = '3D Polymer Simulations - Loop Extrusion model'
 readme = "README.md"
 requires-python = '>=3.10'
@@ -27,17 +27,18 @@ classifiers = [
    # 'Environment :: MacOS X'
 ]
 dependencies = [
-    'cooler',
-    'pyranges',
-    'dask',
-    'numpy',
+    "cooler",
+    "pyranges",
+    "dask",
+    "numpy",
     'cython',
-    'pandas',
-    'matplotlib',
-    'scipy',
-    'filelock',
-    'h5py',
-    'seaborn',
+    "pandas",
+    "matplotlib",
+    "scipy",
+    "filelock",
+    "h5py",
+    "seaborn",
+    "build>=1.2.2.post1",
 ]
 
 [tool.setuptools]
