@@ -81,9 +81,9 @@ publish_pypi_develop:
     - source .venv/bin/activate
     - export UV_LINK_MODE=copy
     - uv pip install build twine
-    - cat "${PYPIRC}" > ~/.pypirc
+    - cat "${UV_PYPIRC}" > ~/.pypirc
     - uv build
-    - uv publish
+    - uv publish -config-file ~/.pypirc
     # - python -m build --wheel --plat-name manylinux1-x86_64
     # - twine upload --repository testpypi dist/* --skip-existing --verbose --config-file ~/.pypirc
   rules:
