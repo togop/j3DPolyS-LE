@@ -31,6 +31,7 @@ doc:
 
 test:
 	# under construction
+	export UV_LINK_MODE=copy
 	uv pip install pytest
 	uv pip install pytest-cov
 	pytest --cov=py3dpolys_le test/
