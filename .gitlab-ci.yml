@@ -83,8 +83,9 @@ publish_pypi_develop:
     - uv pip install build twine
     - cat "${PYPIRC}" > ~/.pypirc
     - uv build
+    - uv publish
     # - python -m build --wheel --plat-name manylinux1-x86_64
-    - twine upload --repository testpypi dist/* --skip-existing --verbose --config-file ~/.pypirc
+    # - twine upload --repository testpypi dist/* --skip-existing --verbose --config-file ~/.pypirc
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
 
