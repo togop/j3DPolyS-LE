@@ -19,17 +19,17 @@ image:
 before_script:
     # - apt-get update
     - echo "$SYLABS_TOKEN"
-    - echo "PATH=$PATH:/opt/uv/" >> ~/.bashrc
+    - echo "PATH=$PATH:/opt/uv" >> ~/.bashrc
     - source ~/.bashrc
 #    - mamba update -n base mamba
 #    - mamba init bash
 #    - source ~/.bashrc
     - which uv
     - uv --version
-    - python --version
 #    - pip --version
 #    - mamba --version
     - make venv
+    - python --version
 #    - mamba install -y -q cooler pyranges -c bioconda
 #    - mamba install -y -q numpy pandas matplotlib scipy dask h5py filelock seaborn -c conda-forge
 #    - mamba install -y -q build
