@@ -20,6 +20,7 @@ sif:
 	singularity build --force py3DPolyS-LE.sif Singularity
 
 install:
+	export UV_LINK_MODE=copy
 	uv pip install -e .
 
 package:

@@ -1,4 +1,5 @@
 .idea/
+.venv
 bin/3dpolys_le
 cmake-build
 cmake-build-debug
