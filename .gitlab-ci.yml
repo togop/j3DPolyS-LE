@@ -24,6 +24,7 @@ before_script:
 #    - mamba update -n base mamba
 #    - mamba init bash
 #    - source ~/.bashrc
+    - which uv
     - uv --version
     - python3 --version
 #    - pip --version
