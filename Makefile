@@ -30,12 +30,12 @@ doc:
 
 test:
 	# under construction
-	mamba install -y -q pytest
-	mamba install -y -q pytest-cov
+	uv pip install pytest
+	uv pip install pytest-cov
 	pytest --cov=py3dpolys_le test/
 
 uninstall:
-	conda env remove --name py3dpolys_le
+	rm -r .venv
 
 clean:
 	cmake --build cmake-build --target clean
