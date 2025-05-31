@@ -29,6 +29,7 @@ before_script:
 #    - pip --version
 #    - mamba --version
     - make venv
+    - source .venv/bin/activate
     - python --version
 #    - mamba install -y -q cooler pyranges -c bioconda
 #    - mamba install -y -q numpy pandas matplotlib scipy dask h5py filelock seaborn -c conda-forge
