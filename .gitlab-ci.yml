@@ -76,6 +76,8 @@ test:
 
 publish_pypi_develop:
   stage: publish
+  environment:
+    name: develop
   needs: [test]
   script:
     - source .venv/bin/activate
@@ -83,7 +85,7 @@ publish_pypi_develop:
     - uv pip install build twine
     - cat "${UV_CONFIG_FILE}" > ~/uv.toml
     - uv build
-    - uv publish --config-file ~/uv.toml
+    - uv publish --config-file ~/uv.toml --index testpypi
     # - python -m build --wheel --plat-name manylinux1-x86_64
     # - twine upload --repository testpypi dist/* --skip-existing --verbose --config-file ~/.pypirc
   rules:
