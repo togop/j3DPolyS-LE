@@ -3,7 +3,7 @@ singularity pull library://todor/default/py3dpolys_le:latest
 # and use the following prefix to all commands bellow
 singularity exec -H $HOME -B $PWD py3dpolys_le_latest.sif
 
-3dpolys_le -o:./demo_run test/demo_run_shell.cfg
-3dpolys_le -o:/cluster/home/gitchevt/3dpolys-le/demo_run -a:/cluster/home/gitchevt/3dpolys-le/demo_run/r2.84 /cluster/home/gitchevt/3dpolys-le/demo_run_shell.cfg
-3dpolys_le_stats -o /cluster/home/gitchevt/3dpolys-le/demo_run -a /cluster/home/gitchevt/3dpolys-le/demo_run/r2.84 -i /cluster/home/gitchevt/3dpolys-le/demo_run_shell.cfg -f /cluster/home/gitchevt/3dpolys-le/sim_stats.csv
-3dpolys_le_runner multi_decay_plot -o /cluster/home/gitchevt/3dpolys-le/demo_run -a /cluster/home/gitchevt/3dpolys_le/demo_run/r2.84 -i /cluster/home/gitchevt/3dpolys-le/demo_run_shell.cfg
+3dpolys_le -o:./out/demo_run test/demo_run_shell.cfg
+3dpolys_le -o:./out/demo_run -a:./out/demo_run/r2.84 test/demo_run_shell.cfg
+3dpolys_le_stats -o ./out/demo_run -a ./out/demo_run/r2.84 -i test/demo_run_shell.cfg -f sim_stats.csv
+3dpolys_le_runner multi_decay_plot -o ./out/demo_run -a ./out/demo_run/r2.84 -i test/demo_run_shell.cfg

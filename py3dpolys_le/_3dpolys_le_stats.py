@@ -96,8 +96,8 @@ def main():
     hic_folder = os.path.dirname(sim_hic_file)
     plots_folder = os.path.join(hic_folder, ha.PLOTS_FOLDER)
 
-    plot_cmap = cfg_job_runner.get_property(profile='stats', name='plot_cmap')
-    plot_format = cfg_job_runner.get_property(profile='stats', name='plot_format')
+    plot_cmap = cfg_job_runner.get_property(profile='stats', name='plot_cmap', default=ha.CMAP)
+    plot_format = cfg_job_runner.get_property(profile='stats', name='plot_format', default=ha.PLOT_FORMAT)
 
     # need only normed for chi2_log and chi2_linear and for given tads-boundary sites and 1tad(the whole chromosome)
     if exp_cool:
