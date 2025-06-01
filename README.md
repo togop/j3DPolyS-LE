@@ -154,11 +154,13 @@ uv pip install cooler pyranges numpy pandas matplotlib scipy filelock h5py dask 
 
 Installing 3DPolyS-LE using pip (experimental):
 ```
+export UV_LINK_MODE=copy
 uv pip install py3dpolys-le
 ```
 
 For a development release, specifying the exact version, use for example:
 ```
+export UV_LINK_MODE=copy
 uv pip install -i https://test.pypi.org/simple/ py3dpolys-le==2025.2.dev3
 ```
 On macOS, it is recommended to build from source (see "2. Build and install").
@@ -174,6 +176,9 @@ Check commands help with the following commands:
 plot_hic -h
 plot_sim_stats -h
 ```
+
+Download test configuration files from https://gitlab.com/togop/3DPolyS-LE/-/tree/master/test?ref_type=heads , 
+and unzip them in our working folder. You should have a subfolder `test` with all demo configuration files. 
 
 Run a demo simulation:
 ```
