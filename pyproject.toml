@@ -5,7 +5,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'py3dpolys_le'
-version = '2025.1'
+version = '2025.1.dev1'
 description = '3D Polymer Simulations - Loop Extrusion model'
 readme = "README.md"
 requires-python = '>=3.10'

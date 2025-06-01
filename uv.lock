@@ -973,7 +973,7 @@ wheels = [
 
 [[package]]
 name = "py3dpolys-le"
-version = "2025.1"
+version = "2025.1.dev1"
 source = { editable = "." }
 dependencies = [
     { name = "build" },
