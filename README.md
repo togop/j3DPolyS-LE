@@ -159,7 +159,7 @@ uv pip install py3dpolys-le
 
 For a development release, specifying the exact version, use for example:
 ```
-uv pip install -i https://test.pypi.org/simple/ py3dpolys-le==2025.2.dev2
+uv pip install -i https://test.pypi.org/simple/ py3dpolys-le==2025.2.dev3
 ```
 On macOS, it is recommended to build from source (see "2. Build and install").
 
