@@ -24,7 +24,7 @@ Packages and libraries:
 - **GNU make** version 3.81 or higher;
 - **CMake** version 3.15.0 or higher;
 - **Python** 3.10, all required packages are listed in the requirements.txt file and alternatively in the environment.yml file;
-- **Mamba** version 1.1.0 or higher.
+- **UV** version 0.6.16 or higher.
 
 for previous version v2022.9:
  - **Python** 3.7, 3.8. 3.9;
@@ -52,13 +52,14 @@ brew install gcc
 
 For example on an HPC cluster (Slurm) you might need to load the following modules:
 
-###### Conda (https://conda.io)
+###### UV (https://github.com/astral-sh/uv)
 ```
-module load Anaconda3
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
-Alternative could be installation of Mambaforge (https://docs.conda.io/en/latest/miniconda.html)
-
-Alternative could be installation of Miniconda (https://docs.conda.io/en/latest/miniconda.html)
+Or, from PyPI:
+```
+pip install uv
+```
 
 ###### HDF5 (https://www.hdfgroup.org/solutions/hdf5/)
 ```
@@ -66,7 +67,7 @@ module load HDF5
 ```
 Alternatively, on an Ubuntu/Debian Linux could be installed like hits:
 ```
-conda install hdf5
+uv pip install h5py
 ```
 
 On MacOs, you can use:
@@ -100,7 +101,7 @@ module load CMake
 ```
 Alternatively, you can install it using Conda:
 ```
-conda install cmake
+uv pip install cmake
 ```
 
 On MacOs, you can use:
@@ -127,32 +128,38 @@ To build and install as Python package, run the following commands:
 ```
 # go to the cloned repository project folder 
 cd 3DPolyS-LE 
+make venv
 make all
 ```
 
 #### Alternative installation from the Python Package Index (PyPi) repository.
 With prebuild binaries for some Linux and macOS system environments.
 
-If you already use Conda as a package manager, switching to alternative more efficient Mamba package manager is recommended.
+If you already use UV as a package manager:
 ```
-conda install -c conda-forge mamba
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
+For more datails see https://docs.astral.sh/uv/getting-started/installation/
 
 Creating a dedicated Python environment is also recommended:
 ```
-mamba create -n py3dpolys_le python=3.10
-mamba activate py3dpolys_le
+uv venv
+source .venv/bin/activate
 ```
 
-Installing dependencies (tested on _mamba_ v1.4.1):
+Installing dependencies (tested on _uv 0.6.16_):
 ```
-mamba install cooler pyranges -c bioconda
-mamba install numpy pandas matplotlib scipy dask h5py filelock seaborn -c conda-forge
+uv pip install cooler pyranges numpy pandas matplotlib scipy filelock h5py dask seaborn openmpi setuptools
 ```
 
 Installing 3DPolyS-LE using pip (experimental):
 ```
-pip install py3dpolys-le
+uv pip install py3dpolys-le
+```
+
+For a development release, use:
+```
+uv pip install -i https://test.pypi.org/simple/ py3dpolys-le
 ```
 
 ### 3. Test installation
@@ -165,6 +172,14 @@ Check commands help with the following commands:
 3dpolys_le_stats -h
 plot_hic -h
 plot_sim_stats -h
+```
+
+Run a demo simulation:
+```
+mpirun 3dpolys_le -o:./out/demo_run test/demo_run_shell.cfg
+3dpolys_le -o:./out/demo_run -a:./out/demo_run/r2.84 test/demo_run_shell.cfg
+3dpolys_le_stats -o ./out/demo_run -a ./out/demo_run/r2.84 -i test/demo_run_shell.cfg -f sim_stats.csv
+3dpolys_le_runner multi_decay_plot -o ./out/demo_run -a ./out/demo_run/r2.84 -i test/demo_run_shell.cfg
 ```
 
 If everything was installed properly the complete help should be printed out, otherwise check the '6.Troubleshooting' section bellow.

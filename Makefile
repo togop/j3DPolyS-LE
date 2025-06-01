@@ -8,13 +8,11 @@ debug:
 	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build-debug -S . -DCMAKE_BUILD_TYPE=Debug
 	cmake --build cmake-build-debug --target 3dpolys_le -- -j 6
 
-env:
-	mamba env create -f environment.yml
-
 venv:
 	uv venv
 	uv add -r requirements.txt
-#	source .venv/bin/activate
+	# source .venv/bin/activate
+	# uv pip install -r requirements.txt
 
 sif:
 	singularity build --force py3DPolyS-LE.sif Singularity

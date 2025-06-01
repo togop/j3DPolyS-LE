@@ -8,5 +8,6 @@ filelock
 h5py
 dask
 seaborn
+openmpi
 setuptools
 #build

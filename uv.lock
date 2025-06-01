@@ -740,6 +740,15 @@ wheels = [
 ]
 
 [[package]]
+name = "openmpi"
+version = "0.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/46/f2/ac705c7a6bc58111976870e51f646394e0530da687d6d407ea16c72e83ca/openmpi-0.0.0.tar.gz", hash = "sha256:55224dded0893f1da459b4eb8ec73ababbdbec3f59cbfc85d9a75671bdf40a49", size = 809, upload_time = "2024-11-18T19:43:49.936Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b6/f0/eeecd4debe3ecc087a6e173a86c6743cf4fc7e99bcbaf41378d842de0114/openmpi-0.0.0-py3-none-any.whl", hash = "sha256:e70f57821e9aac7173bd6d3ae022d1c929ebab4d50723adbd29d94f57a5b3278", size = 1007, upload_time = "2025-04-07T10:53:48.401Z" },
+]
+
+[[package]]
 name = "packaging"
 version = "25.0"
 source = { registry = "https://pypi.org/simple" }
@@ -924,16 +933,16 @@ wheels = [
 
 [[package]]
 name = "py3dpolys-le"
-version = "2025.1.dev2"
+version = "2025.2.dev1"
 source = { editable = "." }
 dependencies = [
-    { name = "build" },
     { name = "cooler" },
     { name = "dask" },
     { name = "filelock" },
     { name = "h5py" },
     { name = "matplotlib" },
     { name = "numpy" },
+    { name = "openmpi" },
     { name = "pandas" },
     { name = "pyranges" },
     { name = "scipy" },
@@ -951,13 +960,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "build", specifier = ">=1.2.2.post1" },
     { name = "cooler" },
     { name = "dask" },
     { name = "filelock" },
     { name = "h5py" },
     { name = "matplotlib" },
     { name = "numpy" },
+    { name = "openmpi", specifier = ">=0.0.0" },
     { name = "pandas" },
     { name = "pip-tools", marker = "extra == 'dev'" },
     { name = "pyranges" },
