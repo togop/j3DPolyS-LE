@@ -1,11 +1,11 @@
 [build-system]
-requires = ['setuptools', 'sphinx', 'sphinx-argparse', 'sphinx-argparse-cli']   # , "wheel"]
+requires = ['setuptools', 'sphinx', 'sphinx-argparse', 'sphinx-argparse-cli', 'build', 'wheel']
 build-backend = 'setuptools.build_meta'
 #build-backend = "hatchling.build"
 
 [project]
 name = 'py3dpolys_le'
-version = '2024.1'
+version = '2025.2'
 description = '3D Polymer Simulations - Loop Extrusion model'
 readme = "README.md"
 requires-python = '>=3.10'
@@ -27,17 +27,19 @@ classifiers = [
    # 'Environment :: MacOS X'
 ]
 dependencies = [
-    'cooler',
-    'pyranges',
-    'dask',
-    'numpy',
-    'cython',
-    'pandas',
-    'matplotlib',
-    'scipy',
-    'filelock',
-    'h5py',
-    'seaborn',
+    "cooler",
+    "pyranges",
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "scipy",
+    "filelock",
+    "h5py",
+    "dask",
+    "seaborn",
+    "openmpi>=0.0.0",
+    "setuptools<81",
+    #    "build>=1.2.2.post1",
 ]
 
 [tool.setuptools]

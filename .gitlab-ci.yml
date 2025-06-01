@@ -12,24 +12,28 @@ stages:
   - production
 
 image:
-  togop/gcc_gfortran_openmpi_hdf5_python_mamba:2023-06-16
+  togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-05-31
 
 before_script:
-    # - apt-get update
+    #- apt-get update
+    - curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/opt/uv" sh
     - echo "$SYLABS_TOKEN"
-    - echo "PATH=$PATH:/opt/mambaforge/bin/" >> ~/.bashrc
+    - echo "PATH=$PATH:/opt/uv" >> ~/.bashrc
     - source ~/.bashrc
-    - mamba update -n base mamba
-    - mamba init bash
-    - source ~/.bashrc
+#    - mamba update -n base mamba
+#    - mamba init bash
+#    - source ~/.bashrc
+    - which uv
+    - uv --version
+#    - pip --version
+#    - mamba --version
+    - make venv
+    - source .venv/bin/activate
     - python --version
-    - pip --version
-    - mamba --version
-    #- make env
-    - mamba install -y -q cooler pyranges -c bioconda
-    - mamba install -y -q numpy pandas matplotlib scipy dask h5py filelock seaborn -c conda-forge
-    - mamba install -y -q build
-    - mamba install -y -q cmake
+#    - mamba install -y -q cooler pyranges -c bioconda
+#    - mamba install -y -q numpy pandas matplotlib scipy dask h5py filelock seaborn -c conda-forge
+#    - mamba install -y -q build
+#    - mamba install -y -q cmake
     #- python -m ensurepip --upgrade
     - make all
     - export OMPI_ALLOW_RUN_AS_ROOT=1
@@ -71,28 +75,36 @@ test:
 
 publish_pypi_develop:
   stage: publish
+  environment:
+    name: develop
   needs: [test]
   script:
-    - pip install build twine
-    - cat "${PYPIRC}" > ~/.pypirc
-    - python -m build
-    - python setup.py bdist_wheel --plat-name manylinux1-x86_64
-    - twine upload --repository testpypi dist/* --skip-existing --verbose --config-file ~/.pypirc
+    - source .venv/bin/activate
+    - export UV_LINK_MODE=copy
+    - uv pip install build twine
+    - cat "${UV_CONFIG_FILE}" > ~/uv.toml
+    - uv build
+    - uv publish --config-file ~/uv.toml --index testpypi
+    # - python -m build --wheel --plat-name manylinux1-x86_64
+    # - twine upload --repository testpypi dist/* --skip-existing --verbose --config-file ~/.pypirc
   rules:
     - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"
 
 # not yet ready
-#publish_pypi_master:
-#  stage: publish
-#  needs: [test]
-#  script:
-#    - pip install build twine
-#    - cat "${PYPIRC}" > ~/.pypirc
+publish_pypi_production:
+  stage: publish
+  needs: [test]
+  environment:
+    name: develop
+  script:
+    - uv pip install build twine
+    - uv build
+    - uv publish
 #    - python -m build
 #    - python setup.py bdist_wheel --plat-name manylinux1-x86_64
 #    - twine upload dist/* --skip-existing --verbose --config-file ~/.pypirc
-#  rules:
-#    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 singularity:
   stage: production

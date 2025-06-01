@@ -1,9 +1,22 @@
 # Release notes #
 
+## 2025.2
+
+### Fixed
+- Handling missing parameters "plot_format" and "plot_cmap" using default values.
+
+### Changed
+- improve compatibility with Python version >= 3.11
+- Switch to using UV as a Python package manager
+- Updated Singularity image
+
+### Added
+- PyPi package installation
+
 ## 2024.1
 
 ### Added
-- Continue option: continue simulation with different configuration scenario
+- Continue option: continue simulation with a different configuration scenario
 
 ## 2023.5
 

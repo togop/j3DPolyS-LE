@@ -90,18 +90,18 @@ class CfgJobRunner(JobRunner):
             value = ''
         return value
 
-    def get_property(self, profile, name):
-        value = ''
+    def get_property(self, profile, name, default=''):
+        value = default
         if profile:
             try:
                 value = self._config.get('job_runner_' + profile, name)
             except (configparser.NoOptionError, configparser.NoSectionError) as e:
-                value = ''
+                value = default
         if not value:
             try:
                 value = self._config.get('job_runner', name)
             except (configparser.NoOptionError, configparser.NoSectionError) as e:
-                value = ''
+                value = default
         return value
 
     def _cmd_run_shell(self, profile) -> bool:
