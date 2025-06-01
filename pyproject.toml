@@ -1,5 +1,5 @@
 [build-system]
-requires = ['setuptools<81', 'sphinx', 'sphinx-argparse', 'sphinx-argparse-cli', 'build>=1.2.2.post1']   # , "wheel"]
+requires = ['setuptools', 'sphinx', 'sphinx-argparse', 'sphinx-argparse-cli', 'build']   # , "wheel"]
 build-backend = 'setuptools.build_meta'
 #build-backend = "hatchling.build"
 
@@ -37,9 +37,8 @@ dependencies = [
     "h5py",
     "dask",
     "seaborn",
-#    "setuptools<81",
+    "setuptools<81",
     #    "build>=1.2.2.post1",
-#    "build>=1.2.2.post1",
 ]
 
 [tool.setuptools]

@@ -8,5 +8,5 @@ filelock
 h5py
 dask
 seaborn
-#setuptools
+setuptools
 #build
