@@ -157,10 +157,11 @@ Installing 3DPolyS-LE using pip (experimental):
 uv pip install py3dpolys-le
 ```
 
-For a development release, use:
+For a development release, specifying the exact version, use for example:
 ```
-uv pip install -i https://test.pypi.org/simple/ py3dpolys-le
+uv pip install -i https://test.pypi.org/simple/ py3dpolys-le==2025.2.dev1
 ```
+On macOS, it is recommended to build from source (see "2. Build and install").
 
 ### 3. Test installation
 
@@ -182,13 +183,13 @@ mpirun 3dpolys_le -o:./out/demo_run test/demo_run_shell.cfg
 3dpolys_le_runner multi_decay_plot -o ./out/demo_run -a ./out/demo_run/r2.84 -i test/demo_run_shell.cfg
 ```
 
-If everything was installed properly the complete help should be printed out, otherwise check the '6.Troubleshooting' section bellow.
+If everything was correctly installed, the complete help should be printed out. Otherwise, check the '6.Troubleshooting' section below.
 
 ### 4. Additional outputs
 
 ![Figure_2.png](Figure_2.png)
 Figure 2. (A) Grid-simulations run with a `3dpolys_le_runner grid_nlef_km --nlef_list --km_list` command and plotted with 
-a `plot_sim_stats --stats_file` command to find the best set of parameters that fit a target data. For each parameter set, a Chi2-score is estimated. Example of optimization by varying the
+a `plot_sim_stats --stats_file` command to find the best set of parameters that fit the target data. For each parameter set, a Chi2-score is estimated. Example of optimization by varying the
 LEF density and extruding speed with synthetic human Hi-C data as target (see Paper's Supp. Methods). (B) Best Hi-C map model predictions from the simulations in (A) (lower part) compared to
 target Hi-C data (upper part).
 
@@ -232,31 +233,23 @@ cd 3DPolyS-LE
 
 Build the default *3DPolyS-LE*'s Python environment *py3dpolys_le*:
 ```
-make env
+make venv
 ```
 If your default Python version is a bit old you might need to specify a newer version.
 In this case, you can install the *py3dpolys_le* like that:
 ```
-mamba env create -f environment.yml python=3.10
+uv venv --python 3.12
 # or
-mamba create -n py3dpolys_le python=3.10
-mamba activate py3dpolys_le
-mamba install -y -q numpy pandas matplotlib scipy dask h5py filelock seaborn build cmake -c conda-forge
-mamba install -y -q cooler pyranges -c bioconda
+source .venv/bin/activate
+uv pip install cooler pyranges numpy pandas matplotlib scipy dask h5py filelock seaborn openmpi setuptools build cmake 
 ```
 
-Active your *py3dpolys_le* environment:
-```
-mamba activate py3dpolys_le
-# or
-source activate py3dpolys_le
-```
 Finally, build and install:
 ```
 make all
 ```
 
-Check you installation as shown in the 'Test installation' section above. 
+Check your installation as shown in the 'Test installation' section above. 
 
 - In case of such an error:
 ```

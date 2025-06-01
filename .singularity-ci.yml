@@ -13,7 +13,7 @@ singularity-image:
     - mkdir -p ~/.singularity
     - cat "$SYLABS_TOKEN" > ~/.singularity/sylabs-token
     - singularity remote login SylabsCloud < ~/.singularity/sylabs-token
-    - singularity build --remote --force library://todor/default/py3dpolys_le:v2025.1 Singularity_openmpi
+    - singularity build --remote --force library://todor/default/py3dpolys_le:v2025.2 Singularity_openmpi
     #TODO - singularity build --remote --force library://todor/default/py3dpolys_le:latest Singularity
     #- singularity pull py3dpolys_le.sif library://todor/default/py3dpolys_le:latest
     #- singularity key list
