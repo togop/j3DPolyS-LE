@@ -12,12 +12,17 @@ stages:
   - production
 
 image:
-  togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-05-31
+#  togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-05-31
 #  togop/gcc_gfortran_openmpi_hdf5_python_mamba:2023-06-16
-#  debian:stable-slim
+  debian:stable-slim
 
 before_script:
-    # - apt-get update
+    - apt-get update
+    - apt-get install --yes gcc
+    - apt-get install --yes gfortran
+    - apt-get install --yes cmake
+    - apt-get install --yes curl
+    - curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/opt/uv" sh
     - echo "$SYLABS_TOKEN"
     - echo "PATH=$PATH:/opt/uv" >> ~/.bashrc
     - source ~/.bashrc
