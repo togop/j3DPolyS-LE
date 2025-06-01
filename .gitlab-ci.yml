@@ -72,6 +72,9 @@ test:
     - ./test/test.sh ./out-8860/r2.84/hic_002_hot_r.png
     - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5.10000_decay_probs_lin.txt
     - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5.10000_decay_probs_log.txt
+  only:
+    - branches
+    - merge_requests
 
 publish_pypi_develop:
   stage: publish
@@ -95,7 +98,7 @@ publish_pypi_production:
   stage: publish
   needs: [test]
   environment:
-    name: develop
+    name: production
   script:
     - uv pip install build twine
     - uv build
@@ -104,7 +107,8 @@ publish_pypi_production:
 #    - python setup.py bdist_wheel --plat-name manylinux1-x86_64
 #    - twine upload dist/* --skip-existing --verbose --config-file ~/.pypirc
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
 
 singularity:
   stage: production
