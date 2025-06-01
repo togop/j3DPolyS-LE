@@ -8,14 +8,18 @@ debug:
 	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build-debug -S . -DCMAKE_BUILD_TYPE=Debug
 	cmake --build cmake-build-debug --target 3dpolys_le -- -j 6
 
-env:
-	mamba env create -f environment.yml
+venv:
+	uv venv
+	uv add -r requirements.txt
+	# source .venv/bin/activate
+	# uv pip install -r requirements.txt
 
 sif:
 	singularity build --force py3DPolyS-LE.sif Singularity
 
 install:
-	pip install -e .
+	export UV_LINK_MODE=copy
+	uv pip install -e .
 
 package:
 	python -m build
@@ -25,12 +29,13 @@ doc:
 
 test:
 	# under construction
-	mamba install -y -q pytest
-	mamba install -y -q pytest-cov
+	export UV_LINK_MODE=copy
+	uv pip install pytest
+	uv pip install pytest-cov
 	pytest --cov=py3dpolys_le test/
 
 uninstall:
-	conda env remove --name py3dpolys_le
+	rm -r .venv
 
 clean:
 	cmake --build cmake-build --target clean

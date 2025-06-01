@@ -58,7 +58,6 @@ message( STATUS "HDF5_Fortran_HL_LIBRARIES: " ${HDF5_Fortran_HL_LIBRARIES} )
 message( STATUS "HDF5_INCLUDE_DIRS: " ${HDF5_INCLUDE_DIRS} )
 message( STATUS "HDF5_Fortran_INCLUDE_DIRS: " ${HDF5_Fortran_INCLUDE_DIRS} )
 message( STATUS "HDF5_LIBRARIES: " ${HDF5_LIBRARIES} )
-message( STATUS "HDF5_Fortran_LIBRARIES: " ${HDF5_Fortran_LIBRARIES} )
 message( STATUS "HDF5_LIBRARY_DIRS: " ${HDF5_LIBRARY_DIRS} )
 
 SET(CMAKE_Fortran_MODULE_DIRECTORY "${CMAKE_Fortran_MODULE_DIRECTORY}")
@@ -88,7 +87,7 @@ if(CMAKE_Fortran_COMPILER MATCHES "gfortran*")
     #Compiler gfortran Flags
     set(CMAKE_Fortran_FLAGS "-O3 -fimplicit-none") #  -lhdf5_fortran -fintrinsic-modules-path ${HDF5_INCLUDE_DIRS}") # /usr/local/include") #  TODO find metter way to include ${HDF5_INCLUDE_DIRS}")  #/usr/local/include")  # -lhdf5hl_fortran")          # -std=f2003 ${CMAKE_Fortran_FLAGS}  -qopenmp
     set(CMAKE_Fortran_FLAGS_DEBUG "-g -O0 -Wall -fbacktrace -fbounds-check")  #   -fcheck=bounds
-    set(CMAKE_Fortran_FLAGS_RELEASE "-O3  -Wall")
+    set(CMAKE_Fortran_FLAGS_RELEASE "-O3  -Wall -static")
 
     set(CMAKE_C_FLAGS "-c")
 endif()

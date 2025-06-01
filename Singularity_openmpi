@@ -1,9 +1,9 @@
 Bootstrap: docker
-From:   togop/gcc_gfortran_openmpi_hdf5_python_mamba:2024-01-12
+From:   togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-05-31
 
 %labels
     Author todor.gitchev@gmail.com
-    Version v2024.1
+    Version v2025.2
 
 %help
     3D Polymer Simulation of chromosome folding by modeled loop extrusion
@@ -33,21 +33,14 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_mamba:2024-01-12
 %post
     # apt-get update # just updated bootstrap
     # Install py3dpolys_le package
-    PATH=/opt/mambaforge/bin:$PATH
+    PATH=/opt/uv:$PATH
     export PATH=$PATH
-    echo 'export PATH=/opt/mambaforge/bin:$PATH' >> $SINGULARITY_ENVIRONMENT
-    # conda update -q conda # could be cause of the setup package problem
-    # mamba update -n base mamba # not needed when using a fresh bootstrap image
-    mamba init bash
-    mamba install -y -q cooler pyranges -c bioconda
-    mamba install -y -q numpy pandas matplotlib scipy dask h5py filelock seaborn -c conda-forge
-    mamba install -y -q build
-    mamba install -y -q cmake
+    echo 'export PATH=/opt/uv:$PATH' >> $SINGULARITY_ENVIRONMENT
     apt-get install -y git bash wget
 
     echo "Installing Open MPI"
     export OMPI_DIR=/opt/ompi
-    export OMPI_VERSION=4.1.6
+    export OMPI_VERSION=4.1.8
     export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-$OMPI_VERSION.tar.bz2"
     mkdir -p /tmp/ompi
     mkdir -p /opt
@@ -62,8 +55,9 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_mamba:2024-01-12
     cd /
     git clone https://gitlab.com/togop/3DPolyS-LE.git -b develop
     cd 3DPolyS-LE
+    uv add -r requirements.txt
     make build
-    pip install -e /3DPolyS-LE
+    uv pip install -e /3DPolyS-LE
 
 %runscript
     echo "Container py3DPolyS_LE was created $NOW"

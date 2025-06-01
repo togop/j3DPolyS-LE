@@ -1,4 +1,5 @@
 .idea/
+.venv
 bin/3dpolys_le
 cmake-build
 cmake-build-debug
@@ -16,3 +17,4 @@ py3dpolys_le.egg-info/
 .Rproj
 .RData
 .Rhistory
+uv.toml
