@@ -49,9 +49,9 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-05-31
     cd /
     git clone https://gitlab.com/togop/3DPolyS-LE.git -b develop
     cd 3DPolyS-LE
-    uv pip install -r requirements.txt
+    uv pip install --system -r requirements.txt
     make build
-    uv pip install -e /3DPolyS-LE
+    uv pip install /3DPolyS-LE
 
 %runscript
     echo "Container py3DPolyS_LE was created $NOW"
