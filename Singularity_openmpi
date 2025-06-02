@@ -22,13 +22,7 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-05-31
      export OMPI_DIR=/opt/ompi
      export SINGULARITY_OMPI_DIR=$OMPI_DIR
      export SINGULAIRTYENV_PREPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
-     export SINGULARITYENV_PREPEND_PATH=$OMPI_DIR/bin:/opt/miniconda3/bin:
-     # export PATH=$OMPI_DIR/bin:/opt/miniconda3/bin:$PATH
-     # if using from the Docke image: not tested
-     # export OMPI_DIR=/usr/bin
-     # export SINGULARITY_OMPI_DIR=$OMPI_DIR
-     # export SINGULARITYENV_APPEND_PATH=$OMPI_DIR
-     # export SINGULAIRTYENV_APPEND_LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/openmpi/lib/
+     export SINGULARITYENV_PREPEND_PATH=$OMPI_DIR/bin:/opt/uv:
 
 %post
     # apt-get update # just updated bootstrap
@@ -55,7 +49,7 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-05-31
     cd /
     git clone https://gitlab.com/togop/3DPolyS-LE.git -b develop
     cd 3DPolyS-LE
-    uv add -r requirements.txt
+    uv pip install -r requirements.txt
     make build
     uv pip install -e /3DPolyS-LE
 
