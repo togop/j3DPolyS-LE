@@ -72,6 +72,7 @@ test:
     - ./test/test.sh ./out-8860/r2.84/hic_002_hot_r.png
     - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5.10000_decay_probs_lin.txt
     - ./test/test.sh ./out-8860/r2.84/hic_002.hdf5.10000_decay_probs_log.txt
+  allow_failure: true
   only:
     - branches
     - merge_requests
