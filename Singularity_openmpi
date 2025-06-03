@@ -22,7 +22,8 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-05-31
      export OMPI_DIR=/opt/ompi
      export SINGULARITY_OMPI_DIR=$OMPI_DIR
      export SINGULAIRTYENV_PREPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
-     export SINGULARITYENV_PREPEND_PATH=$OMPI_DIR/bin:/opt/uv:
+     export SINGULARITYENV_PREPEND_PATH=$OMPI_DIR/bin:/opt/uv:/3DPolyS-LE/.venv/bin:
+     export VIRTUAL_ENV="/3DPolyS-LE/.venv"
 
 %post
     # apt-get update # just updated bootstrap
@@ -32,29 +33,28 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-05-31
     echo 'export PATH=/opt/uv:$PATH' >> $SINGULARITY_ENVIRONMENT
 
     #echo "Installing Open MPI"
-    #apt-get install -y  bash wget
-    #export OMPI_DIR=/opt/ompi
-    #export OMPI_VERSION=4.1.8
-    #export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-$OMPI_VERSION.tar.bz2"
-    #mkdir -p /tmp/ompi
-    #mkdir -p /opt
-    #cd /tmp/ompi && wget -O openmpi-$OMPI_VERSION.tar.bz2 $OMPI_URL && tar -xjf openmpi-$OMPI_VERSION.tar.bz2
-    ## Compile and install
-    #cd /tmp/ompi/openmpi-$OMPI_VERSION && ./configure --prefix=$OMPI_DIR && make install
-    ## Set env variables so we can compile our application
-    #export PATH=$OMPI_DIR/bin:$PATH
-    #export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
-    #export MANPATH=$OMPI_DIR/share/man:$MANPATH
+    apt-get install -y  bash wget
+    export OMPI_DIR=/opt/ompi
+    export OMPI_VERSION=4.1.8
+    export OMPI_URL="https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-$OMPI_VERSION.tar.bz2"
+    mkdir -p /tmp/ompi
+    mkdir -p /opt
+    cd /tmp/ompi && wget -O openmpi-$OMPI_VERSION.tar.bz2 $OMPI_URL && tar -xjf openmpi-$OMPI_VERSION.tar.bz2
+    # Compile and install
+    cd /tmp/ompi/openmpi-$OMPI_VERSION && ./configure --prefix=$OMPI_DIR && make install
+    # Set env variables so we can compile our application
+    export PATH=$OMPI_DIR/bin:$PATH
+    export LD_LIBRARY_PATH=$OMPI_DIR/lib:$LD_LIBRARY_PATH
+    export MANPATH=$OMPI_DIR/share/man:$MANPATH
 
     apt-get install -y git
     cd /
     git clone https://gitlab.com/togop/3DPolyS-LE.git -b develop
-    # cd 3DPolyS-LE
-    uv add -r /3DPolyS-LE/requirements.txt
-    uv pip install /3DPolyS-LE
+    cd 3DPolyS-LE
+    make venv
+    make all
 
 %runscript
     echo "Container py3DPolyS_LE was created $NOW"
     echo "Arguments received: $*"
-    # source /3DPolyS-LE.venv/bin/activate
     exec echo "$@"
