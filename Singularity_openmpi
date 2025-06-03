@@ -50,7 +50,7 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-05-31
     cd /
     git clone https://gitlab.com/togop/3DPolyS-LE.git -b develop
     # cd 3DPolyS-LE
-    uv pip install -r /3DPolyS-LE/requirements.txt
+    uv add -r /3DPolyS-LE/requirements.txt
     uv pip install /3DPolyS-LE
 
 %runscript
