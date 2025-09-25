@@ -487,7 +487,7 @@ To see all supported parameters, run the following command:
 
 For using the Python wrapper, triggering data analysis (predicted ChIP, HiC/HiC3D, chi2-min score) steps afterwards.
 
-Alternatively, the simulation engine directly is also available via:
+Alternatively, the simulation engine is also directly available via:
 
   `3dpolys_le -h`
 
