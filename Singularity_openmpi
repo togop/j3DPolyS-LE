@@ -55,7 +55,7 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-05-31
     make all
 
 %runscript
-    echo "Container py3DPolyS_LE was created $NOW"
-    echo "Arguments received: $*"
-    PATH="/3DPolyS-LE/.venv/bin:${PATH}"
+    # echo "Container py3DPolyS_LE was created $NOW"
+    # echo "Arguments received: $*"
+    # PATH="/3DPolyS-LE/.venv/bin:${PATH}"
     cd /3DPolyS-LE && . .venv/bin/activate && exec echo "$@"
