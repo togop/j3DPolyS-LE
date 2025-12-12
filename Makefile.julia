@@ -1,0 +1,58 @@
+# Makefile for Julia package operations
+
+.PHONY: install test clean dev-install
+
+# Install the package in development mode
+dev-install:
+	julia -e 'using Pkg; Pkg.develop(path=".")'
+
+# Install the package in production mode
+install:
+	julia -e 'using Pkg; Pkg.add(path=".")'
+
+# Run tests
+test:
+	julia --project=. -e 'using Pkg; Pkg.test()'
+
+# Instantiate dependencies
+deps:
+	julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+# Build PyCall
+build-pycall:
+	julia --project=. -e 'using Pkg; Pkg.build("PyCall")'
+
+# Clean build artifacts
+clean:
+	rm -rf Manifest.toml
+	rm -rf .julia
+	find . -name "*.jl.cov" -delete
+	find . -name "*.jl.*.cov" -delete
+	find . -name "*.jl.mem" -delete
+
+# Format code (requires JuliaFormatter)
+format:
+	julia -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format("src.jl")'
+
+# Check code style (requires JuliaFormatter)
+check-format:
+	julia -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format("src.jl", verbose=true, overwrite=false)'
+
+# Create standalone executables (requires PackageCompiler)
+compile:
+	julia --project=. -e 'using Pkg; Pkg.add("PackageCompiler"); using PackageCompiler; create_app(".", "build/j3DPolySLE_app", executables=["3dpolys_le_runner" => "j3dpolys_le_runner"])'
+
+help:
+	@echo "Available targets:"
+	@echo "  dev-install    - Install package in development mode"
+	@echo "  install       - Install package in production mode"
+	@echo "  test          - Run test suite"
+	@echo "  deps          - Install all dependencies"
+	@echo "  build-pycall  - Rebuild PyCall"
+	@echo "  clean         - Remove build artifacts"
+	@echo "  format        - Format Julia code"
+	@echo "  check-format  - Check code formatting"
+	@echo "  compile       - Create standalone executables"
+	@echo "  help          - Show this help message"
+
+

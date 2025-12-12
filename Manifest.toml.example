@@ -1,0 +1,15 @@
+# This is an example Manifest.toml file
+# The actual Manifest.toml is generated automatically by Julia and should be gitignored
+# This file shows what a typical manifest looks like
+
+# To generate the actual manifest:
+# julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+# The manifest will contain:
+# - Exact versions of all dependencies
+# - Dependency tree
+# - Package UUIDs and checksums
+
+# This ensures reproducible builds across different environments
+
+

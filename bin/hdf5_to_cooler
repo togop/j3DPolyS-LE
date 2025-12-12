@@ -1,0 +1,26 @@
+#!/usr/bin/env julia
+# Command-line interface for hdf5_to_cooler (alias for hic_converters)
+# This script works both when run from the project directory and when the package is installed
+
+# Patch doc! to handle abstract types gracefully - must be BEFORE loading modules
+@eval Base.Docs begin
+    doc!(::Type, ::Base.Docs.Binding, ::Base.Docs.DocStr) = nothing
+    doc!(::Type, ::Any...) = nothing
+end
+
+project_root = abspath(joinpath(@__DIR__, ".."))
+if isfile(joinpath(project_root, "Project.toml"))
+    using Pkg
+    Pkg.activate(project_root)
+    include(joinpath(project_root, "src.jl", "j3DPolySLE.jl"))
+    using .j3DPolySLE
+    j3DPolySLE.HicConverters.hdf5_to_cooler()
+else
+    try
+        using j3DPolySLE
+        j3DPolySLE.HicConverters.hdf5_to_cooler()
+    catch
+        error("j3DPolySLE package not found. Please run from project directory or install with: using Pkg; Pkg.add(\"j3DPolySLE\")")
+    end
+end
+

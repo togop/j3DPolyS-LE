@@ -1,0 +1,49 @@
+#!/bin/bash
+# Wrapper script to call the Fortran 3dpolys_le binary
+# This matches the Python entry point behavior
+
+# Set MPI environment variables to avoid network interface errors
+# This fixes the "OFI call tsenddata failed (default nic=bridge101: No such file or directory)" error
+# Force MPI to use shared memory for single-node execution and completely disable OFI
+
+# OpenMPI environment variables (if binary was compiled with OpenMPI)
+# Note: MCA framework only allows a single ^ at the beginning
+export OMPI_MCA_btl=^openib,usnic,ofi,tcp
+export OMPI_MCA_btl_vader_single_copy_mechanism=none
+export OMPI_MCA_pml=ob1
+export OMPI_MCA_ofi_interface=""
+export OMPI_MCA_orte_ess_base_hnp_uri=""
+export OMPI_MCA_btl_tcp_if_exclude=bridge101,lo,docker0
+export OMPI_MCA_btl_ofi_use_provider=""
+
+# MPICH environment variables (if binary was compiled with MPICH)
+# Note: Setting MPICH environment variables can cause initialization failures
+# We'll leave them unset and accept the OFI finalization error instead
+# The simulation completes successfully before the finalization error occurs
+# If you need to avoid the finalization error, consider:
+# 1. Using OpenMPI and rebuilding the binary
+# 2. Rebuilding MPICH without OFI support
+# 3. Ignoring the finalization error (simulation results are valid)
+
+# Try to find the Fortran binary in common locations
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Look for the Fortran binary
+BINARY_PATH=""
+if [ -f "$PROJECT_ROOT/py3dpolys_le/bin/3dpolys_le" ]; then
+    BINARY_PATH="$PROJECT_ROOT/py3dpolys_le/bin/3dpolys_le"
+elif [ -f "$PROJECT_ROOT/build/lib/py3dpolys_le/bin/3dpolys_le" ]; then
+    BINARY_PATH="$PROJECT_ROOT/build/lib/py3dpolys_le/bin/3dpolys_le"
+elif command -v 3dpolys_le &> /dev/null; then
+    BINARY_PATH="3dpolys_le"
+else
+    echo "Error: Could not find 3dpolys_le Fortran binary" >&2
+    echo "Please build the Fortran code first or ensure it's in your PATH" >&2
+    exit 1
+fi
+
+# Execute the binary with all arguments
+exec "$BINARY_PATH" "$@"
+
+
