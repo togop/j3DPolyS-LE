@@ -4,6 +4,7 @@ Hi-C Analysis module
 module HicAnalysis
 
 import Base.CoreLogging: @info, @warn, @error, @debug
+import Base: splitext, basename, dirname, intersect
 using HDF5
 using DataFrames
 using CSV
@@ -424,13 +425,379 @@ function compare_hic_chromosome(hic_file::String, cmp_hic::String;
     return (0.0, 1.0)
 end
 
-function plot_distance_contact_prob_decay(hic_list::Vector{String}, hic_chrs::Vector{String} = CHR_SYNONYMS,
-                                           tads::Union{String, Nothing} = nothing, exp_cool::Union{String, Nothing} = nothing,
-                                           output_folder::Union{String, Nothing} = nothing, res::Int = RESOLUTION,
-                                           confidence::Float64 = 0.0, replace::Bool = true,
-                                           chi2_mode::String = CHI2_MODE_LOG, format::String = PLOT_FORMAT)::String
-    # Implementation needed
-    return ""
+# Helper function to get decay distribution from HDF5
+function get_decay_distribution_hdf5(hic_h5::String, resolution::Int, confidence::Float64 = 0.0, min_dist::Int = 1, max_dist::Union{Int, Nothing} = nothing)::Tuple{Tuple{Vector{Int}, Vector{Float64}, Vector{Float64}, Vector{Float64}}, Int}
+    hic = get_hic(hic_h5, resolution)
+    dists, probs, probs_confi_l, probs_confi_u = get_decay_distribution(hic, confidence, min_dist, max_dist)
+    return (dists, probs, probs_confi_l, probs_confi_u), size(hic, 1)
+end
+
+# Helper function to get decay distribution from cooler
+function get_decay_distribution_cool(hic_cooler, chr::String, resolution::Int, confidence::Float64 = 0.0, min_dist::Int = 1, max_dist::Union{Int, Nothing} = nothing)::Tuple{Vector{Int}, Vector{Float64}, Vector{Float64}, Vector{Float64}}
+    hic = hic_cooler.matrix(balance=false).fetch(chr)
+    fill_diagonal!(hic, 0)
+    
+    # Convert PyObject binsize to Int - access as Python value and convert
+    binsize_py = hic_cooler.binsize
+    # Try to convert directly - PyCall should handle Python int to Julia Int
+    binsize_val = try
+        Int(binsize_py)
+    catch
+        # Fallback: use Python int() function
+        py_int = pyimport("builtins").int
+        Int(py_int(binsize_py))
+    end
+    resolution_factor = Float64(binsize_val) / Float64(resolution)
+    min_dist_corrected = min_dist !== nothing ? Int(round(Float64(min_dist) / resolution_factor)) : min_dist
+    max_dist_corrected = max_dist !== nothing ? Int(round(Float64(max_dist) / resolution_factor)) : max_dist
+    
+    dists, probs, probs_confi_l, probs_confi_u = get_decay_distribution(hic, confidence, min_dist_corrected, max_dist_corrected)
+    dists_corrected = resolution_factor != 1.0 ? [Int(round(Float64(d) * resolution_factor)) for d in dists] : dists
+    return dists_corrected, probs, probs_confi_l, probs_confi_u
+end
+
+# Helper function to get cooler and chromosome names
+function get_hic_cooler_res(hic_file::String, hic_chrs::Vector{String}, res::Int)
+    py_cooler = pyimport("cooler")
+    hic_cooler = nothing
+    # Try to open as mcool first (multi-resolution cooler)
+    try
+        hic_cooler = py_cooler.Cooler("$hic_file::/resolutions/$res")
+    catch
+        # If that fails, try as single-resolution cooler
+        try
+            hic_cooler = py_cooler.Cooler("$hic_file::/")
+        catch e
+            @error "Failed to open cooler file $hic_file: $e"
+            rethrow(e)
+        end
+    end
+    
+    if hic_cooler === nothing
+        error("Failed to open cooler file $hic_file")
+    end
+    
+    hic_chr_names = [String(x) for x in hic_cooler.chromnames]
+    hic_chrs_select = intersect(hic_chr_names, hic_chrs)
+    return hic_cooler, collect(hic_chrs_select)
+end
+
+# Helper function to fill diagonal with zeros
+function fill_diagonal!(matrix::Matrix, value::Number = 0)
+    n = min(size(matrix, 1), size(matrix, 2))
+    for i in 1:n
+        matrix[i, i] = value
+    end
+end
+
+function plot_distance_contact_prob_decay(hic_list::Vector{String};
+                                           hic_chrs::Vector{String} = CHR_SYNONYMS,
+                                           tads::Union{String, Nothing} = nothing,
+                                           exp_cool::Union{String, Nothing} = nothing,
+                                           output_folder::Union{String, Nothing} = nothing,
+                                           res::Int = RESOLUTION,
+                                           confidence::Float64 = 0.0,
+                                           replace::Bool = true,
+                                           chi2_mode::String = CHI2_MODE_LOG,
+                                           format::String = PLOT_FORMAT)::String
+    if isempty(hic_chrs)
+        # If hic_chrs is empty, use CHR_SYNONYMS, but if that's also empty, use default CHR_X_SYNONYMS
+        hic_chrs = !isempty(CHR_SYNONYMS) ? CHR_SYNONYMS : CHR_X_SYNONYMS
+    end
+    
+    # Determine output folder
+    if output_folder === nothing
+        output_folder = dirname(hic_list[1])
+    end
+    
+    # Build filename
+    hic_names = [splitext(basename(hic))[1] for hic in hic_list]
+    exp_base_name = exp_cool !== nothing ? splitext(basename(exp_cool))[1] : ""
+    
+    hics = ""
+    for (i, hic_r) in enumerate(hic_names)
+        hic = hic_list[i]
+        hics_suffix = (isfile(hic) && endswith(hic, ".hdf5") && DECAY_USE_HDF5) ? ".h5" : ""
+        hics *= "_$(hic_r)$(hics_suffix)"
+    end
+    
+    tads_pref = tads !== nothing ? "_t$(splitext(basename(tads))[1])" : ""
+    conf_suffix = confidence > 0.0 ? "_c$(round(confidence, digits=2))" : ""
+    chi2_suffix = "_chi2_$(chi2_mode[1:min(3, length(chi2_mode))])"
+    sem_suffix = !CHI2_USE_SEM ? "_sd" : ""
+    zoom_suffix = CHI2_MODE_LOG_ZOOM ? "_zoom" : ""
+    
+    # Build filename - we'll determine actual chromosome names from the data
+    # Initialize with defaults, will be updated when we process the data
+    # Python uses CHR_SYNONYMS[-1] for experimental and hic_chrs[-1] for simulation
+    # Use fallback to CHR_X_SYNONYMS if CHR_SYNONYMS is empty
+    actual_chr_synonyms = !isempty(CHR_SYNONYMS) ? CHR_SYNONYMS : CHR_X_SYNONYMS
+    exp_chr_name = actual_chr_synonyms[end]
+    # For simulation, use hic_chrs[-1] (which should be set from parameter or CHR_SYNONYMS/CHR_X_SYNONYMS)
+    sim_chr_name = hic_chrs[end]
+    
+    # Build initial filename - will be updated with correct chromosome names after processing
+    hic_decay_plot = joinpath(output_folder,
+                              "contact-decay_$(exp_base_name)_$(exp_chr_name)_vs_$(sim_chr_name)$(hics)$(tads_pref)$(conf_suffix)$(chi2_suffix)$(sem_suffix)$(zoom_suffix).$(res).$(format)")
+    
+    if isfile(hic_decay_plot)
+        if !replace
+            @info "Distance-contact decay plot already existing: $hic_decay_plot, so skip it"
+            return hic_decay_plot
+        else
+            @warn "Replacing existing Distance-contact decay plot: $hic_decay_plot"
+        end
+    end
+    
+    @info "Distance-contact decay plot: $hic_decay_plot ..."
+    @info "hic_list: $hic_list"
+    @info "exp_cool: $exp_cool"
+    @info "output_folder: $output_folder"
+    
+    max_tad_size = chr_size ÷ SIM_RESOLUTION
+    
+    min_dist = CHI2_RANGE_START * SIM_RESOLUTION ÷ res
+    max_dist = CHI2_RANGE_END * SIM_RESOLUTION ÷ res
+    
+    # Determine scale attributes - use :log10 for xscale when in log mode (not :log)
+    xscale_attr = chi2_mode == CHI2_MODE_LOG ? :log10 : :identity
+    if chi2_mode == CHI2_MODE_LOG && !CHI2_MODE_LOG_ZOOM
+        min_dist = 1
+        max_dist = nothing
+    end
+    
+    # Create empty plot with scales - use :log10 for yscale (not :log)
+    # Don't create empty plot - we'll create it with the first data point
+    fig = nothing
+    
+    lines = []
+    legend_entries = String[]
+    cmp_hic = exp_cool !== nothing ? Base.replace(exp_cool, r".cool$" => "") : ""
+    chr_i = 0
+    first_plot = true  # Track if this is the first plot to create the figure
+    
+    for (i, hic) in enumerate(hic_list)
+        if !isfile(hic)
+            @error "Missing file $hic, skip it!"
+            continue
+        end
+        
+        hic_cooler = nothing
+        if isfile(hic) && endswith(hic, ".hdf5") && DECAY_USE_HDF5
+            # For HDF5 files, use the last element of hic_chrs (matching Python's hic_chrs[-1])
+            # If hic_chrs is empty or was set to empty, use CHR_SYNONYMS instead
+            actual_hic_chrs = !isempty(hic_chrs) ? hic_chrs : CHR_SYNONYMS
+            hic_chrs_select = !isempty(actual_hic_chrs) ? [actual_hic_chrs[end]] : ["chrX"]
+            # Update sim_chr_name from actual data - use last element to match Python's hic_chrs[-1]
+            sim_chr_name = String(hic_chrs_select[1])
+        else
+            try
+                # hic_chrs should already be set (either from parameter or CHR_SYNONYMS)
+                hic_cooler, hic_chrs_select = get_hic_cooler_res(hic, hic_chrs, res)
+                # Update sim_chr_name from actual data (use last element, matching Python's hic_chrs[-1])
+                if !isempty(hic_chrs_select)
+                    sim_chr_name = String(hic_chrs_select[end])
+                end
+            catch e
+                @error "Failed to get cooler for $hic: $e"
+                continue
+            end
+        end
+        
+        for hic_chr in hic_chrs_select
+            if isfile(hic) && endswith(hic, ".hdf5") && DECAY_USE_HDF5
+                max_dist_val = max_dist !== nothing ? max_dist : nothing
+                (dists, probs, probs_confi_l, probs_confi_u), hic_chr_size = get_decay_distribution_hdf5(hic, res, confidence, min_dist, max_dist_val)
+            else
+                if hic_cooler === nothing
+                    @error "hic_cooler is not defined for $hic"
+                    continue
+                end
+                dists, probs, probs_confi_l, probs_confi_u = get_decay_distribution_cool(hic_cooler, hic_chr, res, confidence, min_dist, max_dist)
+                # Convert PyObject chromsize to Int
+                try
+                    hic_chr_size = Int(hic_cooler.chromsizes[hic_chr])
+                catch
+                    py_int = pyimport("builtins").int
+                    hic_chr_size = Int(py_int(hic_cooler.chromsizes[hic_chr]))
+                end
+            end
+            
+            max_tad_size = min(max_tad_size, hic_chr_size ÷ res)
+            
+            # Calculate chi2 and alpha
+            plots_folder = joinpath(output_folder, PLOTS_FOLDER)
+            if !isempty(cmp_hic)
+                chi2, alpha = compare_hic_chromosome(hic, cmp_hic, hic_chrs=[hic_chr], chrs=CHR_SYNONYMS, res=res,
+                                                      tads_boundary=tads, plots_folder=plots_folder, norm=true,
+                                                      chi2_mode=chi2_mode)
+            else
+                chi2, alpha = 0.0, 1.0
+            end
+            
+            probs_adjust = probs .* alpha
+            color_idx = chr_i * DECAY_PALETTE_SHIFT
+            # Use color palette - tab20 has 20 colors, cycle through them
+            color_num = (color_idx % DECAY_COLOR_MAX) + 1
+            color = palette(:tab20)[color_num]
+            
+            legend_label = "$(hic_names[i]).$hic_chr chi2_min: $(round(chi2, digits=3))"
+            @info "Plotting $(length(dists)) points: dists range [$(minimum(dists)), $(maximum(dists))], probs range [$(minimum(probs_adjust)), $(maximum(probs_adjust))]"
+            # Filter out zero or negative values for log scale - keep only positive values
+            valid_idx = probs_adjust .> 0
+            num_valid = sum(valid_idx)
+            @info "Valid (non-zero) points: $num_valid out of $(length(dists))"
+            
+            if any(valid_idx)
+                dists_plot = dists[valid_idx]
+                probs_plot = probs_adjust[valid_idx]
+                
+                # Create plot with first data point if this is the first plot
+                if first_plot
+                    @info "Creating plot with $(length(dists_plot)) points: dists [$(minimum(dists_plot)), $(maximum(dists_plot))], probs [$(minimum(probs_plot)), $(maximum(probs_plot))]"
+                    fig = plot(dists_plot, probs_plot, 
+                              xscale=xscale_attr, yscale=:log10,
+                              xlabel="genomic distance in $(res ÷ 1000)kb",
+                              ylabel="average #contacts ~ contact probability",
+                              title="Distance-contact decay chi2:x$chi2_mode\n$output_folder",
+                              color=color, alpha=DECAY_PLOT_ALPHA, label=legend_label,
+                              showaxis=true, grid=true, legend=true,
+                              framestyle=:box, minorgrid=false)
+                    first_plot = false
+                else
+                    plot!(fig, dists_plot, probs_plot, color=color, alpha=DECAY_PLOT_ALPHA, label=legend_label)
+                end
+            else
+                @warn "All probabilities are zero or negative for $hic, skipping plot"
+            end
+            push!(lines, (dists, probs_adjust))
+            
+            if confidence != 0.0 && fig !== nothing
+                conf_color_num = ((color_idx + 1) % DECAY_COLOR_MAX) + 1
+                conf_color = palette(:tab20)[conf_color_num]
+                # Replace zeros in confidence intervals
+                probs_confi_u_plot = copy(probs_confi_u)
+                probs_confi_u_plot[probs_confi_u_plot .<= 0] .= 1e-10
+                probs_confi_l_plot = copy(probs_confi_l)
+                probs_confi_l_plot[probs_confi_l_plot .<= 0] .= 1e-10
+                plot!(fig, dists, probs_confi_u_plot, color=conf_color, alpha=DECAY_PLOT_ALPHA, label="", linestyle=:dash)
+                plot!(fig, dists, probs_confi_l_plot, color=conf_color, alpha=DECAY_PLOT_ALPHA, label="", linestyle=:dash)
+            end
+            
+            push!(legend_entries, legend_label)
+            
+            if SAVE_DECAY_PROBABILITY
+                f_name = "$(hic).$(res)_decay_probs_$(chi2_mode[1:min(3, length(chi2_mode))]).txt"
+                @info "Save simulation data from Distance-contact decay plot: $hic to $f_name"
+                open(f_name, "w") do f
+                    write(f, join([string(elem) for elem in probs], "\n"))
+                end
+            end
+            
+            chr_i += 1
+        end
+    end
+    
+    # Plot experimental decay
+    if exp_cool !== nothing && isfile(exp_cool)
+        # Use the original exp_cool path, not cmp_hic (which has .cool removed)
+        exp_cooler, exp_chr_select = get_hic_cooler_res(exp_cool, CHR_SYNONYMS, res)
+        exp_chr = !isempty(exp_chr_select) ? exp_chr_select[1] : nothing
+        
+        if exp_chr !== nothing
+            # Update exp_chr_name from actual experimental data
+            exp_chr_name = String(exp_chr)
+            
+            dists, probs, probs_confi_l, probs_confi_u = get_decay_distribution_cool(exp_cooler, exp_chr, res, confidence, min_dist, max_dist)
+            # Convert PyObject chromsize to Int
+            exp_chr_size = try
+                Int(exp_cooler.chromsizes[exp_chr])
+            catch
+                py_int = pyimport("builtins").int
+                Int(py_int(exp_cooler.chromsizes[exp_chr]))
+            end
+            max_tad_size = min(max_tad_size, Int(round(exp_chr_size / res)))
+            
+            if SAVE_DECAY_PROBABILITY
+                f_name = "$(cmp_hic).$(res)_decay_probs_$(chi2_mode[1:min(3, length(chi2_mode))]).txt"
+                @info "Save experimental data from Distance-contact decay plot: $exp_cool to $f_name"
+                open(f_name, "w") do f
+                    write(f, join([string(elem) for elem in probs], "\n"))
+                end
+            end
+            
+            exp_legend_label = "$(basename(exp_cool)).$exp_chr"
+            @info "Plotting experimental $(length(dists)) points: dists range [$(minimum(dists)), $(maximum(dists))], probs range [$(minimum(probs)), $(maximum(probs))]"
+            # Filter out zero or negative values in experimental data
+            valid_exp_idx = probs .> 0
+            if any(valid_exp_idx)
+                dists_exp = dists[valid_exp_idx]
+                probs_exp = probs[valid_exp_idx]
+                
+                # Create plot if it doesn't exist yet (shouldn't happen, but just in case)
+                if fig === nothing
+                    fig = plot(dists_exp, probs_exp,
+                              xscale=xscale_attr, yscale=:log10,
+                              xlabel="genomic distance in $(res ÷ 1000)kb",
+                              ylabel="average #contacts ~ contact probability",
+                              title="Distance-contact decay chi2:x$chi2_mode\n$output_folder",
+                              color=:navy, alpha=DECAY_PLOT_ALPHA, label=exp_legend_label,
+                              showaxis=true, grid=true, legend=true,
+                              framestyle=:box, minorgrid=false)
+                else
+                    plot!(fig, dists_exp, probs_exp, color=:navy, alpha=DECAY_PLOT_ALPHA, label=exp_legend_label)
+                end
+            else
+                @warn "All experimental probabilities are zero or negative, skipping plot"
+            end
+            push!(legend_entries, exp_legend_label)
+            
+            if confidence != 0.0
+                # Replace zeros in experimental confidence intervals too
+                probs_confi_u_exp = copy(probs_confi_u)
+                probs_confi_u_exp[probs_confi_u_exp .<= 0] .= 1e-10
+                probs_confi_l_exp = copy(probs_confi_l)
+                probs_confi_l_exp[probs_confi_l_exp .<= 0] .= 1e-10
+                plot!(fig, dists, probs_confi_u_exp, color=:blue, alpha=DECAY_PLOT_ALPHA, label="", linestyle=:dash)
+                plot!(fig, dists, probs_confi_l_exp, color=:blue, alpha=DECAY_PLOT_ALPHA, label="", linestyle=:dash)
+            end
+        end
+    end
+    
+    # Plot chi2 dist range
+    @info "call get_chi2_dist_range($chi2_mode, $res) # calculated max_tad_size:$max_tad_size"
+    dist_range = get_chi2_dist_range(chi2_mode, res, max_tad_size)
+    if fig !== nothing
+        # Add vertical lines for chi2 range boundaries
+        plot!(fig, [CHI2_RANGE_START * SIM_RESOLUTION / res], seriestype=:vline, color=:gray, linewidth=1, label="", legend=false)
+        plot!(fig, [CHI2_RANGE_END * SIM_RESOLUTION / res], seriestype=:vline, color=:gray, linewidth=1, label="", legend=false)
+        
+        for d in dist_range
+            plot!(fig, [d], seriestype=:vline, color=:gray, linewidth=1, label="", linestyle=:dash, alpha=0.5, legend=false)
+        end
+    end
+    
+    # Rebuild filename with correct chromosome names now that we've processed the data
+    hic_decay_plot = joinpath(output_folder,
+                              "contact-decay_$(exp_base_name)_$(exp_chr_name)_vs_$(sim_chr_name)$(hics)$(tads_pref)$(conf_suffix)$(chi2_suffix)$(sem_suffix)$(zoom_suffix).$(res).$(format)")
+    
+    # Ensure plot exists and has data
+    if fig === nothing
+        @error "No plot was created! No data to plot."
+        return ""
+    end
+    
+    # Update title if needed (labels are already set when creating the plot)
+    plot!(fig, title="Distance-contact decay chi2:x$chi2_mode\n$output_folder")
+    
+    # Ensure plot has proper axis settings - explicitly set to show axes
+    plot!(fig, showaxis=true, grid=true, framestyle=:box, minorgrid=false, 
+          xguide="genomic distance in $(res ÷ 1000)kb",
+          yguide="average #contacts ~ contact probability")
+    
+    savefig(fig, hic_decay_plot)
+    @info " save plot: $hic_decay_plot"
+    return hic_decay_plot
 end
 
 function chip_out_to_bedgraph(chip_out_file::String, bed_graph_file::Union{String, Nothing} = nothing,

@@ -383,16 +383,41 @@ function run_multi_decay_plot(runner::DccExtrusionRunner, dcc_args::DccExtrusion
 end
 
 function multi_decay_plot(dcc_args::DccExtrusionArgs; replace::Bool = false)
+    @info "multi_decay_plot called with output_folder=$(dcc_args.output_folder), analyse=$(dcc_args.analyse), exp_cool=$(dcc_args.exp_cool)"
     sub_folders = !isempty(dcc_args.analyse) ? [dcc_args.analyse] : sort([f.path for f in readdir(dcc_args.output_folder, join=true) if isdir(f)])
     plots_folder = joinpath(dcc_args.output_folder, HicAnalysis.PLOTS_FOLDER)
     if plots_folder in sub_folders
         filter!(x -> x != plots_folder, sub_folders)
     end
+    @info "sub_folders: $sub_folders"
     hic_h5_list = String[]
     for analysis_folder in sub_folders
-        push!(hic_h5_list, HicAnalysis.get_last_hic(analysis_folder))
+        last_hic = HicAnalysis.get_last_hic(analysis_folder)
+        @info "Found HIC file: $last_hic"
+        push!(hic_h5_list, last_hic)
     end
-    # Implementation of plot_distance_contact_prob_decay would go here
+    @info "hic_h5_list: $hic_h5_list"
+    
+    # Call plot_distance_contact_prob_decay for both log and linear modes
+    @info "Calling plot_distance_contact_prob_decay for log mode..."
+    hic_multi_decay_plot_log = HicAnalysis.plot_distance_contact_prob_decay(hic_h5_list,
+                                                                              exp_cool=dcc_args.exp_cool,
+                                                                              output_folder=dcc_args.output_folder,
+                                                                              res=dcc_args.resolution,
+                                                                              confidence=0.0,
+                                                                              replace=replace,
+                                                                              chi2_mode=HicAnalysis.CHI2_MODE_LOG)
+    @info "Log mode plot saved to: $hic_multi_decay_plot_log"
+    
+    @info "Calling plot_distance_contact_prob_decay for linear mode..."
+    hic_multi_decay_plot_lin = HicAnalysis.plot_distance_contact_prob_decay(hic_h5_list,
+                                                                             exp_cool=dcc_args.exp_cool,
+                                                                             output_folder=dcc_args.output_folder,
+                                                                             res=dcc_args.resolution,
+                                                                             confidence=0.0,
+                                                                             replace=replace,
+                                                                             chi2_mode=HicAnalysis.CHI2_MODE_LINEAR)
+    @info "Linear mode plot saved to: $hic_multi_decay_plot_lin"
 end
 
 function grid_nlef_km(runner::DccExtrusionRunner, dcc_args::DccExtrusionArgs,
@@ -568,6 +593,8 @@ function main()
         grid_nlef_km(dcc_run, dcc_args, nlef_list, km_list, list_contact_radii, args["replace"])
     elseif run_command == "run"
         run(dcc_run, dcc_args, radii=list_contact_radii, replace=args["replace"])
+    elseif run_command == "multi_decay_plot"
+        multi_decay_plot(dcc_args, replace=args["replace"])
     # Additional commands would be implemented here
     end
 end
