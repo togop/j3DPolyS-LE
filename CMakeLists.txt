@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.13)
 cmake_policy(SET CMP0068 NEW)
-project(py3dpolys_le VERSION 2021.1.1 LANGUAGES Fortran)
+project(py3dpolys_le VERSION 2025.3 LANGUAGES Fortran)
 enable_language(Fortran C)
+
+# Prevent C++ from taking over link language for Fortran static libraries (CMake 3.22+ with C enabled)
+set(CMAKE_CXX_LINKER_PREFERENCE_PROPAGATES FALSE)
 
 # set default build paths
 #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PYTHONPATH})
@@ -14,8 +17,9 @@ if(NOT hasMPI)
 endif()
 
 set(TARGET 3dpolys_le)
-set(SOURCE_FOLDER py3dpolys_le/src)
-set(SOURCE_FILES ${SOURCE_FOLDER}/logging.f03 ${SOURCE_FOLDER}/randomnumber.f03 ${SOURCE_FOLDER}/kinds.f03 ${SOURCE_FOLDER}/timers.f03 ${SOURCE_FOLDER}/lattice_data.f03 ${SOURCE_FOLDER}/polymer_model.f03 ${SOURCE_FOLDER}/analyse.f03 ${SOURCE_FOLDER}/3dpolys_le.f03)
+set(SOURCE_FOLDER sim_src)
+# Unified sources compiled into executable only (no static libs from same sources = no duplicate symbol linker errors)
+set(SOURCE_FILES ${SOURCE_FOLDER}/logging.f03 ${SOURCE_FOLDER}/randomnumber.f03 ${SOURCE_FOLDER}/kinds.f03 ${SOURCE_FOLDER}/timers.f03 ${SOURCE_FOLDER}/lib_conf.f90 ${SOURCE_FOLDER}/lattice_data.f03 ${SOURCE_FOLDER}/polymer_model.f03 ${SOURCE_FOLDER}/analyse.f03 ${SOURCE_FOLDER}/3dpolys_le.f03)
 set(PACKAGE py3dpolys_le/bin)
 
 set(CMAKE_Fortran_SOURCE_FILE_EXTENSIONS f03;f90)
@@ -85,9 +89,9 @@ if(CMAKE_Fortran_COMPILER MATCHES "gfortran*")
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
     #Compiler gfortran Flags
-    set(CMAKE_Fortran_FLAGS "-O3 -fimplicit-none") #  -lhdf5_fortran -fintrinsic-modules-path ${HDF5_INCLUDE_DIRS}") # /usr/local/include") #  TODO find metter way to include ${HDF5_INCLUDE_DIRS}")  #/usr/local/include")  # -lhdf5hl_fortran")          # -std=f2003 ${CMAKE_Fortran_FLAGS}  -qopenmp
-    set(CMAKE_Fortran_FLAGS_DEBUG "-g -O0 -Wall -fbacktrace -fbounds-check")  #   -fcheck=bounds
-    set(CMAKE_Fortran_FLAGS_RELEASE "-O3  -Wall -static")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -fimplicit-none")   #  -lhdf5_fortran -fintrinsic-modules-path ${HDF5_INCLUDE_DIRS}") # /usr/local/include") #  TODO find metter way to include ${HDF5_INCLUDE_DIRS}")  #/usr/local/include")  # -lhdf5hl_fortran")          # -std=f2003 ${CMAKE_Fortran_FLAGS}
+    set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -g -O0 -Wall -fbacktrace -fbounds-check")  #   -fcheck=bounds
+    set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O3  -Wall -static")
 
     set(CMAKE_C_FLAGS "-c")
 endif()
@@ -99,49 +103,12 @@ elseif (${CMAKE_BUILD_TYPE} MATCHES "Debug")
 endif()
 
 # -------------------------------------------------------------------------------------------------------------------------
-# Libraries
+# Executable (all sources in one target to avoid duplicate symbol linker errors)
 # -------------------------------------------------------------------------------------------------------------------------
 
-# fotrasn objs
-SET(RANDOMNUMBER randomnumber)
-ADD_LIBRARY(${RANDOMNUMBER} STATIC ${SOURCE_FOLDER}/randomnumber.f03)
-target_link_libraries(${RANDOMNUMBER})
-
-SET(LOGGING logging)
-ADD_LIBRARY(${LOGGING} STATIC ${SOURCE_FOLDER}/logging.f03)
-target_link_libraries(${LOGGING})
-
-SET(KINDS kinds)
-ADD_LIBRARY(${KINDS} STATIC ${SOURCE_FOLDER}/kinds.f03)
-target_link_libraries(${KINDS})
-
-SET(TIMERS timers)
-ADD_LIBRARY(${TIMERS} STATIC ${SOURCE_FOLDER}/timers.f03)
-target_link_libraries(${TIMERS} ${KINDS})
-
-SET(LIB_CONF lib_conf)
-ADD_LIBRARY(${LIB_CONF} STATIC ${SOURCE_FOLDER}/lib_conf.f90)
-target_link_libraries(${LIB_CONF} ${LOGGING} ${RANDOMNUMBER} ${TIMERS} ${KINDS})
-
-SET(LATTICE_DATA lattice_data)
-ADD_LIBRARY(${LATTICE_DATA} STATIC ${SOURCE_FOLDER}/lattice_data.f03)
-target_link_libraries(${LATTICE_DATA})
-
-SET(POLYMER_MODEL polymer_model)
-ADD_LIBRARY(${POLYMER_MODEL} STATIC ${SOURCE_FOLDER}/polymer_model.f03)
-target_link_libraries(${POLYMER_MODEL} ${LOGGING} ${RANDOMNUMBER} ${TIMERS} ${KINDS} ${LIB_CONF})
-
-SET(ANALYSE analyse)
-ADD_LIBRARY(${ANALYSE} STATIC ${SOURCE_FOLDER}/analyse.f03)
-target_include_directories(${ANALYSE} PRIVATE ${HDF5_INCLUDE_DIRS})
-target_link_libraries(${ANALYSE} PRIVATE ${LATTICE_DATA} ${POLYMER_MODEL} ${RANDOMNUMBER} ${TIMERS} ${KINDS} ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
-
-
-# include_directories(src)
-
 add_executable(${TARGET} ${SOURCE_FILES})
-##target_include_directories(${TARGET} PRIVATE ${HDF5_INCLUDE_DIRS})
-target_link_libraries(${TARGET} ${RANDOMNUMBER} ${KINDS} ${TIMERS} ${LIB_CONF} ${LATTICE_DATA} ${POLYMER_MODEL} ${ANALYSE} MPI::MPI_Fortran) ## ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
+target_link_libraries(${TARGET} PRIVATE MPI::MPI_Fortran ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
+
 set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE Fortran)
 
 # data files

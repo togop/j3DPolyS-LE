@@ -1021,7 +1021,7 @@ contains
         implicit none
         class (PolymerModel), intent(inout) :: self
         integer, intent(in) :: fout
-        character(len = 1), intent(in) :: init_mode
+        character(*), intent(in) :: init_mode
         character(*), intent(in) :: interaction_sites
         character(*), intent(in) :: boundary_file
         character(*), intent(in) :: lef_loading_sites

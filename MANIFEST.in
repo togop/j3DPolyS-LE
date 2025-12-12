@@ -1,4 +1,4 @@
 include py3dpolys_le/bin/*
 include py3dpolys_le/Figure*.png
 include py3dpolys_le/data/*
-exclude py3dpolys_le/src/*.f03
+exclude sim_src/*.f03
