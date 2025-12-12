@@ -410,8 +410,118 @@ end
 # These would need to be fully implemented based on the Python code
 
 function read_tads_bed(tads_bed_file::Union{String, Nothing})::Union{Matrix{Int}, Nothing}
-    # Implementation needed
-    return nothing
+    if tads_bed_file === nothing || !isfile(tads_bed_file)
+        return nothing
+    end
+    
+    # Read BED file - simple implementation
+    # Format: chrom start end (tab-separated)
+    tads = Matrix{Int}[]
+    open(tads_bed_file, "r") do f
+        for line in eachline(f)
+            if startswith(line, "#") || isempty(strip(line))
+                continue
+            end
+            parts = split(strip(line), r"[\t\s]+")
+            if length(parts) >= 3
+                try
+                    start_pos = parse(Int, parts[2])
+                    end_pos = parse(Int, parts[3])
+                    push!(tads, [start_pos, end_pos])
+                catch
+                    @warn "Could not parse TAD line: $line"
+                end
+            end
+        end
+    end
+    
+    return isempty(tads) ? nothing : hcat([tad[1] for tad in tads], [tad[2] for tad in tads])
+end
+
+function chi2_minimization(hic1_mat::Matrix, cmp_hic_cooler, chrs::Vector{String}, res::Int, 
+                           tads::Matrix{Int}, comp_filename::String, plots_folder::Union{String, Nothing},
+                           norm::Bool = true, chi2_mode::String = CHI2_MODE_LINEAR,
+                           hic_balance::Bool = CHI2_USE_BALANCED, plot_cmap::String = CMAP,
+                           plot_format::String = PLOT_FORMAT)::Tuple{Float64, Float64}
+    comp_chr = first(intersect([String(x) for x in cmp_hic_cooler.chromnames], chrs))
+    
+    # Total sums for chi2 calculation
+    tot_PS = 0.0
+    tot_FS = 0.0
+    tot_PFS = 0.0
+    norm_term = 0
+    
+    for i in 1:size(tads, 1)
+        tad_start = tads[i, 1]
+        tad_end = tads[i, 2]
+        tadi_size = (tad_end - tad_start) ÷ res
+        
+        if tadi_size == 0
+            @info "skip TAD:$tad_start-$tad_end, size:$tadi_size"
+            continue
+        end
+        
+        @info "calculate TAD:$tad_start-$tad_end, size:$tadi_size"
+        
+        # Get experimental TAD matrix
+        balanced = hic_balance && (cmp_hic_cooler.bins()["weights"] !== nothing)
+        tadi_mat2_py = cmp_hic_cooler.matrix(balance=balanced).fetch((comp_chr, tad_start, tad_end - res))
+        tadi_mat2 = Array{Float64}(tadi_mat2_py)
+        if balanced
+            tadi_mat2 = replace(tadi_mat2, NaN => 0.0)
+        end
+        
+        # Get simulation TAD matrix
+        tadi_mat1_start = tad_start ÷ res
+        tadi_mat1_end = tad_end ÷ res
+        tadi_mat1 = hic1_mat[(tadi_mat1_start+1):tadi_mat1_end, (tadi_mat1_start+1):tadi_mat1_end]
+        
+        # Get distance range for chi2 calculation
+        dist_range = get_chi2_dist_range(chi2_mode, res, tadi_size)
+        
+        if isempty(dist_range)
+            @warn "Empty chi2-dist-range for TAD with size chi2(mode:$chi2_mode, resolution:$res), TADi_size:$tadi_size[$tad_start-$tad_end]"
+            continue
+        end
+        
+        toti_PFS = 0.0
+        toti_PS = 0.0
+        toti_FS = 0.0
+        tadi_norm_term = 0
+        
+        for dist in dist_range
+            p_i, p_i_sdsem = average_contact_prob(tadi_mat1, dist)
+            f_i, f_i_p_i_sdsem = average_contact_prob(tadi_mat2, dist)
+            sigma_i_2 = f_i_p_i_sdsem^2
+            
+            if sigma_i_2 != 0
+                toti_PFS += (p_i * f_i) / sigma_i_2
+                toti_PS += (p_i^2) / sigma_i_2
+                toti_FS += (f_i^2) / sigma_i_2
+                norm_term += 1
+                tadi_norm_term += 1
+                @debug "chi2(dis:$dist) : p_i: $p_i * f_i: $f_i = $(p_i * f_i), sigma_i^2= $sigma_i_2, tot_FS=$toti_FS, tot_PFS=$toti_PFS, tot_PS=$toti_PS"
+            else
+                @debug "Skip chi2(dis:$dist) NAN sigma_i^2= $sigma_i_2"
+            end
+        end
+        
+        tot_PFS += toti_PFS
+        tot_PS += toti_PS
+        tot_FS += toti_FS
+    end
+    
+    # Final calculation
+    alpha_min = tot_PS > 0 ? (tot_PFS / tot_PS) : 1.0
+    chi2_min = tot_PS > 0 ? ((tot_FS - (tot_PFS^2 / tot_PS)) / 2) : 0.0
+    
+    if norm && norm_term > 0
+        chi2_min = chi2_min / norm_term
+    end
+    
+    @info "chi2_minimization: tot_PS=$tot_PS, tot_FS=$tot_FS, tot_PFS=$tot_PFS, norm_term=$norm_term, chi2_min=$chi2_min, alpha_min=$alpha_min"
+    
+    return Float64(chi2_min), Float64(alpha_min)
 end
 
 function compare_hic_chromosome(hic_file::String, cmp_hic::String;
@@ -421,8 +531,80 @@ function compare_hic_chromosome(hic_file::String, cmp_hic::String;
                                 plots_folder::Union{String, Nothing} = nothing, norm::Bool = true,
                                 chi2_mode::String = CHI2_MODE_LOG, hic_balance::Bool = CHI2_USE_BALANCED,
                                 plot_cmap::String = CMAP, plot_format::String = PLOT_FORMAT)::Tuple{Float64, Float64}
-    # Implementation needed - this is a complex function
-    return (0.0, 1.0)
+    if hic_chrs === nothing
+        hic_chrs = chrs
+    end
+    
+    # Get simulation Hi-C matrix
+    if isfile(hic_file) && endswith(hic_file, ".hdf5") && DECAY_USE_HDF5
+        hic_mat1 = get_hic(hic_file, res, hic_balance)
+        hic1_chr = hic_chrs[1]
+        hic1_chr_size = size(hic_mat1, 1) * res
+    else
+        hic1cooler, hic1_chrs = get_hic_cooler_res(hic_file, hic_chrs, res)
+        hic1_chr = hic1_chrs[1]
+        balanced = hic_balance && (hic1cooler.bins()["weights"] !== nothing)
+        hic_mat1_py = hic1cooler.matrix(balance=balanced).fetch(hic1_chr)
+        # Convert PyObject to Julia Array
+        hic_mat1 = try
+            Array{Float64}(hic_mat1_py)
+        catch
+            # If direct conversion fails, use numpy array conversion
+            py_np = pyimport("numpy")
+            Array{Float64}(py_np.array(hic_mat1_py))
+        end
+        if balanced
+            hic_mat1 = replace(hic_mat1, NaN => 0.0)
+        end
+        try
+            hic1_chr_size = Int(hic1cooler.chromsizes[hic1_chr])
+        catch
+            py_int = pyimport("builtins").int
+            hic1_chr_size = Int(py_int(hic1cooler.chromsizes[hic1_chr]))
+        end
+    end
+    
+    # Get experimental Hi-C cooler
+    cmp_hic_mcool = get_exp_sim_mcool(cmp_hic, chrs, res)
+    py_cooler = pyimport("cooler")
+    hic2cooler = py_cooler.Cooler("$cmp_hic_mcool::/resolutions/$res")
+    
+    exp_chr_list = intersect([String(x) for x in hic2cooler.chromnames], chrs)
+    if isempty(exp_chr_list)
+        @error "Experimental HiC data contains none of the chromosome names: $chrs instead $(hic2cooler.chromnames)"
+        error("No matching chromosome found")
+    end
+    exp_chr = exp_chr_list[1]
+    
+    # Get file names for comparison
+    h1 = basename(hic_file)
+    h2 = basename(cmp_hic)
+    
+    # Get TADs
+    exp_chr_size = try
+        Int(hic2cooler.chromsizes[exp_chr])
+    catch
+        py_int = pyimport("builtins").int
+        Int(py_int(hic2cooler.chromsizes[exp_chr]))
+    end
+    chr_end = min(hic1_chr_size, exp_chr_size)
+    tads = read_tads_bed(tads_boundary)
+    
+    if tads === nothing
+        @info "Whole chromosome as a single TAD representing the whole chromosome."
+        tads = [1 chr_end]
+    end
+    
+    # Build comparison filename
+    tads_pref = tads_boundary !== nothing ? "_t$(splitext(basename(tads_boundary))[1])" : ""
+    comp_filename = "comp_$(h1)_$(h2)_res$(res)$(tads_pref)$(hic_balance ? "_balanced" : "")"
+    
+    # Call chi2_minimization
+    chi2_min, alpha_min = chi2_minimization(hic_mat1, hic2cooler, chrs, res, tads, comp_filename,
+                                            plots_folder, norm, chi2_mode, hic_balance, plot_cmap, plot_format)
+    
+    @info "chi2_minimization score for $h1 and $h2 (resolution: $res): $chi2_min,$alpha_min on TADs: $tads_boundary"
+    return Float64(chi2_min), Float64(alpha_min)
 end
 
 # Helper function to get decay distribution from HDF5
@@ -567,7 +749,7 @@ function plot_distance_contact_prob_decay(hic_list::Vector{String};
     end
     
     # Create empty plot with scales - use :log10 for yscale (not :log)
-    # Don't create empty plot - we'll create it with the first data point
+    # We'll create the plot with the first valid data point to ensure axes are properly initialized
     fig = nothing
     
     lines = []
@@ -652,6 +834,8 @@ function plot_distance_contact_prob_decay(hic_list::Vector{String};
                 dists_plot = dists[valid_idx]
                 probs_plot = probs_adjust[valid_idx]
                 
+                @info "Plotting $(length(dists_plot)) points: dists [$(minimum(dists_plot)), $(maximum(dists_plot))], probs [$(minimum(probs_plot)), $(maximum(probs_plot))]"
+                
                 # Create plot with first data point if this is the first plot
                 if first_plot
                     @info "Creating plot with $(length(dists_plot)) points: dists [$(minimum(dists_plot)), $(maximum(dists_plot))], probs [$(minimum(probs_plot)), $(maximum(probs_plot))]"
@@ -661,8 +845,9 @@ function plot_distance_contact_prob_decay(hic_list::Vector{String};
                               ylabel="average #contacts ~ contact probability",
                               title="Distance-contact decay chi2:x$chi2_mode\n$output_folder",
                               color=color, alpha=DECAY_PLOT_ALPHA, label=legend_label,
-                              showaxis=true, grid=true, legend=true,
-                              framestyle=:box, minorgrid=false)
+                              showaxis=true, grid=true, legend=:topright,
+                              framestyle=:box, minorgrid=false, legendfontsize=8,
+                              size=(800, 600))
                     first_plot = false
                 else
                     plot!(fig, dists_plot, probs_plot, color=color, alpha=DECAY_PLOT_ALPHA, label=legend_label)
@@ -742,8 +927,9 @@ function plot_distance_contact_prob_decay(hic_list::Vector{String};
                               ylabel="average #contacts ~ contact probability",
                               title="Distance-contact decay chi2:x$chi2_mode\n$output_folder",
                               color=:navy, alpha=DECAY_PLOT_ALPHA, label=exp_legend_label,
-                              showaxis=true, grid=true, legend=true,
-                              framestyle=:box, minorgrid=false)
+                              showaxis=true, grid=true, legend=:topright,
+                              framestyle=:box, minorgrid=false, legendfontsize=8,
+                              size=(800, 600))
                 else
                     plot!(fig, dists_exp, probs_exp, color=:navy, alpha=DECAY_PLOT_ALPHA, label=exp_legend_label)
                 end
@@ -782,7 +968,7 @@ function plot_distance_contact_prob_decay(hic_list::Vector{String};
                               "contact-decay_$(exp_base_name)_$(exp_chr_name)_vs_$(sim_chr_name)$(hics)$(tads_pref)$(conf_suffix)$(chi2_suffix)$(sem_suffix)$(zoom_suffix).$(res).$(format)")
     
     # Ensure plot exists and has data
-    if fig === nothing
+    if fig === nothing || first_plot
         @error "No plot was created! No data to plot."
         return ""
     end
@@ -790,10 +976,12 @@ function plot_distance_contact_prob_decay(hic_list::Vector{String};
     # Update title if needed (labels are already set when creating the plot)
     plot!(fig, title="Distance-contact decay chi2:x$chi2_mode\n$output_folder")
     
-    # Ensure plot has proper axis settings - explicitly set to show axes
+    # Ensure plot has proper axis settings - explicitly set to show axes and legend
+    # Position legend in top-right corner and make it visible
     plot!(fig, showaxis=true, grid=true, framestyle=:box, minorgrid=false, 
           xguide="genomic distance in $(res ÷ 1000)kb",
-          yguide="average #contacts ~ contact probability")
+          yguide="average #contacts ~ contact probability",
+          legend=:topright, legendfontsize=8)
     
     savefig(fig, hic_decay_plot)
     @info " save plot: $hic_decay_plot"
