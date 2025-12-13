@@ -47,7 +47,7 @@ Pkg.add(path="/path/to/3DPolyS-LE")      # Production mode
 Or install from a Git repository:
 
 ```julia
-Pkg.add(url="https://gitlab.com/togop/3DPolyS-LE.git")
+Pkg.add(url="https://gitlab.com/togop/3DPolyS-LE.git", rev ="julia_port")
 ```
 
 See `README_INSTALL.md` for detailed installation instructions.

@@ -7,7 +7,7 @@ import Base.CoreLogging: @info, @warn, @error, @debug
 using DataFrames
 using CSV
 using Plots
-using Statistics
+import Statistics
 using ArgParse
 using Printf
 
@@ -77,7 +77,7 @@ function plot_for_radius(subplot, r::String, z_col::String, color, sim_stats_all
         # Handle duplicates by taking the mean (like pandas pivot_table default)
         # First, group by nlef and km, then take mean of z_col
         grouped = groupby(sim_stats_pd, [:nlef, :km])
-        aggregated = combine(grouped, Symbol(z_col) => mean => Symbol(z_col))
+        aggregated = combine(grouped, Symbol(z_col) => Statistics.mean => Symbol(z_col))
         
         # Now unstack should work without duplicates
         heatmap_data = unstack(aggregated, :nlef, :km, Symbol(z_col))

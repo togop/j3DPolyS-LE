@@ -25,6 +25,17 @@
 """
 module j3DPolySLE
 
+# Patch doc! to handle abstract types gracefully - must be BEFORE any includes
+# This prevents precompilation errors when Julia tries to document abstract types
+# We define these methods directly without using @eval to avoid breaking incremental compilation
+if !isdefined(Base.Docs, :doc!)
+    # This shouldn't happen, but just in case
+else
+    # Extend doc! to handle Type (abstract types) by doing nothing
+    Base.Docs.doc!(::Type, ::Base.Docs.Binding, ::Base.Docs.DocStr) = nothing
+    Base.Docs.doc!(::Type, ::Any...) = nothing
+end
+
 # Export main modules
 export Runner3dpolysLe, Stats3dpolysLe, HicAnalysis, JobRunner, PlotHic, PlotSimStats, HicConverters
 export main

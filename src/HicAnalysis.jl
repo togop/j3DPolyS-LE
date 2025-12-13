@@ -8,7 +8,7 @@ import Base: splitext, basename, dirname, intersect
 using HDF5
 using DataFrames
 using CSV
-using Statistics
+import Statistics
 using Distributions
 using LinearAlgebra
 using Glob
@@ -207,12 +207,12 @@ function average_contact_prob(prob_mat::Matrix, dist::Int, plot::Bool = false)
         end
     end
     
-    avrg_prob = count > 0 ? mean(probs) : 0.0
+    avrg_prob = count > 0 ? Statistics.mean(probs) : 0.0
     if CHI2_USE_SEM
         # Standard error of the mean: std / sqrt(n)
-        sd_sem = count > 1 ? std(probs) / sqrt(count) : 0.0
+        sd_sem = count > 1 ? Statistics.std(probs) / sqrt(count) : 0.0
     else
-        sd_sem = count > 1 ? std(probs) : 0.0
+        sd_sem = count > 1 ? Statistics.std(probs) : 0.0
     end
     
     return Float64(avrg_prob), Float64(sd_sem)

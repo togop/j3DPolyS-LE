@@ -3,6 +3,8 @@ JobRunner module for managing job execution
 """
 module JobRunner
 
+# Note: doc! patch is defined in the main j3DPolySLE module to avoid duplicate definitions
+
 import Base.CoreLogging: @info, @warn, @error, @debug
 using TOML
 using Base: searchsorted
