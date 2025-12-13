@@ -14,7 +14,7 @@ if isfile(joinpath(project_root, "Project.toml"))
     using Pkg
     Pkg.activate(project_root)
     # Load directly using include to bypass precompilation
-    include(joinpath(project_root, "src.jl", "j3DPolySLE.jl"))
+    include(joinpath(project_root, "src", "j3DPolySLE.jl"))
     using .j3DPolySLE
     j3DPolySLE.Runner3dpolysLe.main()
 else

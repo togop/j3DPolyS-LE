@@ -55,7 +55,7 @@ Base.Docs.doc!(::Type, ::Any...) = nothing
 # Load package directly (bypasses precompilation)
 # Catch documentation errors and continue - the module may partially load
 try
-    include("src.jl/j3DPolySLE.jl")
+    include("src/j3DPolySLE.jl")
     using .j3DPolySLE
 catch e
     err_str = string(e)
@@ -69,7 +69,7 @@ catch e
             try
                 # Suppress errors during include
                 old_stderr = stderr
-                include("src.jl/j3DPolySLE.jl")
+                include("src/j3DPolySLE.jl")
                 using .j3DPolySLE
             catch e2
                 @error "Failed to load package even after retry"

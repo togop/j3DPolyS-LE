@@ -11,7 +11,7 @@ end
 println("✓ Project.toml found")
 
 # Check main module file
-if !isfile("src.jl/j3DPolySLE.jl")
+if !isfile("src/j3DPolySLE.jl")
     error("src/j3DPolySLE.jl not found!")
 end
 println("✓ Main module file found")
@@ -29,7 +29,7 @@ required_modules = [
 ]
 
 for mod in required_modules
-    if !isfile(joinpath("src.jl", mod))
+    if !isfile(joinpath("src", mod))
         error("Missing module: $mod")
     end
     println("✓ $mod found")
@@ -60,7 +60,7 @@ println("\nTesting package loading...")
 try
     using Pkg
     Pkg.activate(".")
-    include("src.jl/j3DPolySLE.jl")
+    include("src/j3DPolySLE.jl")
     println("✓ Package loads successfully")
 catch e
     @error "Failed to load package" exception=(e, catch_backtrace())

@@ -32,11 +32,11 @@ clean:
 
 # Format code (requires JuliaFormatter)
 format:
-	julia -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format("src.jl")'
+	julia -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format("src")'
 
 # Check code style (requires JuliaFormatter)
 check-format:
-	julia -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format("src.jl", verbose=true, overwrite=false)'
+	julia -e 'using Pkg; Pkg.add("JuliaFormatter"); using JuliaFormatter; format("src", verbose=true, overwrite=false)'
 
 # Create standalone executables (requires PackageCompiler)
 compile:

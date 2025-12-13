@@ -2,8 +2,7 @@
 using Test
 using Pkg
 
-# Load the package directly since we're using src.jl/ instead of src/
-# This bypasses Julia's package system which expects src/
+# Load the package directly
 project_root = abspath(joinpath(@__DIR__, ".."))
 Pkg.activate(project_root)
 
@@ -14,7 +13,7 @@ Pkg.activate(project_root)
 end
 
 # Load the package directly
-include(joinpath(project_root, "src.jl", "j3DPolySLE.jl"))
+include(joinpath(project_root, "src", "j3DPolySLE.jl"))
 using .j3DPolySLE
 
 @testset "j3DPolySLE Tests" begin
