@@ -542,8 +542,14 @@ function cli_parser()
     return s
 end
 
-function main()
-    args = parse_args(cli_parser())
+function main(cmd_args::Union{Vector{String}, Nothing} = nothing)
+    # Allow passing arguments directly (useful for REPL usage)
+    # If cmd_args is provided, use it; otherwise use global ARGS
+    if cmd_args !== nothing
+        args = parse_args(cli_parser(), cmd_args)
+    else
+        args = parse_args(cli_parser())
+    end
     
     if haskey(args, "cmp_chrs") && args["cmp_chrs"] !== nothing
         cmp_chrs = [String(x) for x in args["cmp_chrs"]]
