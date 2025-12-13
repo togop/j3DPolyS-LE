@@ -545,10 +545,11 @@ end
 function main(cmd_args::Union{Vector{String}, Nothing} = nothing)
     # Allow passing arguments directly (useful for REPL usage)
     # If cmd_args is provided, use it; otherwise use global ARGS
+    settings = cli_parser()
     if cmd_args !== nothing
-        args = parse_args(cli_parser(), cmd_args)
+        args = parse_args(cmd_args, settings)
     else
-        args = parse_args(cli_parser())
+        args = parse_args(settings)
     end
     
     if haskey(args, "cmp_chrs") && args["cmp_chrs"] !== nothing
