@@ -55,6 +55,8 @@ contains
 
     subroutine detect_parallelization(self)
         ! Detect best available parallelization method
+        ! Note: If OpenMP/OpenACC is not compiled, the directives in the
+        ! implementation functions are ignored and execution continues sequentially.
         implicit none
         class (PolymerModel_unified), intent(inout) :: self
         character(1000) :: env_var
@@ -65,47 +67,40 @@ contains
         
         ! Check for OpenACC support (if prefer_gpu is true)
         if (self%prefer_gpu) then
-            ! Check environment variable
+            ! Check environment variable - this is a strong indicator
             call get_environment_variable('ACC_DEVICE_TYPE', env_var, env_len, stat)
             if (stat == 0 .and. env_len > 0) then
                 if (trim(env_var) == 'nvidia' .or. trim(env_var) == 'NVIDIA') then
-                    !$acc if (.true.)
+                    ! Environment variable suggests OpenACC should be available
                     self%use_openacc = .true.
-                    call log%info('PolymerModel: OpenACC (GPU) detected and enabled')
+                    call log%info('PolymerModel_unified_mod - Using OpenACC (GPU) for simulation')
                     return
-                    !$acc end if
                 end if
             end if
-            
-            ! Check if compiled with OpenACC
-            !$acc if (.true.)
+            ! Even without environment variable, try OpenACC if compiled
+            ! (directives will be ignored if not compiled)
             self%use_openacc = .true.
-            call log%info('PolymerModel: OpenACC support detected at compile time')
+            call log%info('PolymerModel_unified_mod - Attempting OpenACC (GPU) for simulation')
             return
-            !$acc end if
         end if
         
         ! Check for OpenMP support
-        !$omp if (.true.)
+        ! Try OpenMP if compiled (directives will be ignored if not compiled)
         self%use_openmp = .true.
-        call log%info('PolymerModel: OpenMP (CPU) detected and enabled')
-        return
-        !$omp end if
-        
-        ! Fallback to sequential
-        call log%info('PolymerModel: No parallelization detected, using sequential execution')
+        call log%info('PolymerModel_unified_mod - Using OpenMP (CPU) for simulation')
     end subroutine detect_parallelization
 
     subroutine allocate_unified(self)
         implicit none
         class (PolymerModel_unified), intent(inout) :: self
-        integer :: bittable_t
+        integer :: bittable_t, stat
 
         bittable_t = 4 * (self%L**3)
 
         call log%debug('allocate_unified self%Nchain: ' // trim(str(self%Nchain)) // ' bittable_t: ' // trim(str(bittable_t)))
 
         ! Deallocate if already allocated (e.g., for multiple trajectories)
+        ! Clean up OpenACC data regions first if they exist
         if (allocated(self%config)) then
             !$acc exit data delete(self%config)
             deallocate(self%config)
@@ -135,14 +130,33 @@ contains
             deallocate(self%interaction_sites_state)
         end if
 
+        ! Verify all arrays are deallocated before reallocating
+        if (allocated(self%config) .or. allocated(self%bittable) .or. &
+            allocated(self%dr) .or. allocated(self%contact) .or. &
+            allocated(self%boundary) .or. allocated(self%loading_sites_factor) .or. &
+            allocated(self%interaction_sites_state)) then
+            call log%error('allocate_unified: Failed to deallocate all arrays')
+            stop 'allocate_unified: Array deallocation failed'
+        end if
+
         ! Now allocate fresh arrays
-        allocate (self%config(2, self%Nchain))
-        allocate (self%bittable(14, bittable_t))
-        allocate (self%dr(3, self%Nchain))
-        allocate (self%contact(3, self%Nchain))
-        allocate (self%boundary(2, self%Nchain))
-        allocate (self%loading_sites_factor(self%Nchain))
-        allocate (self%interaction_sites_state(self%Nchain))
+        allocate (self%config(2, self%Nchain), stat=stat)
+        if (stat /= 0) then
+            call log%error('allocate_unified: Failed to allocate config')
+            stop 'allocate_unified: Allocation failed'
+        end if
+        
+        allocate (self%bittable(14, bittable_t), stat=stat)
+        if (stat /= 0) then
+            call log%error('allocate_unified: Failed to allocate bittable')
+            stop 'allocate_unified: Allocation failed'
+        end if
+        
+        allocate (self%dr(3, self%Nchain), stat=stat)
+        allocate (self%contact(3, self%Nchain), stat=stat)
+        allocate (self%boundary(2, self%Nchain), stat=stat)
+        allocate (self%loading_sites_factor(self%Nchain), stat=stat)
+        allocate (self%interaction_sites_state(self%Nchain), stat=stat)
         
         ! Initialize arrays
         self%config = 0
@@ -335,7 +349,6 @@ contains
         real :: pt
         real*8 :: randomnumber, r
 
-        !$acc if (.true.)
         burn_Nmeas = 0
         simburnin = 0
 
@@ -373,15 +386,9 @@ contains
 
         ! Final update
         !$acc update host(self%config, self%dr, self%contact)
-        !$acc end if
         
-        !$acc if (.false.)
-        ! Fallback if OpenACC not compiled
-        call log%warn('OpenACC requested but not compiled, falling back to OpenMP')
-        self%use_openacc = .false.
-        self%use_openmp = .true.
-        call do_simulation_openmp_impl(self, trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
-        !$acc end if
+        ! If OpenACC is not compiled, the directives above are ignored
+        ! and we fall back to sequential (handled by caller)
     end subroutine do_simulation_openacc_impl
 
     subroutine do_simulation_openmp_impl(self, trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
@@ -394,7 +401,6 @@ contains
         real :: pt
         real*8 :: randomnumber, r
 
-        !$omp if (.true.)
         burn_Nmeas = 0
         simburnin = 0
 
@@ -421,14 +427,9 @@ contains
                 end do
             end do
         end do
-        !$omp end if
         
-        !$omp if (.false.)
-        ! Fallback if OpenMP not compiled
-        call log%warn('OpenMP requested but not compiled, using sequential')
-        self%use_openmp = .false.
-        call do_simulation_sequential_impl(self, trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
-        !$omp end if
+        ! If OpenMP is not compiled, the directives above are ignored
+        ! and execution continues sequentially (which is fine)
     end subroutine do_simulation_openmp_impl
 
     subroutine do_simulation_sequential_impl(self, trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
