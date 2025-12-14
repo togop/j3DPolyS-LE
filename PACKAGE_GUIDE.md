@@ -62,7 +62,7 @@ The `Project.toml` file contains:
 
 - **name**: `j3DPolySLE`
 - **uuid**: Unique identifier for the package
-- **version**: `2025.2`
+- **version**: `2025.3`
 - **authors**: Package maintainers
 - **description**: Package description
 - **license**: MIT

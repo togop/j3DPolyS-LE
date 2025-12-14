@@ -82,7 +82,7 @@ function hic_to_cool(hic::Matrix, chr::String, resolution::Int, cool_file::Strin
         "bin-size" => resolution,
         "storage-mode" => "symmetric-upper",
         "genome-assembly" => "ce11",
-        "generated-by" => "j3DPolySLE-2025.2"
+        "generated-by" => "j3DPolySLE-2025.3"
     )
     
     py_cooler = pyimport("cooler")

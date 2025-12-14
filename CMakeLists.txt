@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 cmake_policy(SET CMP0068 NEW)
-project(py3dpolys_le VERSION 2021.1.1 LANGUAGES Fortran)
+project(py3dpolys_le VERSION 2025.3 LANGUAGES Fortran)
 enable_language(Fortran C)
 
 # set default build paths
@@ -14,7 +14,7 @@ if(NOT hasMPI)
 endif()
 
 set(TARGET 3dpolys_le)
-set(SOURCE_FOLDER py3dpolys_le/src)
+set(SOURCE_FOLDER sim_src)
 set(SOURCE_FILES ${SOURCE_FOLDER}/logging.f03 ${SOURCE_FOLDER}/randomnumber.f03 ${SOURCE_FOLDER}/kinds.f03 ${SOURCE_FOLDER}/timers.f03 ${SOURCE_FOLDER}/lattice_data.f03 ${SOURCE_FOLDER}/polymer_model.f03 ${SOURCE_FOLDER}/analyse.f03 ${SOURCE_FOLDER}/3dpolys_le.f03)
 set(PACKAGE py3dpolys_le/bin)
 
