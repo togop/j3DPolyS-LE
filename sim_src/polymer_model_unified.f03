@@ -46,7 +46,8 @@ module PolymerModel_unified_mod
         integer, dimension(:), allocatable :: interaction_sites_state
 
     contains
-        procedure, public :: init_unified, do_simulation_unified, detect_parallelization, output_parameters_unified, init_unified_base
+        procedure, public :: init_unified, do_simulation_unified, detect_parallelization, output_parameters_unified, init_unified_base, output_unified
+        procedure, public :: trialmoveex_unified, trialmovetad_unified, trialbound_unified, trialunbound_unified, unbound_all_unified, erase_unified
         procedure, private :: allocate_unified, cleanup_arrays_unified, initbitable_unified, initconfig4_unified, initconfig4_zigzag_unified, initconfig_sim_out_unified
         final :: deallocate_unified
     end type PolymerModel_unified
@@ -441,6 +442,9 @@ contains
 
     subroutine do_simulation_openacc_impl(self, trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
         ! OpenACC implementation
+        ! Note: MC trial moves have dependencies and require random number generation,
+        ! so full GPU parallelization is challenging. This implementation uses OpenACC
+        ! for data management while keeping the simulation logic on CPU.
         implicit none
         class (PolymerModel_unified), intent(inout) :: self
         integer, intent(in) :: trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM
@@ -452,47 +456,118 @@ contains
         burn_Nmeas = 0
         simburnin = 0
 
-        call log%info('Using OpenACC (GPU) for simulation')
+        ! now start the simulation with LEF: measurement after the burn-in time
+        call log%info('Start Trajectory: ' // trim(str(trajectory_i)) // ', Ninter: ' // trim(str(Ninter)) // &
+                ', Nmeas: ' // trim(str(Nmeas)) // ', burnin: ' // trim(str(burnin)) // &
+                ', burnout: ' // trim(str(burnout)) // ', burnoutM: ' // trim(str(burnoutM)))
 
-        ! Update GPU data
-        !$acc update device(self%config, self%contact, self%bittable)
+        ! Ensure GPU data is up to date
+        !$acc update device(self%config, self%contact, self%bittable, self%dr, &
+        !$acc& self%boundary, self%loading_sites_factor, self%interaction_sites_state)
 
-        ! Main simulation loop with GPU acceleration
-        ! Note: Full GPU parallelization of MC moves is complex due to dependencies
-        ! This is a framework - actual implementation would need careful synchronization
-        
-        do j = 1, Nmeas - 1 - burn_Nmeas
+        ! first initial measurement before the burn-in
+        !$acc update host(self%config, self%dr, self%contact)
+        call self%output_unified()
+
+        if (burnin > 0) then
+            burn_Nmeas = burn_Nmeas + 1
+
+            ! choose random simulation burn-in time = initial_burnin + random_fraction * initial_burnin
+            r = randomnumber()
+            simburnin = burnin + int(r * burnin)
+
+            do j = 1, simburnin
+                do v = 1, self%Nchain
+                    call self%trialmovetad_unified() !trial move for monomers
+                end do
+            end do
+            
+            ! Update GPU after burn-in
+            !$acc update device(self%config, self%contact, self%bittable, self%dr)
+            
+            call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', burn-in Measurement, ' // &
+                    ' burn_Nmeas: ' // trim(str(burn_Nmeas)))
+            !$acc update host(self%config, self%dr, self%contact)
+            call self%output_unified()
+        end if
+
+        if (burnout > 0) then
+            burn_Nmeas = burn_Nmeas + 1
+        end if
+
+        if (burnoutM > 0) then
+            burn_Nmeas = burn_Nmeas + burnoutM
+        end if
+
+        ! Main simulation loop - sequential due to dependencies in MC moves
+        ! OpenACC is used for data management, not parallelization
+        do j = 1, Nmeas - 1 - burn_Nmeas  ! account for the initial, burn-in and burn-out measurements
             do k = 1, Ninter
                 Ntrial = 3 * self%Nchain + self%Nleffree
                 pt = real(self%Nchain) / real(Ntrial)
-
-                ! GPU-accelerated trial loop
-                !$acc parallel loop present(self%config, self%contact, self%bittable) &
-                !$acc& private(v, r)
                 do v = 1, Ntrial
-                    ! Note: Actual MC moves need proper GPU implementation
-                    ! This is a placeholder showing the structure
-                    ! In production, you would:
-                    ! 1. Implement GPU versions of trialmovetad, trialmoveex, etc.
-                    ! 2. Use atomic operations for shared state updates
-                    ! 3. Handle dependencies carefully
+                    r = randomnumber()
+                    if (r.lt.pt) then
+                        call self%trialmovetad_unified() !trial move for monomers
+                    elseif (r.lt.2 * pt) then
+                        call self%trialmoveex_unified() !trial move for LEF movement
+                    elseif (r.lt.3 * pt) then
+                        call self%trialunbound_unified() !trial move for unbinding event
+                    else
+                        call self%trialbound_unified() !trial move for binding event
+                    end if
                 end do
-                !$acc end parallel loop
             end do
-            
-            ! Update host data periodically
+            call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', Measurement:' // trim(str(j)))
+            call flush(6)
+            ! Update host data for output
             !$acc update host(self%config, self%dr, self%contact)
+            call self%output_unified()
+            call flush(13)
+            ! Update device data for next iteration
+            !$acc update device(self%config, self%contact, self%bittable, self%dr)
         end do
 
-        ! Final update
-        !$acc update host(self%config, self%dr, self%contact)
-        
-        ! If OpenACC is not compiled, the directives above are ignored
-        ! and we fall back to sequential (handled by caller)
+        ! do burn-out included as extra measurement
+        if (burnout > 0) then
+            call self%unbound_all_unified()
+            do j = 1, burnout
+                do v = 1, self%Nchain
+                    call self%trialmovetad_unified() ! move for monomers
+                end do
+            end do
+            !$acc update device(self%config, self%contact, self%bittable, self%dr)
+            call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', fix burn-out Measurement')
+            !$acc update host(self%config, self%dr, self%contact)
+            call self%output_unified()
+            call flush(13)
+        end if
+
+        if (burnoutM > 0) then
+            call self%unbound_all_unified()
+            do j = 1, burnoutM
+                do k = 1, Ninter
+                    do v = 1, self%Nchain
+                        call self%trialmovetad_unified() ! move for monomers
+                    end do
+                end do
+                !$acc update device(self%config, self%contact, self%bittable, self%dr)
+                call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', burn-out Measurement: ' // trim(str(j)))
+                !$acc update host(self%config, self%dr, self%contact)
+                call self%output_unified()
+                call flush(13)
+            end do
+        end if
+
+        ! Final update before erase
+        !$acc update host(self%config, self%contact, self%bittable)
+        call self%erase_unified()
     end subroutine do_simulation_openacc_impl
 
     subroutine do_simulation_openmp_impl(self, trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
         ! OpenMP implementation
+        ! Note: MC trial moves have dependencies, so the main loop remains sequential
+        ! OpenMP parallelization is limited to independent operations like burn-in/burnout loops
         implicit none
         class (PolymerModel_unified), intent(inout) :: self
         integer, intent(in) :: trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM
@@ -504,32 +579,95 @@ contains
         burn_Nmeas = 0
         simburnin = 0
 
-        call log%info('Using OpenMP (CPU) for simulation')
+        ! now start the simulation with LEF: measurement after the burn-in time
+        call log%info('Start Trajectory: ' // trim(str(trajectory_i)) // ', Ninter: ' // trim(str(Ninter)) // &
+                ', Nmeas: ' // trim(str(Nmeas)) // ', burnin: ' // trim(str(burnin)) // &
+                ', burnout: ' // trim(str(burnout)) // ', burnoutM: ' // trim(str(burnoutM)))
 
-        ! Main simulation loop with OpenMP parallelization
-        ! Note: MC moves have dependencies, so parallelization is limited
-        ! We can parallelize some independent operations
-        
-        do j = 1, Nmeas - 1 - burn_Nmeas
+        ! first initial measurement before the burn-in
+        call self%output_unified()
+
+        if (burnin > 0) then
+            burn_Nmeas = burn_Nmeas + 1
+
+            ! choose random simulation burn-in time = initial_burnin + random_fraction * initial_burnin
+            r = randomnumber()
+            simburnin = burnin + int(r * burnin)
+
+            ! Burn-in loop: sequential due to state dependencies
+            do j = 1, simburnin
+                do v = 1, self%Nchain
+                    call self%trialmovetad_unified() !trial move for monomers
+                end do
+            end do
+            
+            call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', burn-in Measurement, ' // &
+                    ' burn_Nmeas: ' // trim(str(burn_Nmeas)))
+            call self%output_unified()
+        end if
+
+        if (burnout > 0) then
+            burn_Nmeas = burn_Nmeas + 1
+        end if
+
+        if (burnoutM > 0) then
+            burn_Nmeas = burn_Nmeas + burnoutM
+        end if
+
+        ! Main simulation loop - sequential due to dependencies in MC moves
+        do j = 1, Nmeas - 1 - burn_Nmeas  ! account for the initial, burn-in and burn-out measurements
             do k = 1, Ninter
                 Ntrial = 3 * self%Nchain + self%Nleffree
                 pt = real(self%Nchain) / real(Ntrial)
-
-                ! Some operations can be parallelized with OpenMP
-                ! However, MC moves typically need to be sequential due to dependencies
-                ! This is a framework - actual parallelization would need algorithm redesign
-                
-                ! Sequential loop (MC moves have dependencies)
                 do v = 1, Ntrial
                     r = randomnumber()
-                    ! Note: Actual MC move calls would go here
-                    ! call self%trialmovetad(), etc.
+                    if (r.lt.pt) then
+                        call self%trialmovetad_unified() !trial move for monomers
+                    elseif (r.lt.2 * pt) then
+                        call self%trialmoveex_unified() !trial move for LEF movement
+                    elseif (r.lt.3 * pt) then
+                        call self%trialunbound_unified() !trial move for unbinding event
+                    else
+                        call self%trialbound_unified() !trial move for binding event
+                    end if
                 end do
             end do
+            call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', Measurement:' // trim(str(j)))
+            call flush(6)
+            call self%output_unified()
+            call flush(13)
         end do
-        
-        ! If OpenMP is not compiled, the directives above are ignored
-        ! and execution continues sequentially (which is fine)
+
+        ! do burn-out included as extra measurement
+        if (burnout > 0) then
+            call self%unbound_all_unified()
+            ! Burnout loop: sequential due to state dependencies
+            do j = 1, burnout
+                do v = 1, self%Nchain
+                    call self%trialmovetad_unified() ! move for monomers
+                end do
+            end do
+            call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', fix burn-out Measurement')
+            call self%output_unified()
+            call flush(13)
+        end if
+
+        if (burnoutM > 0) then
+            call self%unbound_all_unified()
+            do j = 1, burnoutM
+                ! Sequential loop due to state dependencies
+                do k = 1, Ninter
+                    do v = 1, self%Nchain
+                        call self%trialmovetad_unified() ! move for monomers
+                    end do
+                end do
+                call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', burn-out Measurement: ' // trim(str(j)))
+                call self%output_unified()
+                call flush(13)
+            end do
+        end if
+
+        call self%erase_unified()
     end subroutine do_simulation_openmp_impl
 
     subroutine do_simulation_sequential_impl(self, trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
@@ -545,25 +683,132 @@ contains
         burn_Nmeas = 0
         simburnin = 0
 
-        call log%info('Using Sequential (CPU) for simulation')
+        ! now start the simulation with LEF: measurement after the burn-in time
+        call log%info('Start Trajectory: ' // trim(str(trajectory_i)) // ', Ninter: ' // trim(str(Ninter)) // &
+                ', Nmeas: ' // trim(str(Nmeas)) // ', burnin: ' // trim(str(burnin)) // &
+                ', burnout: ' // trim(str(burnout)) // ', burnoutM: ' // trim(str(burnoutM)))
 
-        ! Sequential implementation - same as original
-        ! This would call the original do_simulation logic
-        ! For now, it's a placeholder showing the structure
-        
-        do j = 1, Nmeas - 1 - burn_Nmeas
+        ! first initial measurement before the burn-in
+        call self%output_unified()
+
+        if (burnin > 0) then
+            burn_Nmeas = burn_Nmeas + 1
+
+            ! choose random simulation burn-in time = initial_burnin + random_fraction * initial_burnin
+            ! add random time (a fraction) after the initial burn-in time
+            r = randomnumber()
+            simburnin = burnin + int(r * burnin)
+
+            do j = 1, simburnin
+                do v = 1, self%Nchain
+                    call self%trialmovetad_unified() !trial move for monomers
+                end do
+            end do
+            ! now start the simulation with LEF: measurement after the burn-in time
+            call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', burn-in Measurement, ' // &
+                    ' burn_Nmeas: ' // trim(str(burn_Nmeas)))
+            call self%output_unified()
+        end if
+
+        if (burnout > 0) then
+            burn_Nmeas = burn_Nmeas + 1
+        end if
+
+        if (burnoutM > 0) then
+            burn_Nmeas = burn_Nmeas + burnoutM
+        end if
+
+        do j = 1, Nmeas - 1 - burn_Nmeas  ! account for the initial, burn-in and burn-out measurements
             do k = 1, Ninter
                 Ntrial = 3 * self%Nchain + self%Nleffree
                 pt = real(self%Nchain) / real(Ntrial)
-
                 do v = 1, Ntrial
                     r = randomnumber()
-                    ! Note: Actual MC move calls would go here
-                    ! This matches the original sequential implementation
+                    if (r.lt.pt) then
+                        call self%trialmovetad_unified() !trial move for monomers
+                    elseif (r.lt.2 * pt) then
+                        call self%trialmoveex_unified() !trial move for LEF movement
+                    elseif (r.lt.3 * pt) then
+                        call self%trialunbound_unified() !trial move for unbinding event
+                    else
+                        call self%trialbound_unified() !trial move for binding event
+                    end if
                 end do
             end do
+            call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', Measurement:' // trim(str(j)))
+            call flush(6)
+            call self%output_unified()
+            call flush(13)
         end do
+
+        ! do burn-out included as extra measurement
+        if (burnout > 0) then
+            call self%unbound_all_unified()
+            do j = 1, burnout
+                do v = 1, self%Nchain
+                    call self%trialmovetad_unified() ! move for monomers
+                end do
+            end do
+            call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', fix burn-out Measurement')
+            call self%output_unified()
+            call flush(13)
+        end if
+
+        if (burnoutM > 0) then
+            call self%unbound_all_unified()
+            do j = 1, burnoutM
+                do k = 1, Ninter
+                    do v = 1, self%Nchain
+                        call self%trialmovetad_unified() ! move for monomers
+                    end do
+                end do
+                call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', burn-out Measurement: ' // trim(str(j)))
+                call self%output_unified()
+                call flush(13)
+            end do
+        end if
+
+        call self%erase_unified()
     end subroutine do_simulation_sequential_impl
+
+    subroutine output_unified(self)
+        ! Write simulation data to output files (same as original output)
+        ! This implementation matches the original output() subroutine exactly:
+        ! - Unit 10: config array (configuration data)
+        ! - Unit 11: dr array (displacement data)
+        ! - Unit 12: contact array (extruder occupancy data)
+        ! - Unit 14: Nleffree (number of free extruders)
+        !
+        ! NOTE: The simulation implementations (do_simulation_*_impl) are currently
+        ! placeholders and do NOT call this output method. For full functionality,
+        ! the simulation implementations need to call output_unified() at the same
+        ! points as the original do_simulation calls output():
+        !   1. Before burn-in (initial measurement)
+        !   2. After burn-in
+        !   3. After each measurement in the main loop
+        !   4. After burnout
+        !   5. After each burnoutM measurement
+        implicit none
+        class (PolymerModel_unified), intent(inout) :: self
+
+        integer :: j
+
+        ! Write in output files (units 10, 11, 12, 14 as in original)
+        do j = 1, self%Nchain
+            ! TODO maybe possible to write the whole chain in one round
+            write(10, *) self%config(:, j) !the configuration: config(1,j)=node where monomer j is located, config(2,j)=direction of the vector between j and j+1
+            write(11, *) self%dr(:, j) !the displacement: vector (x,y,z in lattice unit) of displacement of monomer j between time 0 and current time
+            write(12, *) self%contact(:, j) !the extruder occupancy and information: contact(1,j) \ne 0 if one lef of a extruder is in j, contact(1,j)=the monomer where the other lef is, contact(2,j)=the vector between the two legs, contact(3,j)=-1 (resp. +1) if it's a lef walking in the (-) direction (resp. (+) direction)
+        end do
+        write(14, *) self%Nleffree !number of free (unbound) extruders
+
+        flush(10)
+        flush(11)
+        flush(12)
+        flush(14)
+
+        return
+    end subroutine output_unified
 
     subroutine output_parameters_unified(self, fout, init_mode, interaction_sites, boundary_file, lef_loading_sites, &
             basal_loading_factor, boundary_direction, &
@@ -944,6 +1189,497 @@ contains
             !$acc update device(self%config, self%bittable)
         end if
     end subroutine initconfig_sim_out_unified
+
+    ! ============================================================================
+    ! Trial Move Methods (copied from original PolymerModel and adapted)
+    ! ============================================================================
+
+    subroutine trialmoveex_unified(self)
+        ! trial move to move a LEF leg
+        implicit none
+        class (PolymerModel_unified), intent(inout) :: self
+
+        integer :: n, iv, s, id, con(3), strand
+        real*8 :: randomnumber, fc
+        real :: impermeability
+
+        !choose randomly a monomer
+        n = int(self%Nchain * randomnumber()) + 1
+
+        s = self%contact(3, n)
+
+        if ((s.eq.0).or.(n.eq.1).or.(n.eq.self%Nchain)) return !if monomer not occupied or end-monomer do nothing
+
+        strand = (s + 1) / 2 + 1 ! 1 (-), 2 (+)
+        impermeability = abs(self%boundary(strand, n))
+        fc = (1. - impermeability)**(1. / real(self%ikm)) ! probability of permeability
+
+        do iv = 1, self%ikm
+            if (randomnumber().ge.(self%km * fc)) return
+        end do
+
+        if (s.eq.-1) then !if a (-) direction leg move to n-1
+            if (connec(1, self%config(2, n - 1), self%contact(2, n)).eq.0) return !if break the slip-link do not move
+
+            if (self%contact(1, n - 1).ne.0) then !if n-1 already occupied, try to swap
+                if (.not. self%z_loop) return
+                if ((self%contact(3, n - 1).eq.-1).or.(n.eq.2)) return !if same direction or at the end do not swap
+                if (connec(1, opp(self%config(2, n - 1)), self%contact(2, n - 1)).eq.0) return !if break the slip-link of n-1 do not swap
+                con = self%contact(:, n - 1)
+
+                iv = connec(1, self%config(2, n - 1), self%contact(2, n))
+                id = self%contact(1, n)
+                self%contact(1, n - 1) = id
+                self%contact(2, n - 1) = iv
+                self%contact(3, n - 1) = -1
+                self%contact(1, id) = n - 1
+                self%contact(2, id) = opp(iv)
+
+                iv = connec(1, opp(self%config(2, n - 1)), con(2))
+                id = con(1)
+                self%contact(1, n) = id
+                self%contact(2, n) = iv
+                if (self%unidirectional) then
+                    self%contact(3, n) = con(3)
+                else
+                    self%contact(3, n) = 1
+                end if
+                self%contact(1, id) = n
+                self%contact(2, id) = opp(iv)
+            else
+                iv = connec(1, self%config(2, n - 1), self%contact(2, n))
+                id = self%contact(1, n)
+                self%contact(1, n - 1) = id
+                self%contact(2, n - 1) = iv
+                self%contact(3, n - 1) = -1
+                self%contact(1, id) = n - 1
+                self%contact(2, id) = opp(iv)
+                self%contact(:, n) = 0
+            end if
+        elseif (s.eq.1) then !if a (+1) direction leg move to n+1
+            if (connec(1, opp(self%config(2, n)), self%contact(2, n)).eq.0) return !if break the slip-link do not move
+
+            if (self%contact(1, n + 1).ne.0) then !if n+1 already occupied, try to swap
+                if (.not. self%z_loop) return
+                if ((self%contact(3, n + 1).eq.1).or.(n.eq.(self%Nchain - 1))) return ! if same direction or at the end do not swap
+                if (connec(1, self%config(2, n + 1), self%contact(2, n + 1)).eq.0) return !if break the slip-link of n+1 do not swap
+                con = self%contact(:, n + 1)
+
+                iv = connec(1, opp(self%config(2, n)), self%contact(2, n))
+                id = self%contact(1, n)
+                self%contact(1, n + 1) = id
+                self%contact(2, n + 1) = iv
+                self%contact(3, n + 1) = 1
+                self%contact(1, id) = n + 1
+                self%contact(2, id) = opp(iv)
+
+                iv = connec(1, self%config(2, n + 1), con(2))
+                id = con(1)
+                self%contact(1, n) = id
+                self%contact(2, n) = iv
+                if (self%unidirectional) then
+                    self%contact(3, n) = con(3)
+                else
+                    self%contact(3, n) = -1
+                end if
+                self%contact(1, id) = n
+                self%contact(2, id) = opp(iv)
+            else
+                iv = connec(1, opp(self%config(2, n)), self%contact(2, n))
+                id = self%contact(1, n)
+                self%contact(1, n + 1) = id
+                self%contact(2, n + 1) = iv
+                self%contact(3, n + 1) = 1
+                self%contact(1, id) = n + 1
+                self%contact(2, id) = opp(iv)
+                self%contact(:, n) = 0
+            end if
+        end if
+
+        return
+    end subroutine trialmoveex_unified
+
+    subroutine trialmovetad_unified(self)
+        !trial move for monomer
+        ! NOTE: This is a very long method - copying from original
+        ! For full implementation, see polymer_model.f03 lines 566-853
+        implicit none
+        class (PolymerModel_unified), intent(inout) :: self
+
+        integer :: n, iv, v, b, j, nv1, nv2, nm2, np1, en, cn2, cn3, cm2, en2, id, cc, a
+        real :: dE
+        real*8 :: randomnumber
+
+        !choose randomly a monomer
+        n = int(self%Nchain * randomnumber()) + 1
+        en = self%config(1, n)
+
+        !test if allowed moved and move
+        if (n.eq.1) then
+            en2 = self%config(1, 2)
+            cn2 = opp(self%config(2, 1))
+            if (cn2.lt.self%config(2, 2)) then
+                cm2 = self%config(2, 2)
+            else
+                cm2 = cn2
+                cn2 = self%config(2, 2)
+            end if
+            iv = int(11 * randomnumber()) + 1
+            if (iv.ge.cn2) iv = iv + 1
+            if (iv.ge.cm2) iv = iv + 1
+
+            if (iv.eq.1) then
+                v = en2
+            else
+                v = self%bittable(iv, en2)
+            end if
+            b = self%bittable(1, v)
+            if ((b.eq.0).or.((b.eq.1).and.(en2.eq.v))) then
+                id = self%contact(1, n)
+                cn2 = self%config(2, 1)
+                cn3 = self%contact(2, n)
+                if (cn3.eq.0) then
+                    cc = 0
+                else
+                    cc = connec(iv, opp(cn2), cn3)
+                end if
+                if ((id.ne.0).and.(cc.eq.0)) return
+                dE = costhet(opp(iv), self%config(2, 2)) - costhet(cn2, self%config(2, 2))
+
+                if (self%interaction_sites_state(n).gt.0) then
+                    dE = dE + self%Ei*(self%bittable(14, v) - self%bittable(14, en))
+                end if
+
+                if ((self%contact(3, n).eq.-1).and.(id.lt.self%Nchain)) then
+                    if (connec(opp(self%contact(2, n)), self%config(2, id), 1).ne.0) dE = dE - self%Ea
+                    if (connec(opp(cc), self%config(2, id), 1).ne.0) dE = dE + self%Ea
+                end if
+
+                if (self%contact(3, n + 1).eq.-1) then
+                    if (connec(opp(cn2), self%contact(2, n + 1), 1).ne.0) dE = dE - self%Ea
+                    if (connec(iv, self%contact(2, n + 1), 1).ne.0) dE = dE + self%Ea
+                end if
+
+                if (randomnumber().lt.exp(-dE)) then
+                    self%bittable(1, en) = self%bittable(1, en) - 1
+                    self%bittable(1, v) = self%bittable(1, v) + 1
+
+                    if (self%interaction_sites_state(n).gt.0) then
+                        self%bittable(14, en) = self%bittable(14, en) - 1
+                        self%bittable(14, v) = self%bittable(14, v) + 1
+                        do j=2,13
+                            a=self%bittable(j, en)
+                            self%bittable(14, a) = self%bittable(14, a) - 1
+                            a=self%bittable(j, v)
+                            self%bittable(14, a) = self%bittable(14, a) + 1
+                        end do
+                    end if
+
+                    self%config(1, 1) = v
+                    self%config(2, 1) = opp(iv)
+                    if (id.ne.0) then
+                        self%contact(2, n) = cc
+                        self%contact(2, id) = opp(cc)
+                    end if
+
+                    self%dr(1, n) = self%dr(1, n) + voisxyz(1, iv) + voisxyz(1, cn2)
+                    self%dr(2, n) = self%dr(2, n) + voisxyz(2, iv) + voisxyz(2, cn2)
+                    self%dr(3, n) = self%dr(3, n) + voisxyz(3, iv) + voisxyz(3, cn2)
+                end if
+            end if
+
+        elseif (n.eq.self%Nchain) then
+            en2 = self%config(1, self%Nchain - 1)
+            cn2 = self%config(2, self%Nchain - 1)
+            if (cn2.lt.opp(self%config(2, self%Nchain - 2))) then
+                cm2 = opp(self%config(2, self%Nchain - 2))
+            else
+                cm2 = cn2
+                cn2 = opp(self%config(2, self%Nchain - 2))
+            end if
+
+            iv = int(11 * randomnumber()) + 1
+            if (iv.ge.cn2) iv = iv + 1
+            if (iv.ge.cm2) iv = iv + 1
+
+            if (iv.eq.1) then
+                v = en2
+            else
+                v = self%bittable(iv, en2)
+            end if
+            b = self%bittable(1, v)
+
+            if ((b.eq.0).or.((b.eq.1).and.(en2.eq.v))) then
+                id = self%contact(1, n)
+                cn2 = self%config(2, self%Nchain - 1)
+                cn3 = self%contact(2, n)
+                if (cn3.eq.0) then
+                    cc = 0
+                else
+                    cc = connec(iv, cn2, cn3)
+                end if
+                if ((id.ne.0).and.(cc.eq.0)) return
+                dE = costhet(self%config(2, self%Nchain - 2), iv) - costhet(self%config(2, self%Nchain - 2), cn2)
+
+                if (self%interaction_sites_state(n).gt.0) then
+                    dE = dE + self%Ei*(self%bittable(14, v) - self%bittable(14, en))
+                end if
+
+                if ((self%contact(3, n).eq.1).and.(id.gt.1)) then
+                    if (connec(self%contact(2, n), opp(self%config(2, id - 1)), 1).ne.0) dE = dE - self%Ea
+                    if (connec(cc, opp(self%config(2, id - 1)), 1).ne.0) dE = dE + self%Ea
+                end if
+
+                if (self%contact(3, n - 1).eq.1) then
+                    if (connec(cn2, self%contact(2, n - 1), 1).ne.0) dE = dE - self%Ea
+                    if (connec(iv, self%contact(2, n - 1), 1).ne.0) dE = dE + self%Ea
+                end if
+
+                if (randomnumber().lt.exp(-dE)) then
+                    self%bittable(1, en) = self%bittable(1, en) - 1
+                    self%bittable(1, v) = self%bittable(1, v) + 1
+
+                    if (self%interaction_sites_state(n).gt.0) then
+                        self%bittable(14, en) = self%bittable(14, en) - 1
+                        self%bittable(14, v) = self%bittable(14, v) + 1
+                        do j=2,13
+                            a = self%bittable(j, en)
+                            self%bittable(14, a) = self%bittable(14, a) - 1
+                            a = self%bittable(j, v)
+                            self%bittable(14, a) = self%bittable(14, a) + 1
+                        end do
+                    end if
+
+                    self%config(1, self%Nchain) = v
+                    self%config(2, self%Nchain - 1) = iv
+                    if (id.ne.0) then
+                        self%contact(2, n) = cc
+                        self%contact(2, id) = opp(cc)
+                    end if
+                    self%dr(1, n) = self%dr(1, n) + voisxyz(1, iv) - voisxyz(1, cn2)
+                    self%dr(2, n) = self%dr(2, n) + voisxyz(2, iv) - voisxyz(2, cn2)
+                    self%dr(3, n) = self%dr(3, n) + voisxyz(3, iv) - voisxyz(3, cn2)
+                end if
+            end if
+        else
+            cn2 = self%config(2, n)
+            cm2 = self%config(2, n - 1)
+            en2 = self%config(1, n - 1)
+            nm2 = n - 2
+            np1 = n + 1
+
+            if (voisnn(1, cm2, cn2).gt.1) then
+                iv = int((voisnn(1, cm2, cn2) - 1) * randomnumber()) + 1
+                if (voisnn(2 * iv, cm2, cn2).ge.cm2) iv = iv + 1
+                nv1 = voisnn(2 * iv, cm2, cn2)
+                nv2 = voisnn(2 * iv + 1, cm2, cn2)
+                if (nv1.eq.1) then
+                    v = en2
+                else
+                    v = self%bittable(nv1, en2)
+                end if
+                b = self%bittable(1, v)
+                if ((b.eq.0).or.((b.eq.1).and.((v.eq.en2).or.(v.eq.self%config(1, np1))))) then
+                    id = self%contact(1, n)
+                    cn3 = self%contact(2, n)
+                    if (cn3.eq.0) then
+                        cc = 0
+                    else
+                        cc = connec(nv1, cm2, cn3)
+                    end if
+                    if ((id.ne.0).and.(cc.eq.0)) return
+                    if (n.eq.2) then
+                        dE = costhet(nv1, nv2) + costhet(nv2, self%config(2, np1)) - costhet(cm2, cn2) &
+                                - costhet(cn2, self%config(2, np1))
+                    elseif (n.eq.self%Nchain - 1) then
+                        dE = costhet(self%config(2, nm2), nv1) + costhet(nv1, nv2) - costhet(self%config(2, nm2), cm2) &
+                                - costhet(cm2, cn2)
+                    else
+                        dE = costhet(self%config(2, nm2), nv1) + costhet(nv1, nv2) + costhet(nv2, self%config(2, np1)) &
+                                - costhet(self%config(2, nm2), cm2) - costhet(cm2, cn2) - costhet(cn2, self%config(2, np1))
+                    end if
+
+                    if (self%interaction_sites_state(n).gt.0) then
+                        dE = dE + self%Ei*(self%bittable(14, v) - self%bittable(14, en))
+                    end if
+
+                    if ((self%contact(3, n).eq.-1).and.(id.lt.self%Nchain)) then
+                        if (connec(opp(self%contact(2, n)), self%config(2, id), 1).ne.0) dE = dE - self%Ea
+                        if (connec(opp(cc), self%config(2, id), 1).ne.0) dE = dE + self%Ea
+                    elseif ((self%contact(3, n).eq.1).and.(id.gt.1)) then
+                        if (connec(self%contact(2, n), opp(self%config(2, id - 1)), 1).ne.0) dE = dE - self%Ea
+                        if (connec(cc, opp(self%config(2, id - 1)), 1).ne.0) dE = dE + self%Ea
+                    end if
+
+                    if (self%contact(3, n + 1).eq.-1) then
+                        if (connec(opp(cn2), self%contact(2, n + 1), 1).ne.0) dE = dE - self%Ea
+                        if (connec(opp(nv2), self%contact(2, n + 1), 1).ne.0) dE = dE + self%Ea
+                    end if
+                    if (self%contact(3, n - 1).eq.1) then
+                        if (connec(cm2, self%contact(2, n - 1), 1).ne.0) dE = dE - self%Ea
+                        if (connec(nv1, self%contact(2, n - 1), 1).ne.0) dE = dE + self%Ea
+                    end if
+
+                    if (randomnumber().lt.exp(-dE)) then
+                        self%bittable(1, en) = self%bittable(1, en) - 1
+                        self%bittable(1, v) = self%bittable(1, v) + 1
+
+                        if (self%interaction_sites_state(n).gt.0) then
+                            self%bittable(14, en) = self%bittable(14, en) - 1
+                            self%bittable(14, v) = self%bittable(14, v) + 1
+                            do j=2,13
+                                a = self%bittable(j, en)
+                                self%bittable(14, a) = self%bittable(14, a) - 1
+                                a = self%bittable(j, v)
+                                self%bittable(14, a) = self%bittable(14, a) + 1
+                            end do
+                        end if
+
+                        self%config(1, n) = v
+                        self%config(2, n - 1) = nv1
+                        self%config(2, n) = nv2
+                        if (id.ne.0) then
+                            self%contact(2, n) = cc
+                            self%contact(2, id) = opp(cc)
+                        end if
+                        self%dr(1, n) = self%dr(1, n) + voisxyz(1, nv1) - voisxyz(1, cm2)
+                        self%dr(2, n) = self%dr(2, n) + voisxyz(2, nv1) - voisxyz(2, cm2)
+                        self%dr(3, n) = self%dr(3, n) + voisxyz(3, nv1) - voisxyz(3, cm2)
+                    end if
+                end if
+            end if
+        end if
+        return
+    end subroutine trialmovetad_unified
+
+    subroutine trialbound_unified(self)
+        !trial move for binding LEF
+        implicit none
+        class (PolymerModel_unified), intent(inout) :: self
+
+        integer :: n, id, j, d
+        real :: kbp
+        real*8 :: randomnumber
+
+        !choose randomly a monomer
+        n = int(self%Nchain * randomnumber()) + 1
+
+        id = self%contact(1, n)
+        if (id==0) then !if the bin is not occupied by a leg, try to randomly insert a LEF to NN sites
+            kbp = self%kb * (  self%loading_sites_factor(n)**(1./real(self%ikb)) )
+            do j = 1, self%ikb
+                if (randomnumber()>=kbp) return
+            end do
+            d = int(2 * randomnumber()) + 1
+            if (d==1) then
+                if (n>1) then
+                    if (self%contact(1, n - 1)==0) then
+                        self%contact(1, n) = n - 1
+                        self%contact(2, n) = opp(self%config(2, n - 1))
+                        self%contact(1, n - 1) = n
+                        self%contact(2, n - 1) = self%config(2, n - 1)
+                        if (self%unidirectional) then
+                            if (randomnumber()<0.5) then
+                                self%contact(3, n) = 2
+                                self%contact(3, n - 1) = -1
+                            else
+                                self%contact(3, n) = 1
+                                self%contact(3, n - 1) = -2
+                            end if
+                        else
+                            self%contact(3, n) = 1
+                            self%contact(3, n - 1) = -1
+                         end if
+                        self%Nleffree = self%Nleffree - 1
+                    end if
+                end if
+            else if (n<self%Nchain) then
+                if (self%contact(1, n + 1)==0) then
+                    self%contact(1, n) = n + 1
+                    self%contact(2, n) = self%config(2, n)
+                    self%contact(1, n + 1) = n
+                    self%contact(2, n + 1) = opp(self%config(2, n))
+                    if (self%unidirectional) then
+                        if (randomnumber()<0.5) then
+                            self%contact(3, n) = -2
+                            self%contact(3, n + 1) = 1
+                        else
+                            self%contact(3, n) = -1
+                            self%contact(3, n + 1) = 2
+                        end if
+                    else
+                        self%contact(3, n) = -1
+                        self%contact(3, n + 1) = 1
+                    end if
+                    self%Nleffree = self%Nleffree - 1
+                end if
+            end if
+        end if
+
+        return
+    end subroutine trialbound_unified
+
+    subroutine trialunbound_unified(self)
+        !trial move for unbinding LEF
+        implicit none
+        class (PolymerModel_unified), intent(inout) :: self
+
+        integer :: n, id, j
+        real*8 :: randomnumber
+
+        !choose randomly a monomer
+        n = int(self%Nchain * randomnumber()) + 1
+
+        id = self%contact(1, n)
+        if (id.gt.0) then !if the monomer is occupied by a leg, try to remove it
+            do j = 1, self%iku
+                if (randomnumber().ge.self%ku) return
+            end do
+            self%contact(:, n) = 0
+            self%contact(:, id) = 0
+            write(13, *) n, id
+            self%Nleffree = self%Nleffree + 1
+        end if
+
+        return
+    end subroutine trialunbound_unified
+
+    subroutine unbound_all_unified(self)
+        !unbinding of all bound LEFs
+        implicit none
+        class (PolymerModel_unified), intent(inout) :: self
+
+        integer :: n, id
+
+        do n = 1, self%Nchain
+            id = self%contact(1, n)
+            if (id.gt.0) then !if the monomer is occupied by a leg, try to remove it
+                self%contact(:, n) = 0
+                self%contact(:, id) = 0
+                write(13, *) n, id
+                self%Nleffree = self%Nleffree + 1
+            end if
+        end do
+
+        return
+    end subroutine unbound_all_unified
+
+    subroutine erase_unified(self)
+        implicit none
+        class (PolymerModel_unified), intent(inout) :: self
+
+        integer :: i, a
+
+        !erase the configuration and occupancy of the bittable
+
+        do i = 1, self%Nchain
+            a = self%config(1, i)
+            self%bittable(1, a) = 0
+        end do
+        self%config = 0
+
+        return
+    end subroutine erase_unified
 
 end module PolymerModel_unified_mod
 
