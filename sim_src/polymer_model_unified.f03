@@ -6,6 +6,7 @@ module PolymerModel_unified_mod
     use lattice_data_mod
     use logging_mod, only: Logger, LOG_INFO, LOG_DEBUG, str, strf
     use lib_conf
+    !$ use omp_lib
     implicit none
 
     private
@@ -354,9 +355,13 @@ contains
         end if
         
         ! Set up OpenMP if using
-        if (self%use_openmp .and. self%num_threads > 0) then
-            !$ call omp_set_num_threads(self%num_threads)
-            call log%info('PolymerModel: OpenMP threads set to ' // trim(str(self%num_threads)))
+        if (self%use_openmp) then
+            if (self%num_threads > 0) then
+                !$ call omp_set_num_threads(self%num_threads)
+                call log%info('PolymerModel: OpenMP threads set to ' // trim(str(self%num_threads)))
+            else
+                !$ call log%info('PolymerModel: OpenMP enabled with default thread count: ' // trim(str(omp_get_max_threads())))
+            end if
         end if
     end subroutine init_unified
 
@@ -576,8 +581,20 @@ contains
 
     subroutine do_simulation_openmp_impl(self, trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
         ! OpenMP implementation
-        ! Note: MC trial moves have dependencies, so the main loop remains sequential
-        ! OpenMP parallelization is limited to independent operations like burn-in/burnout loops
+        ! 
+        ! IMPORTANT: The main Monte Carlo simulation loop CANNOT be parallelized with OpenMP
+        ! because each trial move modifies shared state (config, bittable, contact arrays).
+        ! The moves have dependencies - each move depends on the current state and modifies it.
+        ! 
+        ! OpenMP is used for:
+        ! - initbitable_unified(): Parallelizes the bittable initialization loop (independent iterations)
+        ! - Other independent initialization operations
+        !
+        ! The simulation itself runs sequentially to maintain correctness.
+        ! For true parallelization, consider:
+        ! 1. Running multiple independent trajectories in parallel (MPI)
+        ! 2. Algorithm redesign with conflict resolution
+        ! 3. Red-black ordering schemes
         implicit none
         class (PolymerModel_unified), intent(inout) :: self
         integer, intent(in) :: trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM
@@ -915,6 +932,7 @@ contains
 
     subroutine initbitable_unified(self)
         ! Initialize bittable (same as original)
+        ! This loop can be parallelized with OpenMP since each iteration is independent
         implicit none
         class (PolymerModel_unified), intent(inout) :: self
         type(Timer) :: crono
@@ -926,6 +944,10 @@ contains
         L2 = self%L ** 2
         call log%debug('initialize the bittable (periodic boundary conditions) for L: ' // trim(str(self%L)))
         call crono%Tic()
+        
+        ! Parallelize the outer loop - each iteration is independent
+        !$omp parallel do if(self%use_openmp) default(none) &
+        !$omp& shared(self, L2) private(a, i, j, k, v, x, y, z, xp, yp, zp, ip, jp, kp)
         do a = 1, 4 * L2 * self%L
             k = int((a - 1) / (2 * L2)) + 1
             j = int((a - 1) / self%L - 2 * self%L * (k - 1)) + 1
@@ -950,6 +972,7 @@ contains
                 self%bittable(v + 1, a) = ip + (jp - 1) * self%L + (kp - 1) * 2 * L2
             end do
         end do
+        !$omp end parallel do
         call log%info('lattice density: ' // trim(strf(real(self%Nchain) / real(4 * L2 * self%L))))
         call log%info(crono%Tac(info = 'initbitable_unified(): '))
         
