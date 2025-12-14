@@ -100,7 +100,8 @@ contains
         call log%debug('allocate_unified self%Nchain: ' // trim(str(self%Nchain)) // ' bittable_t: ' // trim(str(bittable_t)))
 
         ! Deallocate if already allocated (e.g., for multiple trajectories)
-        ! Clean up OpenACC data regions first if they exist
+        ! Note: OpenACC data regions should already be cleaned up in init_unified
+        ! but we clean them up here as well for safety
         if (allocated(self%config)) then
             !$acc exit data delete(self%config)
             deallocate(self%config)
@@ -130,33 +131,64 @@ contains
             deallocate(self%interaction_sites_state)
         end if
 
-        ! Verify all arrays are deallocated before reallocating
+        ! Double-check that all arrays are deallocated before allocating
         if (allocated(self%config) .or. allocated(self%bittable) .or. &
             allocated(self%dr) .or. allocated(self%contact) .or. &
             allocated(self%boundary) .or. allocated(self%loading_sites_factor) .or. &
             allocated(self%interaction_sites_state)) then
-            call log%error('allocate_unified: Failed to deallocate all arrays')
-            stop 'allocate_unified: Array deallocation failed'
+            call log%error('allocate_unified: Arrays still allocated after deallocation attempt')
+            call log%error('  config allocated: ' // merge('YES', 'NO ', allocated(self%config)))
+            call log%error('  bittable allocated: ' // merge('YES', 'NO ', allocated(self%bittable)))
+            call log%error('  dr allocated: ' // merge('YES', 'NO ', allocated(self%dr)))
+            call log%error('  contact allocated: ' // merge('YES', 'NO ', allocated(self%contact)))
+            call log%error('  boundary allocated: ' // merge('YES', 'NO ', allocated(self%boundary)))
+            call log%error('  loading_sites_factor allocated: ' // merge('YES', 'NO ', allocated(self%loading_sites_factor)))
+            call log%error('  interaction_sites_state allocated: ' // merge('YES', 'NO ', allocated(self%interaction_sites_state)))
+            stop 'allocate_unified: Cannot allocate - arrays still allocated'
         end if
 
         ! Now allocate fresh arrays
         allocate (self%config(2, self%Nchain), stat=stat)
         if (stat /= 0) then
-            call log%error('allocate_unified: Failed to allocate config')
+            call log%error('allocate_unified: Failed to allocate config, stat=' // trim(str(stat)))
             stop 'allocate_unified: Allocation failed'
         end if
         
         allocate (self%bittable(14, bittable_t), stat=stat)
         if (stat /= 0) then
-            call log%error('allocate_unified: Failed to allocate bittable')
+            call log%error('allocate_unified: Failed to allocate bittable, stat=' // trim(str(stat)))
             stop 'allocate_unified: Allocation failed'
         end if
         
         allocate (self%dr(3, self%Nchain), stat=stat)
+        if (stat /= 0) then
+            call log%error('allocate_unified: Failed to allocate dr, stat=' // trim(str(stat)))
+            stop 'allocate_unified: Allocation failed'
+        end if
+        
         allocate (self%contact(3, self%Nchain), stat=stat)
+        if (stat /= 0) then
+            call log%error('allocate_unified: Failed to allocate contact, stat=' // trim(str(stat)))
+            stop 'allocate_unified: Allocation failed'
+        end if
+        
         allocate (self%boundary(2, self%Nchain), stat=stat)
+        if (stat /= 0) then
+            call log%error('allocate_unified: Failed to allocate boundary, stat=' // trim(str(stat)))
+            stop 'allocate_unified: Allocation failed'
+        end if
+        
         allocate (self%loading_sites_factor(self%Nchain), stat=stat)
+        if (stat /= 0) then
+            call log%error('allocate_unified: Failed to allocate loading_sites_factor, stat=' // trim(str(stat)))
+            stop 'allocate_unified: Allocation failed'
+        end if
+        
         allocate (self%interaction_sites_state(self%Nchain), stat=stat)
+        if (stat /= 0) then
+            call log%error('allocate_unified: Failed to allocate interaction_sites_state, stat=' // trim(str(stat)))
+            stop 'allocate_unified: Allocation failed'
+        end if
         
         ! Initialize arrays
         self%config = 0
@@ -212,6 +244,36 @@ contains
         real, intent(in), optional :: kint
         logical, intent(in), optional :: prefer_gpu
         integer, intent(in), optional :: num_threads
+
+        ! Clean up any existing OpenACC data regions before reallocating
+        ! This must be done BEFORE allocate_unified to avoid conflicts
+        if (allocated(self%config) .or. allocated(self%bittable) .or. &
+            allocated(self%dr) .or. allocated(self%contact) .or. &
+            allocated(self%boundary) .or. allocated(self%loading_sites_factor) .or. &
+            allocated(self%interaction_sites_state)) then
+            ! Clean up OpenACC data regions if they exist
+            if (allocated(self%config)) then
+                !$acc exit data delete(self%config)
+            end if
+            if (allocated(self%bittable)) then
+                !$acc exit data delete(self%bittable)
+            end if
+            if (allocated(self%dr)) then
+                !$acc exit data delete(self%dr)
+            end if
+            if (allocated(self%contact)) then
+                !$acc exit data delete(self%contact)
+            end if
+            if (allocated(self%boundary)) then
+                !$acc exit data delete(self%boundary)
+            end if
+            if (allocated(self%loading_sites_factor)) then
+                !$acc exit data delete(self%loading_sites_factor)
+            end if
+            if (allocated(self%interaction_sites_state)) then
+                !$acc exit data delete(self%interaction_sites_state)
+            end if
+        end if
 
         self%L = L
         self%Nchain = Nchain
