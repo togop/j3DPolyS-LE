@@ -1,5 +1,14 @@
 # Release notes #
 
+## 2025.3
+
+### Added
+- experimental: Julia implementation of Python scripts
+- GPU optimization: use OpenACC and OpnMP if available
+
+### Fixed
+- Singularity image Python environment activation
+
 ## 2025.2
 
 ### Fixed

@@ -79,15 +79,62 @@ if(HDF5_FOUND)
     include_directories(${HDF5_Fortran_INCLUDE_DIRS})
 endif()
 
+# OpenMP CPU parallelization support (works on Linux, macOS, Windows)
+option(ENABLE_OPENMP "Enable OpenMP CPU parallelization" OFF)
+
+if(ENABLE_OPENMP)
+    find_package(OpenMP)
+    if(OpenMP_Fortran_FOUND)
+        target_link_libraries(${TARGET} PRIVATE OpenMP::OpenMP_Fortran)
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${OpenMP_Fortran_FLAGS}")
+        message(STATUS "OpenMP enabled: Using ${OpenMP_Fortran_FLAGS}")
+    else()
+        # Try to set flags manually if FindOpenMP doesn't work
+        if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
+            set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fopenmp")
+            message(STATUS "OpenMP enabled: Using -fopenmp flag")
+        elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
+            set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -qopenmp")
+            message(STATUS "OpenMP enabled: Using -qopenmp flag")
+        else()
+            message(WARNING "OpenMP requested but compiler support not detected")
+        endif()
+    endif()
+else()
+    message(STATUS "OpenMP support disabled (use -DENABLE_OPENMP=ON to enable)")
+endif()
+
+# OpenACC GPU acceleration support
+option(ENABLE_OPENACC "Enable OpenACC GPU acceleration" OFF)
+
+if(ENABLE_OPENACC)
+    if(CMAKE_Fortran_COMPILER_ID MATCHES "NVHPC|PGI")
+        # NVIDIA HPC SDK / PGI Compiler
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -acc -gpu=cc70,cc75,cc80,cc86,cc89,cc90")
+        set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -Minfo=accel")
+        message(STATUS "OpenACC enabled: Using NVIDIA HPC SDK compiler")
+    elseif(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
+        # GCC with OpenACC support
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fopenacc")
+        set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -fopt-info-optimized-omp")
+        message(STATUS "OpenACC enabled: Using GCC with OpenACC support")
+    else()
+        message(WARNING "OpenACC requested but compiler may not support it. Compiler: ${CMAKE_Fortran_COMPILER_ID}")
+        set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fopenacc")
+    endif()
+else()
+    message(STATUS "OpenACC support disabled (use -DENABLE_OPENACC=ON to enable)")
+endif()
+
 if(CMAKE_Fortran_COMPILER MATCHES "gfortran*")
     set(CMAKE_SKIP_BUILD_RPATH            FALSE)
     set(CMAKE_BUILD_WITH_INSTALL_RPATH    TRUE)
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
     #Compiler gfortran Flags
-    set(CMAKE_Fortran_FLAGS "-O3 -fimplicit-none") #  -lhdf5_fortran -fintrinsic-modules-path ${HDF5_INCLUDE_DIRS}") # /usr/local/include") #  TODO find metter way to include ${HDF5_INCLUDE_DIRS}")  #/usr/local/include")  # -lhdf5hl_fortran")          # -std=f2003 ${CMAKE_Fortran_FLAGS}  -qopenmp
-    set(CMAKE_Fortran_FLAGS_DEBUG "-g -O0 -Wall -fbacktrace -fbounds-check")  #   -fcheck=bounds
-    set(CMAKE_Fortran_FLAGS_RELEASE "-O3  -Wall -static")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -fimplicit-none -Wopenmp")   #  -lhdf5_fortran -fintrinsic-modules-path ${HDF5_INCLUDE_DIRS}") # /usr/local/include") #  TODO find metter way to include ${HDF5_INCLUDE_DIRS}")  #/usr/local/include")  # -lhdf5hl_fortran")          # -std=f2003 ${CMAKE_Fortran_FLAGS}
+    set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -g -O0 -Wall -fbacktrace -fbounds-check")  #   -fcheck=bounds
+    set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O3  -Wall -static")
 
     set(CMAKE_C_FLAGS "-c")
 endif()
@@ -131,17 +178,29 @@ SET(POLYMER_MODEL polymer_model)
 ADD_LIBRARY(${POLYMER_MODEL} STATIC ${SOURCE_FOLDER}/polymer_model.f03)
 target_link_libraries(${POLYMER_MODEL} ${LOGGING} ${RANDOMNUMBER} ${TIMERS} ${KINDS} ${LIB_CONF})
 
+SET(POLYMER_MODEL_UNIFIED polymer_model_unified)
+ADD_LIBRARY(${POLYMER_MODEL_UNIFIED} STATIC ${SOURCE_FOLDER}/polymer_model_unified.f03)
+target_link_libraries(${POLYMER_MODEL_UNIFIED} ${TIMERS} ${LATTICE_DATA} ${LOGGING} ${LIB_CONF})
+
 SET(ANALYSE analyse)
 ADD_LIBRARY(${ANALYSE} STATIC ${SOURCE_FOLDER}/analyse.f03)
 target_include_directories(${ANALYSE} PRIVATE ${HDF5_INCLUDE_DIRS})
 target_link_libraries(${ANALYSE} PRIVATE ${LATTICE_DATA} ${POLYMER_MODEL} ${RANDOMNUMBER} ${TIMERS} ${KINDS} ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
+
+SET(ANALYSE_UNIFIED analyse_unified)
+ADD_LIBRARY(${ANALYSE_UNIFIED} STATIC ${SOURCE_FOLDER}/analyse_unified.f03)
+target_include_directories(${ANALYSE_UNIFIED} PRIVATE ${HDF5_INCLUDE_DIRS})
+add_dependencies(${ANALYSE_UNIFIED} ${ANALYSE})  # Ensure analyse_mod is compiled first
+target_link_libraries(${ANALYSE_UNIFIED} PRIVATE ${LATTICE_DATA} ${POLYMER_MODEL} ${ANALYSE} ${RANDOMNUMBER} ${TIMERS} ${KINDS} ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
 
 
 # include_directories(src)
 
 add_executable(${TARGET} ${SOURCE_FILES})
 ##target_include_directories(${TARGET} PRIVATE ${HDF5_INCLUDE_DIRS})
-target_link_libraries(${TARGET} ${RANDOMNUMBER} ${KINDS} ${TIMERS} ${LIB_CONF} ${LATTICE_DATA} ${POLYMER_MODEL} ${ANALYSE} MPI::MPI_Fortran) ## ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
+# Ensure libraries are built before executable (for module files)
+add_dependencies(${TARGET} ${POLYMER_MODEL_UNIFIED} ${POLYMER_MODEL} ${ANALYSE} ${ANALYSE_UNIFIED} ${LATTICE_DATA} ${LIB_CONF} ${TIMERS} ${LOGGING} ${RANDOMNUMBER} ${KINDS})
+target_link_libraries(${TARGET} ${RANDOMNUMBER} ${KINDS} ${TIMERS} ${LIB_CONF} ${LATTICE_DATA} ${POLYMER_MODEL} ${POLYMER_MODEL_UNIFIED} ${ANALYSE} ${ANALYSE_UNIFIED} MPI::MPI_Fortran) ## ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
 set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE Fortran)
 
 # data files
