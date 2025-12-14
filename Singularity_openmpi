@@ -21,8 +21,9 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-12-15
      export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
      export OMPI_DIR=/opt/ompi
      export SINGULARITY_OMPI_DIR=$OMPI_DIR
-     export SINGULAIRTYENV_PREPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
-     export SINGULARITYENV_PREPEND_PATH=$OMPI_DIR/bin:/opt/uv:/3DPolyS-LE/.venv/bin:
+     export SINGULARITYENV_PREPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
+     export PATH=$OMPI_DIR/bin:/opt/uv:/3DPolyS-LE/.venv/bin:$PATH
+     export SINGULARITYENV_PREPEND_PATH=$OMPI_DIR/bin:/opt/uv:/3DPolyS-LE/.venv/bin
      export VIRTUAL_ENV="/3DPolyS-LE/.venv"
 
 %post
@@ -51,11 +52,15 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-12-15
     cd /
     git clone https://gitlab.com/togop/3DPolyS-LE.git -b develop
     cd 3DPolyS-LE
+    PATH=/opt/uv:$PATH
+    export PATH
     make venv
+    export UV_LINK_MODE=copy
     make all
+    # Ensure the venv bin directory is in PATH for future use
+    echo 'export PATH=/3DPolyS-LE/.venv/bin:$PATH' >> $SINGULARITY_ENVIRONMENT
 
 %runscript
     # echo "Container py3DPolyS_LE was created $NOW"
     # echo "Arguments received: $*"
-    # PATH="/3DPolyS-LE/.venv/bin:${PATH}"
-    cd /3DPolyS-LE && . .venv/bin/activate && exec echo "$@"
+    cd /3DPolyS-LE && . .venv/bin/activate && exec "$@"
