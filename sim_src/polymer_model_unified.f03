@@ -105,6 +105,37 @@ contains
 
         call log%debug('allocate_unified self%Nchain: ' // trim(str(self%Nchain)) // ' bittable_t: ' // trim(str(bittable_t)))
 
+        ! Deallocate if already allocated (e.g., for multiple trajectories)
+        if (allocated(self%config)) then
+            !$acc exit data delete(self%config)
+            deallocate(self%config)
+        end if
+        if (allocated(self%bittable)) then
+            !$acc exit data delete(self%bittable)
+            deallocate(self%bittable)
+        end if
+        if (allocated(self%dr)) then
+            !$acc exit data delete(self%dr)
+            deallocate(self%dr)
+        end if
+        if (allocated(self%contact)) then
+            !$acc exit data delete(self%contact)
+            deallocate(self%contact)
+        end if
+        if (allocated(self%boundary)) then
+            !$acc exit data delete(self%boundary)
+            deallocate(self%boundary)
+        end if
+        if (allocated(self%loading_sites_factor)) then
+            !$acc exit data delete(self%loading_sites_factor)
+            deallocate(self%loading_sites_factor)
+        end if
+        if (allocated(self%interaction_sites_state)) then
+            !$acc exit data delete(self%interaction_sites_state)
+            deallocate(self%interaction_sites_state)
+        end if
+
+        ! Now allocate fresh arrays
         allocate (self%config(2, self%Nchain))
         allocate (self%bittable(14, bittable_t))
         allocate (self%dr(3, self%Nchain))
