@@ -21,12 +21,14 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-12-15
      export OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
      export OMPI_DIR=/opt/ompi
      export SINGULARITY_OMPI_DIR=$OMPI_DIR
-     export SINGULAIRTYENV_PREPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
-     export SINGULARITYENV_PREPEND_PATH=$OMPI_DIR/bin:/opt/uv:/3DPolyS-LE/.venv/bin:
+     export SINGULARITYENV_PREPEND_LD_LIBRARY_PATH=$OMPI_DIR/lib
+     export PATH=$OMPI_DIR/bin:/opt/uv:/3DPolyS-LE/.venv/bin:$PATH
+     export SINGULARITYENV_PREPEND_PATH=$OMPI_DIR/bin:/opt/uv:/3DPolyS-LE/.venv/bin
      export VIRTUAL_ENV="/3DPolyS-LE/.venv"
 
 %post
-    # apt-get update # just updated bootstrap
+    # Update package lists before installing
+    apt-get update
     # Install py3dpolys_le package
     PATH=/opt/uv:$PATH
     export PATH=$PATH
