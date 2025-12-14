@@ -28,7 +28,8 @@ From:   togop/gcc_gfortran_openmpi_hdf5_python_uv:2025-05-31
 
 %post
     # Update package lists before installing
-    apt-get update
+    # Allow release info changes (handles Debian stable codename updates)
+    apt-get update --allow-releaseinfo-change || apt-get update
     # Install py3dpolys_le package
     PATH=/opt/uv:$PATH
     export PATH=$PATH
