@@ -788,29 +788,53 @@ contains
         ! - Unit 11: dr array (displacement data)
         ! - Unit 12: contact array (extruder occupancy data)
         ! - Unit 14: Nleffree (number of free extruders)
-        !
-        ! NOTE: The simulation implementations (do_simulation_*_impl) are currently
-        ! placeholders and do NOT call this output method. For full functionality,
-        ! the simulation implementations need to call output_unified() at the same
-        ! points as the original do_simulation calls output():
-        !   1. Before burn-in (initial measurement)
-        !   2. After burn-in
-        !   3. After each measurement in the main loop
-        !   4. After burnout
-        !   5. After each burnoutM measurement
         implicit none
         class (PolymerModel_unified), intent(inout) :: self
 
-        integer :: j
+        integer :: j, rc
+
+        ! Ensure we're working with host data if using OpenACC
+        ! Since trial moves run on CPU, host data is always current
+        if (self%use_openacc) then
+            ! Data is already on host (trial moves modify host arrays)
+            ! No need to update from device since we're not using device for computation
+        end if
 
         ! Write in output files (units 10, 11, 12, 14 as in original)
+        ! Check that arrays are allocated and have correct dimensions
+        if (.not.allocated(self%config) .or. .not.allocated(self%dr) .or. .not.allocated(self%contact)) then
+            call log%error('output_unified: Arrays not allocated!')
+            call log%error('  config allocated: ' // merge('YES', 'NO ', allocated(self%config)))
+            call log%error('  dr allocated: ' // merge('YES', 'NO ', allocated(self%dr)))
+            call log%error('  contact allocated: ' // merge('YES', 'NO ', allocated(self%contact)))
+            return
+        end if
+
+        ! Verify array dimensions
+        if (size(self%config, 1) /= 2 .or. size(self%config, 2) /= self%Nchain) then
+            call log%error('output_unified: config array has wrong dimensions!')
+            return
+        end if
+        if (size(self%dr, 1) /= 3 .or. size(self%dr, 2) /= self%Nchain) then
+            call log%error('output_unified: dr array has wrong dimensions!')
+            return
+        end if
+        if (size(self%contact, 1) /= 3 .or. size(self%contact, 2) /= self%Nchain) then
+            call log%error('output_unified: contact array has wrong dimensions!')
+            return
+        end if
+
         do j = 1, self%Nchain
             ! TODO maybe possible to write the whole chain in one round
-            write(10, *) self%config(:, j) !the configuration: config(1,j)=node where monomer j is located, config(2,j)=direction of the vector between j and j+1
-            write(11, *) self%dr(:, j) !the displacement: vector (x,y,z in lattice unit) of displacement of monomer j between time 0 and current time
-            write(12, *) self%contact(:, j) !the extruder occupancy and information: contact(1,j) \ne 0 if one lef of a extruder is in j, contact(1,j)=the monomer where the other lef is, contact(2,j)=the vector between the two legs, contact(3,j)=-1 (resp. +1) if it's a lef walking in the (-) direction (resp. (+) direction)
+            write(10, *, iostat=rc) self%config(:, j) !the configuration: config(1,j)=node where monomer j is located, config(2,j)=direction of the vector between j and j+1
+            if (rc /= 0) call log%warn('output_unified: Error writing to unit 10, iostat=' // trim(str(rc)))
+            write(11, *, iostat=rc) self%dr(:, j) !the displacement: vector (x,y,z in lattice unit) of displacement of monomer j between time 0 and current time
+            if (rc /= 0) call log%warn('output_unified: Error writing to unit 11, iostat=' // trim(str(rc)))
+            write(12, *, iostat=rc) self%contact(:, j) !the extruder occupancy and information: contact(1,j) \ne 0 if one lef of a extruder is in j, contact(1,j)=the monomer where the other lef is, contact(2,j)=the vector between the two legs, contact(3,j)=-1 (resp. +1) if it's a lef walking in the (-) direction (resp. (+) direction)
+            if (rc /= 0) call log%warn('output_unified: Error writing to unit 12, iostat=' // trim(str(rc)))
         end do
-        write(14, *) self%Nleffree !number of free (unbound) extruders
+        write(14, *, iostat=rc) self%Nleffree !number of free (unbound) extruders
+        if (rc /= 0) call log%warn('output_unified: Error writing to unit 14, iostat=' // trim(str(rc)))
 
         flush(10)
         flush(11)
