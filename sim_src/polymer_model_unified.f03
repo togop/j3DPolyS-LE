@@ -16,10 +16,11 @@ module PolymerModel_unified_mod
     
     ! Interface for randomnumber function (from randomnumber.f03)
     ! This is an external function that uses Fortran's random_number
+    ! Using double precision which is equivalent to real*8
     interface
         function randomnumber() result(r)
             implicit none
-            real*8 :: r
+            double precision :: r
         end function randomnumber
     end interface
 
