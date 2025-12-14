@@ -793,6 +793,11 @@ program mainprogram
         end if
     end if
 
+    if ((rank == 0).and.(.not.do_analyse)) then
+        call crono%Tic()
+        call log%info('START Running simulations ...')
+    end if
+
     call log%info('Running simulations for rank:' // trim(str(rank)) // ' #trajectories:' // trim(str(rank_Niter)) // ' ...')
 
     params = ModelParameters(L = L, Nchain = Nchain, iku = iku, ikm = ikm, ikb = ikb, Nleffree = Nlef, &
@@ -866,6 +871,8 @@ program mainprogram
     call log%debug('PASSED MPI_Barrier for rank ' // trim(str(rank)))
 
     if (rank == 0) then
+        call log%info(crono%Tac('END Running similations'))
+
         call crono%Tic()
         ! TODO take care of old files or remove them before generating the new one
         inquire(file = trim(trim(output_folder) // 'config.out'), exist = file_exists)
