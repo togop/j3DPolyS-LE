@@ -952,7 +952,7 @@ contains
         
         ! Parallelize the outer loop - each iteration is independent
         !$omp parallel do if(self%use_openmp) default(none) &
-        !$omp& shared(self, L2) private(a, i, j, k, v, x, y, z, xp, yp, zp, ip, jp, kp)
+        !$omp& shared(self, L2, voisxyz) private(a, i, j, k, v, x, y, z, xp, yp, zp, ip, jp, kp)
         do a = 1, 4 * L2 * self%L
             k = int((a - 1) / (2 * L2)) + 1
             j = int((a - 1) / self%L - 2 * self%L * (k - 1)) + 1

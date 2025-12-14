@@ -45,19 +45,16 @@ contains
             end if
         end if
         
-        ! Check if compiled with OpenACC
-        !$acc if (.true.)
-        available = .true.
-        !$acc end if
+        ! Note: OpenACC doesn't support conditional compilation like OpenMP's !$
+        ! Compile-time availability is determined by whether the code compiles
+        ! If OpenACC is not available, code using OpenACC directives will fail at build time
     end function check_openacc_available
 
     logical function check_openmp_available() result(available)
         ! Check if OpenMP is available
         implicit none
         available = .false.
-        !$omp if (.true.)
-        available = .true.
-        !$omp end if
+        !$ available = .true.
     end function check_openmp_available
 
     subroutine analyse_unified(radiuscontact, use_contact_probability, &
@@ -136,19 +133,15 @@ contains
         
         ! Future implementation with full OpenACC/OpenMP support:
         ! if (use_openacc) then
-        !     !$acc if (.true.)
-        !     use analyse_openacc_mod, only: analyse_openacc
-        !     call analyse_openacc(radiuscontact, use_contact_probability, &
-        !             params, Niter, Nmeas, output_folder, analyse_folder, &
-        !             hic3d_factor, chrom, .true.)
-        !     !$acc end if
+        !     !$acc use analyse_openacc_mod, only: analyse_openacc
+        !     !$acc call analyse_openacc(radiuscontact, use_contact_probability, &
+        !     !$acc         params, Niter, Nmeas, output_folder, analyse_folder, &
+        !     !$acc         hic3d_factor, chrom, .true.)
         ! else if (use_openmp) then
-        !     !$omp if (.true.)
-        !     use analyse_openmp_mod, only: analyse_openmp
-        !     call analyse_openmp(radiuscontact, use_contact_probability, &
-        !             params, Niter, Nmeas, output_folder, analyse_folder, &
-        !             hic3d_factor, chrom, .true., num_threads)
-        !     !$omp end if
+        !     !$ use analyse_openmp_mod, only: analyse_openmp
+        !     !$ call analyse_openmp(radiuscontact, use_contact_probability, &
+        !     !$         params, Niter, Nmeas, output_folder, analyse_folder, &
+        !     !$         hic3d_factor, chrom, .true., num_threads)
         ! else
         !     call analyse(radiuscontact, use_contact_probability, &
         !             params, Niter, Nmeas, output_folder, analyse_folder, &

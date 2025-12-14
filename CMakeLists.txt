@@ -82,23 +82,35 @@ endif()
 # OpenMP CPU parallelization support (works on Linux, macOS, Windows)
 option(ENABLE_OPENMP "Enable OpenMP CPU parallelization" OFF)
 
+# Variable to track if we should link OpenMP (set after executable is created)
+set(OPENMP_FORTRAN_FOUND FALSE)
+set(OPENMP_USE_FLAGS FALSE)
+
 if(ENABLE_OPENMP)
+    # Find OpenMP - on Mac, OpenMP_C might not be found but OpenMP_Fortran can be
+    # Try to find OpenMP Fortran component specifically
     find_package(OpenMP)
+    # Check if Fortran component is found (even if C component is not)
     if(OpenMP_Fortran_FOUND)
-        target_link_libraries(${TARGET} PRIVATE OpenMP::OpenMP_Fortran)
+        set(OPENMP_FORTRAN_FOUND TRUE)
         set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${OpenMP_Fortran_FLAGS}")
         message(STATUS "OpenMP enabled: Using ${OpenMP_Fortran_FLAGS}")
     else()
         # Try to set flags manually if FindOpenMP doesn't work
+        set(OPENMP_USE_FLAGS TRUE)
         if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
             set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fopenmp")
-            message(STATUS "OpenMP enabled: Using -fopenmp flag")
+            message(STATUS "OpenMP enabled: Using -fopenmp flag (manual)")
         elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
             set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -qopenmp")
-            message(STATUS "OpenMP enabled: Using -qopenmp flag")
+            message(STATUS "OpenMP enabled: Using -qopenmp flag (manual)")
         else()
             message(WARNING "OpenMP requested but compiler support not detected")
         endif()
+    endif()
+    # Note: OpenMP_C not found is OK on Mac - we only need Fortran support
+    if(OpenMP_Fortran_FOUND AND NOT OpenMP_C_FOUND)
+        message(STATUS "OpenMP: Fortran support found (C support not required)")
     endif()
 else()
     message(STATUS "OpenMP support disabled (use -DENABLE_OPENMP=ON to enable)")
@@ -200,7 +212,13 @@ add_executable(${TARGET} ${SOURCE_FILES})
 ##target_include_directories(${TARGET} PRIVATE ${HDF5_INCLUDE_DIRS})
 # Ensure libraries are built before executable (for module files)
 add_dependencies(${TARGET} ${POLYMER_MODEL_UNIFIED} ${POLYMER_MODEL} ${ANALYSE} ${ANALYSE_UNIFIED} ${LATTICE_DATA} ${LIB_CONF} ${TIMERS} ${LOGGING} ${RANDOMNUMBER} ${KINDS})
-target_link_libraries(${TARGET} ${RANDOMNUMBER} ${KINDS} ${TIMERS} ${LIB_CONF} ${LATTICE_DATA} ${POLYMER_MODEL} ${POLYMER_MODEL_UNIFIED} ${ANALYSE} ${ANALYSE_UNIFIED} MPI::MPI_Fortran) ## ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
+target_link_libraries(${TARGET} PRIVATE ${RANDOMNUMBER} ${KINDS} ${TIMERS} ${LIB_CONF} ${LATTICE_DATA} ${POLYMER_MODEL} ${POLYMER_MODEL_UNIFIED} ${ANALYSE} ${ANALYSE_UNIFIED} MPI::MPI_Fortran) ## ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
+
+# Link OpenMP if enabled (must be after executable is created)
+if(ENABLE_OPENMP AND OPENMP_FORTRAN_FOUND)
+    target_link_libraries(${TARGET} PRIVATE OpenMP::OpenMP_Fortran)
+endif()
+
 set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE Fortran)
 
 # data files

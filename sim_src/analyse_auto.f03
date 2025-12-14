@@ -50,21 +50,15 @@ contains
                 end if
             end if
             
-            ! Check if compiled with OpenACC support
-            ! Note: This is a compile-time check, so we use conditional compilation
-            !$acc if (.true.)
-            method = PARALLEL_OPENACC
-            call log%info('OpenACC support detected at compile time')
-            return
-            !$acc end if
+            ! Note: OpenACC doesn't support conditional compilation like OpenMP's !$
+            ! If OpenACC is compiled, the environment variable check above should have caught it
+            ! If not compiled, this code path won't be reached anyway
         end if
         
         ! Check for OpenMP support
-        !$omp if (.true.)
-        method = PARALLEL_OPENMP
-        call log%info('OpenMP support detected')
-        return
-        !$omp end if
+        !$ method = PARALLEL_OPENMP
+        !$ call log%info('OpenMP support detected')
+        !$ return
         
         ! Fallback to sequential
         method = PARALLEL_NONE
@@ -115,35 +109,24 @@ contains
         case(PARALLEL_OPENACC)
             method_name = 'OpenACC (GPU)'
             call log%info('Using ' // trim(method_name) // ' for analysis')
-            !$acc if (.true.)
             ! Use OpenACC version
             ! Note: This requires linking with analyse_openacc_mod
             ! For now, we'll call a wrapper that handles the interface
             call analyse_openacc_wrapper(radiuscontact, use_contact_probability, &
                     params, Niter, Nmeas, output_folder, analyse_folder, &
                     hic3d_factor, chrom, .true.)
-            !$acc end if
-            !$acc if (.false.)
-            ! Fallback if OpenACC not compiled
-            call log%warn('OpenACC requested but not compiled, falling back to OpenMP')
-            method = PARALLEL_OPENMP
-            !$acc end if
+            ! Note: If OpenACC is not compiled, this will fail at build/link time
             
         case(PARALLEL_OPENMP)
             method_name = 'OpenMP (CPU)'
             call log%info('Using ' // trim(method_name) // ' for analysis')
-            !$omp if (.true.)
-            ! Use OpenMP version
-            ! Note: This requires linking with analyse_openmp_mod
-            call analyse_openmp_wrapper(radiuscontact, use_contact_probability, &
-                    params, Niter, Nmeas, output_folder, analyse_folder, &
-                    hic3d_factor, chrom, .true., num_threads)
-            !$omp end if
-            !$omp if (.false.)
-            ! Fallback if OpenMP not compiled
-            call log%warn('OpenMP requested but not compiled, using sequential')
-            method = PARALLEL_NONE
-            !$omp end if
+            !$ ! Use OpenMP version
+            !$ ! Note: This requires linking with analyse_openmp_mod
+            !$ call analyse_openmp_wrapper(radiuscontact, use_contact_probability, &
+            !$         params, Niter, Nmeas, output_folder, analyse_folder, &
+            !$         hic3d_factor, chrom, .true., num_threads)
+            ! Note: If OpenMP is not compiled, the above call will not be compiled
+            ! and a link error will occur - this is expected behavior
             
         case default
             method_name = 'Sequential (CPU)'
@@ -178,13 +161,11 @@ contains
         ! 3. Using a function pointer/interface block
         
         ! For now, we'll use conditional compilation
-        !$acc if (.true.)
         ! Note: Uncomment when analyse_openacc_mod is available
         ! use analyse_openacc_mod, only: analyse_openacc
         ! call analyse_openacc(radiuscontact, use_contact_probability, &
         !         params, Niter, Nmeas, output_folder, analyse_folder, &
         !         hic3d_factor, chrom, use_gpu)
-        !$acc end if
         
         call log%error('analyse_openacc_mod not available - please link with OpenACC implementation')
     end subroutine analyse_openacc_wrapper
@@ -204,13 +185,11 @@ contains
         integer, intent(in) :: num_threads
         
         ! Interface to analyse_openmp_mod::analyse_openmp
-        !$omp if (.true.)
-        ! Note: Uncomment when analyse_openmp_mod is available
-        ! use analyse_openmp_mod, only: analyse_openmp
-        ! call analyse_openmp(radiuscontact, use_contact_probability, &
-        !         params, Niter, Nmeas, output_folder, analyse_folder, &
-        !         hic3d_factor, chrom, use_omp, num_threads)
-        !$omp end if
+        !$ ! Note: Uncomment when analyse_openmp_mod is available
+        !$ ! use analyse_openmp_mod, only: analyse_openmp
+        !$ ! call analyse_openmp(radiuscontact, use_contact_probability, &
+        !$ !         params, Niter, Nmeas, output_folder, analyse_folder, &
+        !$ !         hic3d_factor, chrom, use_omp, num_threads)
         
         call log%error('analyse_openmp_mod not available - please link with OpenMP implementation')
     end subroutine analyse_openmp_wrapper
