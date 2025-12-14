@@ -407,14 +407,13 @@ contains
             end if
         end select
 
-        ! Initialize simulation arrays
+        ! Initialize simulation arrays (already zeroed in allocate_unified, but ensure consistency)
+        ! Note: Arrays are already initialized in allocate_unified(), but we set these explicitly
+        ! for clarity since they're used immediately after
         self%contact = 0
         self%dr = 0.
         
-        ! Update GPU data after initialization if using OpenACC
-        if (self%use_openacc) then
-            !$acc update device(self%config, self%bittable, self%contact, self%dr)
-        end if
+        ! Note: No device update needed here - data will be on device only if actually used for GPU computation
     end subroutine init_unified_base
 
     subroutine do_simulation_unified(self, trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
@@ -505,8 +504,8 @@ contains
                 end do
             end do
             
-            ! Keep device data in sync (though not actively used during sequential simulation)
-            !$acc update device(self%config, self%contact, self%bittable, self%dr)
+            ! Note: No device update needed here - trial moves run on CPU and modify host data
+            ! Device data will be updated only when actually needed for GPU computation
             
             call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', burn-in Measurement, ' // &
                     ' burn_Nmeas: ' // trim(str(burn_Nmeas)))
@@ -544,8 +543,7 @@ contains
             call flush(6)
             call self%output_unified()
             call flush(13)
-            ! Keep device data in sync (though not actively used during sequential simulation)
-            !$acc update device(self%config, self%contact, self%bittable, self%dr)
+            ! Note: No device update needed - trial moves run on CPU, data stays on host
         end do
 
         ! do burn-out included as extra measurement
@@ -556,8 +554,7 @@ contains
                     call self%trialmovetad_unified() ! move for monomers
                 end do
             end do
-            ! Keep device data in sync
-            !$acc update device(self%config, self%contact, self%bittable, self%dr)
+            ! Note: No device update needed - trial moves run on CPU
             call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', fix burn-out Measurement')
             call self%output_unified()
             call flush(13)
@@ -571,8 +568,7 @@ contains
                         call self%trialmovetad_unified() ! move for monomers
                     end do
                 end do
-                ! Keep device data in sync
-                !$acc update device(self%config, self%contact, self%bittable, self%dr)
+                ! Note: No device update needed - trial moves run on CPU
                 call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', burn-out Measurement: ' // trim(str(j)))
                 call self%output_unified()
                 call flush(13)
@@ -846,13 +842,23 @@ contains
             return
         end if
 
+        ! Optimized: Write arrays efficiently using array sections
+        ! Using explicit format reduces parsing overhead compared to list-directed I/O
         do j = 1, self%Nchain
-            ! TODO maybe possible to write the whole chain in one round
-            write(10, *, iostat=rc) self%config(:, j) !the configuration: config(1,j)=node where monomer j is located, config(2,j)=direction of the vector between j and j+1
+            ! Write config array: config(1,j)=node where monomer j is located, 
+            ! config(2,j)=direction of the vector between j and j+1
+            write(10, '(2(i0,1x))', iostat=rc) self%config(:, j)
             if (rc /= 0) call log%warn('output_unified: Error writing to unit 10, iostat=' // trim(str(rc)))
-            write(11, *, iostat=rc) self%dr(:, j) !the displacement: vector (x,y,z in lattice unit) of displacement of monomer j between time 0 and current time
+            
+            ! Write dr array: vector (x,y,z in lattice unit) of displacement of monomer j
+            write(11, '(3(es15.8,1x))', iostat=rc) self%dr(:, j)
             if (rc /= 0) call log%warn('output_unified: Error writing to unit 11, iostat=' // trim(str(rc)))
-            write(12, *, iostat=rc) self%contact(:, j) !the extruder occupancy and information: contact(1,j) \ne 0 if one lef of a extruder is in j, contact(1,j)=the monomer where the other lef is, contact(2,j)=the vector between the two legs, contact(3,j)=-1 (resp. +1) if it's a lef walking in the (-) direction (resp. (+) direction)
+            
+            ! Write contact array: contact(1,j) \ne 0 if one lef of a extruder is in j,
+            ! contact(1,j)=the monomer where the other lef is, 
+            ! contact(2,j)=the vector between the two legs, 
+            ! contact(3,j)=-1 (resp. +1) if it's a lef walking in the (-) direction (resp. (+) direction)
+            write(12, '(3(i0,1x))', iostat=rc) self%contact(:, j)
             if (rc /= 0) call log%warn('output_unified: Error writing to unit 12, iostat=' // trim(str(rc)))
         end do
         write(14, *, iostat=rc) self%Nleffree !number of free (unbound) extruders
@@ -961,10 +967,13 @@ contains
             y = (j - 1) * 0.5
             z = (k - 1) * 0.5
             self%bittable(1, a) = 0
+            ! Inner loop: compute neighbor positions with periodic boundary conditions
+            !$omp simd private(xp, yp, zp, ip, jp, kp)
             do v = 1, 12
                 xp = x + voisxyz(1, v + 1)
                 yp = y + voisxyz(2, v + 1)
                 zp = z + voisxyz(3, v + 1)
+                ! Apply periodic boundary conditions
                 if (xp >= self%L) xp = xp - self%L
                 if (xp < 0) xp = xp + self%L
                 if (yp >= self%L) yp = yp - self%L
@@ -976,6 +985,7 @@ contains
                 kp = int(2 * zp + 1)
                 self%bittable(v + 1, a) = ip + (jp - 1) * self%L + (kp - 1) * 2 * L2
             end do
+            !$omp end simd
         end do
         !$omp end parallel do
         call log%info('lattice density: ' // trim(strf(real(self%Nchain) / real(4 * L2 * self%L))))
