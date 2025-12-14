@@ -12,6 +12,15 @@ module PolymerModel_unified_mod
     public :: PolymerModel_unified, ModelParameters_unified
     
     type(Logger) :: log = Logger('PolymerModel_unified_mod', LOG_INFO)
+    
+    ! Interface for randomnumber function (from randomnumber.f03)
+    ! This is an external function that uses Fortran's random_number
+    interface
+        function randomnumber() result(r)
+            implicit none
+            real*8 :: r
+        end function randomnumber
+    end interface
 
     type ModelParameters_unified
         private
@@ -395,6 +404,11 @@ contains
         ! Initialize simulation arrays
         self%contact = 0
         self%dr = 0.
+        
+        ! Update GPU data after initialization if using OpenACC
+        if (self%use_openacc) then
+            !$acc update device(self%config, self%bittable, self%contact, self%dr)
+        end if
     end subroutine init_unified_base
 
     subroutine do_simulation_unified(self, trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
@@ -445,6 +459,8 @@ contains
         ! Note: MC trial moves have dependencies and require random number generation,
         ! so full GPU parallelization is challenging. This implementation uses OpenACC
         ! for data management while keeping the simulation logic on CPU.
+        ! Since trial moves run sequentially on CPU, we keep data on host and only
+        ! use device data regions for potential future parallelization or caching benefits.
         implicit none
         class (PolymerModel_unified), intent(inout) :: self
         integer, intent(in) :: trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM
@@ -461,12 +477,11 @@ contains
                 ', Nmeas: ' // trim(str(Nmeas)) // ', burnin: ' // trim(str(burnin)) // &
                 ', burnout: ' // trim(str(burnout)) // ', burnoutM: ' // trim(str(burnoutM)))
 
-        ! Ensure GPU data is up to date
-        !$acc update device(self%config, self%contact, self%bittable, self%dr, &
-        !$acc& self%boundary, self%loading_sites_factor, self%interaction_sites_state)
+        ! Since trial moves run on CPU and modify data, we work with host data
+        ! Device data regions are maintained for potential future use but not actively used
+        ! during sequential simulation. Data is kept consistent via present clauses.
 
         ! first initial measurement before the burn-in
-        !$acc update host(self%config, self%dr, self%contact)
         call self%output_unified()
 
         if (burnin > 0) then
@@ -482,12 +497,11 @@ contains
                 end do
             end do
             
-            ! Update GPU after burn-in
+            ! Keep device data in sync (though not actively used during sequential simulation)
             !$acc update device(self%config, self%contact, self%bittable, self%dr)
             
             call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', burn-in Measurement, ' // &
                     ' burn_Nmeas: ' // trim(str(burn_Nmeas)))
-            !$acc update host(self%config, self%dr, self%contact)
             call self%output_unified()
         end if
 
@@ -520,11 +534,9 @@ contains
             end do
             call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', Measurement:' // trim(str(j)))
             call flush(6)
-            ! Update host data for output
-            !$acc update host(self%config, self%dr, self%contact)
             call self%output_unified()
             call flush(13)
-            ! Update device data for next iteration
+            ! Keep device data in sync (though not actively used during sequential simulation)
             !$acc update device(self%config, self%contact, self%bittable, self%dr)
         end do
 
@@ -536,9 +548,9 @@ contains
                     call self%trialmovetad_unified() ! move for monomers
                 end do
             end do
+            ! Keep device data in sync
             !$acc update device(self%config, self%contact, self%bittable, self%dr)
             call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', fix burn-out Measurement')
-            !$acc update host(self%config, self%dr, self%contact)
             call self%output_unified()
             call flush(13)
         end if
@@ -551,16 +563,14 @@ contains
                         call self%trialmovetad_unified() ! move for monomers
                     end do
                 end do
+                ! Keep device data in sync
                 !$acc update device(self%config, self%contact, self%bittable, self%dr)
                 call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', burn-out Measurement: ' // trim(str(j)))
-                !$acc update host(self%config, self%dr, self%contact)
                 call self%output_unified()
                 call flush(13)
             end do
         end if
 
-        ! Final update before erase
-        !$acc update host(self%config, self%contact, self%bittable)
         call self%erase_unified()
     end subroutine do_simulation_openacc_impl
 
@@ -1200,7 +1210,7 @@ contains
         class (PolymerModel_unified), intent(inout) :: self
 
         integer :: n, iv, s, id, con(3), strand
-        real*8 :: randomnumber, fc
+        real*8 :: fc
         real :: impermeability
 
         !choose randomly a monomer
