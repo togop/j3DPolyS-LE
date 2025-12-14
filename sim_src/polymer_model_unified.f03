@@ -16,11 +16,11 @@ module PolymerModel_unified_mod
     
     ! Interface for randomnumber function (from randomnumber.f03)
     ! This is an external function that uses Fortran's random_number
-    ! Using double precision which is equivalent to real*8
+    ! Declared as external function with explicit interface for type safety
     interface
         function randomnumber() result(r)
             implicit none
-            double precision :: r
+            real*8 :: r
         end function randomnumber
     end interface
 
@@ -431,8 +431,9 @@ contains
         integer :: burn_Nmeas, simburnin
         integer :: j, k, v, Ntrial
         real :: pt
-        real*8 :: randomnumber, r
+        real*8 :: r
         character(20) :: method_name
+        ! Note: randomnumber is declared in module interface
 
         burn_Nmeas = 0
         simburnin = 0
@@ -473,7 +474,8 @@ contains
         
         integer :: burn_Nmeas, simburnin, j, k, v, Ntrial
         real :: pt
-        real*8 :: randomnumber, r
+        real*8 :: r
+        ! Note: randomnumber is declared in module interface
 
         burn_Nmeas = 0
         simburnin = 0
@@ -602,7 +604,8 @@ contains
         
         integer :: burn_Nmeas, simburnin, j, k, v, Ntrial
         real :: pt
-        real*8 :: randomnumber, r
+        real*8 :: r
+        ! Note: randomnumber is declared in module interface
 
         burn_Nmeas = 0
         simburnin = 0
@@ -706,7 +709,8 @@ contains
         
         integer :: burn_Nmeas, simburnin, j, k, v, Ntrial
         real :: pt
-        real*8 :: randomnumber, r
+        real*8 :: r
+        ! Note: randomnumber is declared in module interface
 
         burn_Nmeas = 0
         simburnin = 0
@@ -988,7 +992,7 @@ contains
         implicit none
         class (PolymerModel_unified), intent(inout) :: self
         integer :: turn1(7), turn2(7), turn(7), lim, a, n, i, j, t, nv1, nv2, iv, en2, v, b, c(2, self%Nchain)
-        real*8 :: randomnumber
+        ! Note: randomnumber is declared in module interface
 
         self%bittable(1, :) = 0
 
@@ -1068,7 +1072,7 @@ contains
         implicit none
         class (PolymerModel_unified), intent(inout) :: self
         integer :: a, n, i, t, nv1, nv2, iv, en2, v, b, c(2, self%Nchain), lim, v1, v2
-        real*8 :: randomnumber
+        ! Note: randomnumber is declared in module interface
 
         lim = 2 * self%L - 2
 
@@ -1366,7 +1370,7 @@ contains
 
         integer :: n, iv, v, b, j, nv1, nv2, nm2, np1, en, cn2, cn3, cm2, en2, id, cc, a
         real :: dE
-        real*8 :: randomnumber
+        ! Note: randomnumber is declared in module interface
 
         !choose randomly a monomer
         n = int(self%Nchain * randomnumber()) + 1
@@ -1617,7 +1621,7 @@ contains
 
         integer :: n, id, j, d
         real :: kbp
-        real*8 :: randomnumber
+        ! Note: randomnumber is declared in module interface
 
         !choose randomly a monomer
         n = int(self%Nchain * randomnumber()) + 1
@@ -1683,7 +1687,7 @@ contains
         class (PolymerModel_unified), intent(inout) :: self
 
         integer :: n, id, j
-        real*8 :: randomnumber
+        ! Note: randomnumber is declared in module interface, not as local variable
 
         !choose randomly a monomer
         n = int(self%Nchain * randomnumber()) + 1
