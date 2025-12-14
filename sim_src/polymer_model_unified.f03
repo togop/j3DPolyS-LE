@@ -47,7 +47,7 @@ module PolymerModel_unified_mod
 
     contains
         procedure, public :: init_unified, do_simulation_unified, detect_parallelization, output_parameters_unified, init_unified_base
-        procedure, private :: allocate_unified, initbitable_unified, initconfig4_unified, initconfig4_zigzag_unified, initconfig_sim_out_unified
+        procedure, private :: allocate_unified, cleanup_arrays_unified, initbitable_unified, initconfig4_unified, initconfig4_zigzag_unified, initconfig_sim_out_unified
         final :: deallocate_unified
     end type PolymerModel_unified
 
@@ -90,46 +90,84 @@ contains
         call log%info('PolymerModel_unified_mod - Using OpenMP (CPU) for simulation')
     end subroutine detect_parallelization
 
+    subroutine cleanup_arrays_unified(self)
+        ! Helper subroutine to safely clean up all arrays and OpenACC data regions
+        implicit none
+        class (PolymerModel_unified), intent(inout) :: self
+        integer :: dealloc_stat
+        
+        ! Clean up OpenACC data regions first (if they exist and OpenACC was used)
+        if (self%use_openacc) then
+            ! Ensure any pending OpenACC operations complete before cleanup
+            !$acc wait
+            
+            ! Clean up OpenACC data regions
+            if (allocated(self%config) .or. allocated(self%bittable) .or. &
+                allocated(self%dr) .or. allocated(self%contact) .or. &
+                allocated(self%boundary) .or. allocated(self%loading_sites_factor) .or. &
+                allocated(self%interaction_sites_state)) then
+                !$acc exit data delete(self%config, self%bittable, self%dr, self%contact, &
+                !$acc& self%boundary, self%loading_sites_factor, self%interaction_sites_state)
+            end if
+        end if
+        
+        ! Now deallocate arrays (with error handling)
+        if (allocated(self%config)) then
+            deallocate(self%config, stat=dealloc_stat)
+            if (dealloc_stat /= 0) then
+                call log%warn('cleanup_arrays_unified: Warning - failed to deallocate config, stat=' // trim(str(dealloc_stat)))
+            end if
+        end if
+        if (allocated(self%bittable)) then
+            deallocate(self%bittable, stat=dealloc_stat)
+            if (dealloc_stat /= 0) then
+                call log%warn('cleanup_arrays_unified: Warning - failed to deallocate bittable, stat=' // trim(str(dealloc_stat)))
+            end if
+        end if
+        if (allocated(self%dr)) then
+            deallocate(self%dr, stat=dealloc_stat)
+            if (dealloc_stat /= 0) then
+                call log%warn('cleanup_arrays_unified: Warning - failed to deallocate dr, stat=' // trim(str(dealloc_stat)))
+            end if
+        end if
+        if (allocated(self%contact)) then
+            deallocate(self%contact, stat=dealloc_stat)
+            if (dealloc_stat /= 0) then
+                call log%warn('cleanup_arrays_unified: Warning - failed to deallocate contact, stat=' // trim(str(dealloc_stat)))
+            end if
+        end if
+        if (allocated(self%boundary)) then
+            deallocate(self%boundary, stat=dealloc_stat)
+            if (dealloc_stat /= 0) then
+                call log%warn('cleanup_arrays_unified: Warning - failed to deallocate boundary, stat=' // trim(str(dealloc_stat)))
+            end if
+        end if
+        if (allocated(self%loading_sites_factor)) then
+            deallocate(self%loading_sites_factor, stat=dealloc_stat)
+            if (dealloc_stat /= 0) then
+                call log%warn('cleanup_arrays_unified: Warning - failed to deallocate loading_sites_factor, stat=' // trim(str(dealloc_stat)))
+            end if
+        end if
+        if (allocated(self%interaction_sites_state)) then
+            deallocate(self%interaction_sites_state, stat=dealloc_stat)
+            if (dealloc_stat /= 0) then
+                call log%warn('cleanup_arrays_unified: Warning - failed to deallocate interaction_sites_state, stat=' // trim(str(dealloc_stat)))
+            end if
+        end if
+    end subroutine cleanup_arrays_unified
+
     subroutine allocate_unified(self)
         implicit none
         class (PolymerModel_unified), intent(inout) :: self
-        integer :: bittable_t, stat
+        integer :: bittable_t, stat, dealloc_stat
 
         bittable_t = 4 * (self%L**3)
 
         call log%debug('allocate_unified self%Nchain: ' // trim(str(self%Nchain)) // ' bittable_t: ' // trim(str(bittable_t)))
 
-        ! Deallocate if already allocated (e.g., for multiple trajectories)
-        ! Note: OpenACC data regions should already be cleaned up in init_unified
-        ! but we clean them up here as well for safety
-        if (allocated(self%config)) then
-            !$acc exit data delete(self%config)
-            deallocate(self%config)
-        end if
-        if (allocated(self%bittable)) then
-            !$acc exit data delete(self%bittable)
-            deallocate(self%bittable)
-        end if
-        if (allocated(self%dr)) then
-            !$acc exit data delete(self%dr)
-            deallocate(self%dr)
-        end if
-        if (allocated(self%contact)) then
-            !$acc exit data delete(self%contact)
-            deallocate(self%contact)
-        end if
-        if (allocated(self%boundary)) then
-            !$acc exit data delete(self%boundary)
-            deallocate(self%boundary)
-        end if
-        if (allocated(self%loading_sites_factor)) then
-            !$acc exit data delete(self%loading_sites_factor)
-            deallocate(self%loading_sites_factor)
-        end if
-        if (allocated(self%interaction_sites_state)) then
-            !$acc exit data delete(self%interaction_sites_state)
-            deallocate(self%interaction_sites_state)
-        end if
+        ! First, ensure complete cleanup by calling cleanup helper
+        ! This handles both OpenACC data regions and array deallocation
+        call cleanup_arrays_unified(self)
 
         ! Double-check that all arrays are deallocated before allocating
         if (allocated(self%config) .or. allocated(self%bittable) .or. &
