@@ -187,7 +187,7 @@ To publish to the Julia General Registry:
 
 For now, install directly from Git:
 ```julia
-Pkg.add(url="https://gitlab.com/togop/3DPolyS-LE.git")
+Pkg.add(url="https://gitlab.com/togop/3DPolyS-LE.git", rev="julia_port")
 ```
 
 
