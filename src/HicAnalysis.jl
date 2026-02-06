@@ -16,21 +16,10 @@ using PyCall
 using Plots
 using Base: searchsorted, log10
 
-# Try to import cooler via PyCall
-try
-    global cooler = PyNULL()
-    # Add bioconda channel to conda config if not already present
-    try
-        # Check if conda is available and add bioconda channel silently
-        result = run(`conda config --add channels bioconda`, wait=true, stdout=devnull, stderr=devnull)
-    catch
-        # Channel might already be added or conda not available, continue anyway
-    end
-    pyimport_conda("cooler", "cooler", "bioconda")
-    @info "Using cooler via PyCall"
-catch
-    @warn "Could not import cooler. Some functions may not work."
-end
+# Use Julia cooler implementation
+include(joinpath(@__DIR__, "cooler", "CoolerModule.jl"))
+using .CoolerModule
+@info "Using Julia cooler implementation"
 
 # Constants
 const SIM_RESOLUTION = 2000
@@ -181,9 +170,8 @@ function hic_to_cooler(hic_file::String, chr::String = SIM_CHR, resolution::Int 
         )
         
         if !isfile(cool_file)
-            # Use PyCall to create cooler file
-            py_cooler = pyimport("cooler")
-            py_cooler.create_cooler(cool_file, bins=bins, pixels=pixels_dic, dtypes=Dict("count" => "float64"), ordered=true, metadata=metadata)
+            # Use Julia cooler to create cooler file
+            create_cooler(cool_file, bins=bins, pixels=pixels_dic, dtypes=Dict("count" => "float64"), ordered=true, metadata=metadata)
         else
             @warn "Cooler file $cool_file already exists and will not be replaced!"
         end
@@ -254,12 +242,12 @@ function get_hic(hic_h5::String, resolution::Int = SIM_RESOLUTION, balance::Bool
             cool_file = hic_to_cooler(hic_h5, SIM_CHR, SIM_RESOLUTION)
         end
         @info "Extracting hic from $cool_file..."
-        py_cooler = pyimport("cooler")
-        hic_cooler = py_cooler.Cooler("$cool_file::/")
-        hic_chr_names = [String(x) for x in hic_cooler.chromnames]
+        hic_cooler = CoolerFile("$cool_file::/")
+        hic_chr_names = chromnames(hic_cooler)
         hic_chr = first(intersect(hic_chr_names, SIM_CHR_SYNONYMS))
-        balanced = balance && (hic_cooler.bins()["weights"] !== nothing)
-        hic = hic_cooler.matrix(balance=balanced).fetch(hic_chr)
+        balanced = balance && (bins(hic_cooler)["weights"] !== nothing)
+        mat_obj = matrix(hic_cooler, balance=balanced)
+        hic = fetch(mat_obj, hic_chr)
         if balanced
             hic = replace(hic, NaN => 0.0)
         end
@@ -300,7 +288,8 @@ function get_decay_distribution(hic::Matrix, confidence::Float64 = 0.0, min_dist
     @info "get_decay_distribution: data.shape: $(size(hic)), confidence:$confidence, max_dist:$max_dist"
     
     max_dist = max_dist !== nothing ? min(size(hic, 1), max_dist) : size(hic, 1)
-    dists = collect((min_dist+1):max_dist)
+    # old: dists = collect((min_dist+1):max_dist)
+    dists = collect(min_dist:(max_dist-1))
     probs = Float64[]
     probs_confi_u = Float64[]
     probs_confi_l = Float64[]
@@ -331,10 +320,8 @@ function get_exp_sim_mcool(hic::String, chrs::Vector{String}, res::Int = RESOLUT
     exp_sim_cool = endswith(hic, ".cool") ? hic : "$(hic).cool"
     if isfile(exp_sim_cool) && !isfile("$(hic).hdf5")
         # Experimental cooler
-        py_cooler = pyimport("cooler")
-        hic_cooler = py_cooler.Cooler("$exp_sim_cool::/")
-        # Convert PyObject to Int - PyCall should handle this automatically
-        root_res = convert(Int, hic_cooler.binsize)
+        hic_cooler = CoolerFile("$exp_sim_cool::/")
+        root_res = binsize(hic_cooler)
         factors = copy(RES_FACTORS)
         factor_val = res ÷ root_res
         idx = searchsortedfirst(factors, factor_val)
@@ -346,7 +333,7 @@ function get_exp_sim_mcool(hic::String, chrs::Vector{String}, res::Int = RESOLUT
         
         res_cool = nothing
         try
-            res_cool = py_cooler.Cooler("$exp_sim_mcool::/resolutions/$res")
+            res_cool = CoolerFile("$exp_sim_mcool::/resolutions/$res")
         catch
             @info "Missing resolution $res in $exp_sim_mcool so it will be generated again"
         end
@@ -377,14 +364,12 @@ function hic_to_mcool(hic_file::String, chr::String, resolution::Int, factors::V
     resolutions = [Int(i * resolution) for i in factors]
     mcool_file = "$(hic_file).$(resolutions[1]).mcool"
     try
-        py_cooler = pyimport("cooler")
-        py_cooler.zoomify_cooler(cool_file, mcool_file, resolutions=resolutions, chunksize=Int(10e6))
+        zoomify_cooler("$cool_file::/", mcool_file, resolutions=resolutions, chunksize=Int(10e6))
     catch
         @warn "Problem to zoomify file $cool_file so will regenerate it!"
         rm(cool_file, force=true)
         cool_file = hic_to_cooler(hic_file, chr, resolution)
-        py_cooler = pyimport("cooler")
-        py_cooler.zoomify_cooler(cool_file, mcool_file, resolutions=resolutions, chunksize=Int(10e6))
+        zoomify_cooler("$cool_file::/", mcool_file, resolutions=resolutions, chunksize=Int(10e6))
     end
     return mcool_file
 end
@@ -395,12 +380,12 @@ function balance_mcool(cool_file::String, resolutions::Vector{Int}, mcool_file::
     run(cmd)
     
     @info "check balance for $mcool_file"
-    py_cooler = pyimport("cooler")
     for res in resolutions
-        hic_cooler = py_cooler.Cooler("$mcool_file::/resolutions/$res")
-        chr_names = [String(x) for x in hic_cooler.chromnames]
+        hic_cooler = CoolerFile("$mcool_file::/resolutions/$res")
+        chr_names = chromnames(hic_cooler)
         chr = first(intersect(chr_names, CHR_SYNONYMS))
-        hic_mat = hic_cooler.matrix(balance=true).fetch(chr)
+        mat_obj = matrix(hic_cooler, balance=true)
+        hic_mat = fetch(mat_obj, chr)
         @info "resolution: $res hic_mat.shape: $(size(hic_mat))"
     end
     return mcool_file
@@ -438,12 +423,12 @@ function read_tads_bed(tads_bed_file::Union{String, Nothing})::Union{Matrix{Int}
     return isempty(tads) ? nothing : hcat([tad[1] for tad in tads], [tad[2] for tad in tads])
 end
 
-function chi2_minimization(hic1_mat::Matrix, cmp_hic_cooler, chrs::Vector{String}, res::Int, 
+function chi2_minimization(hic1_mat::Matrix, cmp_hic_cooler, chrs::Vector{String}, res::Int,
                            tads::Matrix{Int}, comp_filename::String, plots_folder::Union{String, Nothing},
                            norm::Bool = true, chi2_mode::String = CHI2_MODE_LINEAR,
                            hic_balance::Bool = CHI2_USE_BALANCED, plot_cmap::String = CMAP,
                            plot_format::String = PLOT_FORMAT)::Tuple{Float64, Float64}
-    comp_chr = first(intersect([String(x) for x in cmp_hic_cooler.chromnames], chrs))
+    comp_chr = first(intersect(chromnames(cmp_hic_cooler), chrs))
     
     # Total sums for chi2 calculation
     tot_PS = 0.0
@@ -464,9 +449,9 @@ function chi2_minimization(hic1_mat::Matrix, cmp_hic_cooler, chrs::Vector{String
         @info "calculate TAD:$tad_start-$tad_end, size:$tadi_size"
         
         # Get experimental TAD matrix
-        balanced = hic_balance && (cmp_hic_cooler.bins()["weights"] !== nothing)
-        tadi_mat2_py = cmp_hic_cooler.matrix(balance=balanced).fetch((comp_chr, tad_start, tad_end - res))
-        tadi_mat2 = Array{Float64}(tadi_mat2_py)
+        balanced = hic_balance && (bins(cmp_hic_cooler)["weights"] !== nothing)
+        mat_obj = matrix(cmp_hic_cooler, balance=balanced)
+        tadi_mat2 = fetch(mat_obj, (comp_chr, tad_start, tad_end - res))
         if balanced
             tadi_mat2 = replace(tadi_mat2, NaN => 0.0)
         end
@@ -543,35 +528,23 @@ function compare_hic_chromosome(hic_file::String, cmp_hic::String;
     else
         hic1cooler, hic1_chrs = get_hic_cooler_res(hic_file, hic_chrs, res)
         hic1_chr = hic1_chrs[1]
-        balanced = hic_balance && (hic1cooler.bins()["weights"] !== nothing)
-        hic_mat1_py = hic1cooler.matrix(balance=balanced).fetch(hic1_chr)
-        # Convert PyObject to Julia Array
-        hic_mat1 = try
-            Array{Float64}(hic_mat1_py)
-        catch
-            # If direct conversion fails, use numpy array conversion
-            py_np = pyimport("numpy")
-            Array{Float64}(py_np.array(hic_mat1_py))
-        end
+        balanced = hic_balance && (bins(hic1cooler)["weights"] !== nothing)
+        mat_obj = matrix(hic1cooler, balance=balanced)
+        hic_mat1 = fetch(mat_obj, hic1_chr)
         if balanced
             hic_mat1 = replace(hic_mat1, NaN => 0.0)
         end
-        try
-            hic1_chr_size = Int(hic1cooler.chromsizes[hic1_chr])
-        catch
-            py_int = pyimport("builtins").int
-            hic1_chr_size = Int(py_int(hic1cooler.chromsizes[hic1_chr]))
-        end
+        sizes_dict = chromsizes(hic1cooler)
+        hic1_chr_size = sizes_dict[hic1_chr]
     end
     
     # Get experimental Hi-C cooler
     cmp_hic_mcool = get_exp_sim_mcool(cmp_hic, chrs, res)
-    py_cooler = pyimport("cooler")
-    hic2cooler = py_cooler.Cooler("$cmp_hic_mcool::/resolutions/$res")
-    
-    exp_chr_list = intersect([String(x) for x in hic2cooler.chromnames], chrs)
+    hic2cooler = CoolerFile("$cmp_hic_mcool::/resolutions/$res")
+
+    exp_chr_list = intersect(chromnames(hic2cooler), chrs)
     if isempty(exp_chr_list)
-        @error "Experimental HiC data contains none of the chromosome names: $chrs instead $(hic2cooler.chromnames)"
+        @error "Experimental HiC data contains none of the chromosome names: $chrs instead $(chromnames(hic2cooler))"
         error("No matching chromosome found")
     end
     exp_chr = exp_chr_list[1]
@@ -581,12 +554,8 @@ function compare_hic_chromosome(hic_file::String, cmp_hic::String;
     h2 = basename(cmp_hic)
     
     # Get TADs
-    exp_chr_size = try
-        Int(hic2cooler.chromsizes[exp_chr])
-    catch
-        py_int = pyimport("builtins").int
-        Int(py_int(hic2cooler.chromsizes[exp_chr]))
-    end
+    sizes_dict = chromsizes(hic2cooler)
+    exp_chr_size = sizes_dict[exp_chr]
     chr_end = min(hic1_chr_size, exp_chr_size)
     tads = read_tads_bed(tads_boundary)
     
@@ -616,19 +585,11 @@ end
 
 # Helper function to get decay distribution from cooler
 function get_decay_distribution_cool(hic_cooler, chr::String, resolution::Int, confidence::Float64 = 0.0, min_dist::Int = 1, max_dist::Union{Int, Nothing} = nothing)::Tuple{Vector{Int}, Vector{Float64}, Vector{Float64}, Vector{Float64}}
-    hic = hic_cooler.matrix(balance=false).fetch(chr)
+    mat_obj = matrix(hic_cooler, balance=false)
+    hic = fetch(mat_obj, chr)
     fill_diagonal!(hic, 0)
-    
-    # Convert PyObject binsize to Int - access as Python value and convert
-    binsize_py = hic_cooler.binsize
-    # Try to convert directly - PyCall should handle Python int to Julia Int
-    binsize_val = try
-        Int(binsize_py)
-    catch
-        # Fallback: use Python int() function
-        py_int = pyimport("builtins").int
-        Int(py_int(binsize_py))
-    end
+
+    binsize_val = binsize(hic_cooler)
     resolution_factor = Float64(binsize_val) / Float64(resolution)
     min_dist_corrected = min_dist !== nothing ? Int(round(Float64(min_dist) / resolution_factor)) : min_dist
     max_dist_corrected = max_dist !== nothing ? Int(round(Float64(max_dist) / resolution_factor)) : max_dist
@@ -640,26 +601,25 @@ end
 
 # Helper function to get cooler and chromosome names
 function get_hic_cooler_res(hic_file::String, hic_chrs::Vector{String}, res::Int)
-    py_cooler = pyimport("cooler")
     hic_cooler = nothing
     # Try to open as mcool first (multi-resolution cooler)
     try
-        hic_cooler = py_cooler.Cooler("$hic_file::/resolutions/$res")
+        hic_cooler = CoolerFile("$hic_file::/resolutions/$res")
     catch
         # If that fails, try as single-resolution cooler
         try
-            hic_cooler = py_cooler.Cooler("$hic_file::/")
+            hic_cooler = CoolerFile("$hic_file::/")
         catch e
             @error "Failed to open cooler file $hic_file: $e"
             rethrow(e)
         end
     end
-    
+
     if hic_cooler === nothing
         error("Failed to open cooler file $hic_file")
     end
-    
-    hic_chr_names = [String(x) for x in hic_cooler.chromnames]
+
+    hic_chr_names = chromnames(hic_cooler)
     hic_chrs_select = intersect(hic_chr_names, hic_chrs)
     return hic_cooler, collect(hic_chrs_select)
 end
@@ -796,13 +756,8 @@ function plot_distance_contact_prob_decay(hic_list::Vector{String};
                     continue
                 end
                 dists, probs, probs_confi_l, probs_confi_u = get_decay_distribution_cool(hic_cooler, hic_chr, res, confidence, min_dist, max_dist)
-                # Convert PyObject chromsize to Int
-                try
-                    hic_chr_size = Int(hic_cooler.chromsizes[hic_chr])
-                catch
-                    py_int = pyimport("builtins").int
-                    hic_chr_size = Int(py_int(hic_cooler.chromsizes[hic_chr]))
-                end
+                sizes_dict = chromsizes(hic_cooler)
+                hic_chr_size = sizes_dict[hic_chr]
             end
             
             max_tad_size = min(max_tad_size, hic_chr_size ÷ res)
@@ -894,13 +849,8 @@ function plot_distance_contact_prob_decay(hic_list::Vector{String};
             exp_chr_name = String(exp_chr)
             
             dists, probs, probs_confi_l, probs_confi_u = get_decay_distribution_cool(exp_cooler, exp_chr, res, confidence, min_dist, max_dist)
-            # Convert PyObject chromsize to Int
-            exp_chr_size = try
-                Int(exp_cooler.chromsizes[exp_chr])
-            catch
-                py_int = pyimport("builtins").int
-                Int(py_int(exp_cooler.chromsizes[exp_chr]))
-            end
+            sizes_dict = chromsizes(exp_cooler)
+            exp_chr_size = sizes_dict[exp_chr]
             max_tad_size = min(max_tad_size, Int(round(exp_chr_size / res)))
             
             if SAVE_DECAY_PROBABILITY

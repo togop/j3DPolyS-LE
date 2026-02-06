@@ -12,20 +12,10 @@ using ArgParse
 using LinearAlgebra
 using Base: log10
 
-# Try to import cooler
-try
-    global cooler = PyNULL()
-    # Add bioconda channel to conda config if not already present
-    try
-        # Check if conda is available and add bioconda channel silently
-        result = run(`conda config --add channels bioconda`, wait=true, stdout=devnull, stderr=devnull)
-    catch
-        # Channel might already be added or conda not available, continue anyway
-    end
-    pyimport_conda("cooler", "cooler", "bioconda")
-catch
-    @warn "Could not import cooler"
-end
+# Use Julia cooler implementation
+include(joinpath(@__DIR__, "cooler", "CoolerModule.jl"))
+using .CoolerModule
+@info "Using Julia cooler implementation"
 
 const DEFAULT_CMAP = "hot_r"
 const DEFAULT_RESOLUTION = 2000
@@ -95,13 +85,13 @@ function get_hic(hic_file::String, resolution::Int, balanced::Bool, hic_chrs::Ve
             return hic
         end
     elseif endswith(hic_file, ".cool") || endswith(hic_file, ".mcool")
-        py_cooler = pyimport("cooler")
         cooler_ref = endswith(hic_file, ".cool") ? "$hic_file::/" : "$hic_file::/resolutions/$resolution"
-        hic_cooler = py_cooler.Cooler(cooler_ref)
-        hic_chr_names = [String(x) for x in hic_cooler.chromnames]
+        hic_cooler = CoolerFile(cooler_ref)
+        hic_chr_names = chromnames(hic_cooler)
         hic_chr = first(intersect(hic_chr_names, hic_chrs))
-        balance = balanced && (hic_cooler.bins()["weights"] !== nothing)
-        hic = hic_cooler.matrix(balance=balance).fetch(hic_chr)
+        balance = balanced && (bins(hic_cooler)["weights"] !== nothing)
+        mat_obj = matrix(hic_cooler, balance=balance)
+        hic = fetch(mat_obj, hic_chr)
         if balanced
             hic = replace(hic, NaN => 0.0)
         end

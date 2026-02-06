@@ -10,20 +10,10 @@ using CSV
 using PyCall
 using ArgParse
 
-# Try to import cooler
-try
-    global cooler = PyNULL()
-    # Add bioconda channel to conda config if not already present
-    try
-        # Check if conda is available and add bioconda channel silently
-        result = run(`conda config --add channels bioconda`, wait=true, stdout=devnull, stderr=devnull)
-    catch
-        # Channel might already be added or conda not available, continue anyway
-    end
-    pyimport_conda("cooler", "cooler", "bioconda")
-catch
-    @warn "Could not import cooler"
-end
+# Use Julia cooler implementation
+include(joinpath(@__DIR__, "cooler", "CoolerModule.jl"))
+using .CoolerModule
+@info "Using Julia cooler implementation"
 
 function read_hic_hdf5(hic_hdf5::String)::Matrix
     h5open(hic_hdf5, "r") do f
@@ -85,8 +75,7 @@ function hic_to_cool(hic::Matrix, chr::String, resolution::Int, cool_file::Strin
         "generated-by" => "j3DPolySLE-2025.3"
     )
     
-    py_cooler = pyimport("cooler")
-    py_cooler.create_cooler(cool_file, bins=bins, pixels=pixels_dic, dtypes=Dict("count" => "float64"), ordered=true, metadata=metadata)
+    create_cooler(cool_file, bins=bins, pixels=pixels_dic, dtypes=Dict("count" => "float64"), ordered=true, metadata=metadata)
     return cool_file
 end
 

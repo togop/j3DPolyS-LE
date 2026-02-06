@@ -1,10 +1,8 @@
 # Test suite for j3DPolySLE
 using Test
-using Pkg
 
 # Load the package directly
 project_root = abspath(joinpath(@__DIR__, ".."))
-Pkg.activate(project_root)
 
 # Patch doc! to handle abstract types gracefully - must be BEFORE loading modules
 @eval Base.Docs begin
