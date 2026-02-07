@@ -101,6 +101,7 @@ subroutine print_help()
     print*, '   --no-gpu-prefer : Disable GPU preference for parallelization. Will use OpenMP if available instead of OpenACC. Default: GPU preferred'
     print*, '   --force_method:<method> : Force analysis parallelization: auto, openacc, openmp, sequential. Default: auto'
     print*, '   --threads:<num_threads> : Set number of OpenMP threads for parallelization. Default: 0 (auto-detect)'
+    print*, '   --seed:<seed_value> : Set the random seed for reproducibility. Default: random (based on system clock)'
     print*, '<3dpolys_le.cfg file>: path to the inpit.dat file. Default: ./3dpolys_le.cfg'
     print*, '<output folder>: path to output folder. Default: the folder of the <3dpolys_le.cfg file>'
     print*, 'inpiut.cfg format:'
@@ -175,6 +176,7 @@ program mainprogram
     !real :: pt
     !real*8 :: randomnumber, r
     ! real :: seed
+    integer :: random_seed_value = -1  ! -1 means use random seed based on system clock
     type(Timer) :: crono
     real, dimension(:, :), allocatable :: boundary  ! (strand -/+, permeability)
     real, dimension(:), allocatable :: loading_sites_factor
@@ -281,6 +283,13 @@ program mainprogram
                 READ(opt_s, *) num_threads
                 if (rank == 0) then
                     call log%info('OpenMP threads set to: ' // trim(str(num_threads)))
+                end if
+            elseif (index(input_options, '--seed:') > 0) then
+                i = index(input_options, ':')
+                opt_s = trim(input_options(i + 1:))
+                READ(opt_s, *) random_seed_value
+                if (rank == 0) then
+                    call log%info('Random seed set to: ' // trim(str(random_seed_value)))
                 end if
             elseif (index(input_options, '--hic3d:') > 0) then
                 i = index(input_options, ':')
@@ -412,12 +421,16 @@ program mainprogram
     !start = MPI_Wtime()
 
     !initialize random generator
-    call SYSTEM_CLOCK(time)
-    call srand(time)
-    call random_seed()  ! use PUT=seed_int
-    ! call random_number(seed)
-    ! seed = 7 ! used only for synchronize compare with the original code
-    !call initializerandomnumbergenerator(dble(seed))
+    if (random_seed_value == -1) then
+        ! Use random seed based on system clock
+        call SYSTEM_CLOCK(time)
+        call srand(time)
+        call random_seed()
+    else
+        ! Use specified seed for reproducibility
+        call srand(random_seed_value)
+        call random_seed(put=[(random_seed_value, i=1,12)])
+    end if
 
     i = index(input_dat_file, path_sep, .true.)
     if (i>=0) then
