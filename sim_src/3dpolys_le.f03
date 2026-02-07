@@ -99,6 +99,7 @@ subroutine print_help()
     print*, '   -z|--z_loop : Allow z_loop for LEFs move, where LEFs can traverse one another. Default: false'
     print*, '   -u|--unidirectional : Unidirectional mode for LEFs move otherwise bidirectional. Default: false=bidirectional'
     print*, '   --no-gpu-prefer : Disable GPU preference for parallelization. Will use OpenMP if available instead of OpenACC. Default: GPU preferred'
+    print*, '   --force_method:<method> : Force analysis parallelization: auto, openacc, openmp, sequential. Default: auto'
     print*, '   --threads:<num_threads> : Set number of OpenMP threads for parallelization. Default: 0 (auto-detect)'
     print*, '<3dpolys_le.cfg file>: path to the inpit.dat file. Default: ./3dpolys_le.cfg'
     print*, '<output folder>: path to output folder. Default: the folder of the <3dpolys_le.cfg file>'
@@ -127,11 +128,14 @@ subroutine print_help()
 end subroutine print_help
 
 subroutine check_iostat(io_unit, iostat)
+    use mpi
     integer, intent(in) :: io_unit
     integer, intent(in) :: iostat
+    integer :: ierr
     if (iostat /= 0) then
         close(io_unit)
         call print_help()
+        call MPI_Finalize(ierr)
         call exit(1)
     end if
 end subroutine check_iostat
@@ -201,6 +205,7 @@ program mainprogram
     logical :: file_exists
     logical :: prefer_gpu = .true.
     integer :: num_threads = 0
+    character(20) :: force_method = 'auto'
     character(20) :: parallel_method = 'auto'
 
     type :: BoundarySite
@@ -263,6 +268,12 @@ program mainprogram
                 prefer_gpu = .false.
                 if (rank == 0) then
                     call log%info('GPU preference disabled, will use OpenMP if available')
+                end if
+            elseif (index(input_options, '--force_method:') > 0) then
+                i = index(input_options, ':')
+                force_method = trim(adjustl(input_options(i + 1:)))
+                if (rank == 0) then
+                    call log%info('Force analysis method: ' // trim(force_method))
                 end if
             elseif (index(input_options, '--threads:') > 0) then
                 i = index(input_options, ':')
@@ -373,13 +384,15 @@ program mainprogram
                     call log%info('Init folding mode: ' // init_mode)
                 end if
             elseif ((index(input_options, '--help') > 0).or.(index(input_options, '-h') > 0)) then
-                call print_help()
+                if (rank == 0) call print_help()
+                call MPI_Finalize(ierr)
                 call exit(0)
             else
                 if (rank == 0) then
                     call log%info('unrecognized option: ' // trim(input_options))
+                    call print_help()
                 end if
-                call print_help()
+                call MPI_Finalize(ierr)
                 call exit(0)
             end if
             ai = ai + 1
@@ -432,6 +445,7 @@ program mainprogram
             call log%error('Could not find or open input configuration file: ' // trim(input_dat_file))
             call print_help()
         end if
+        call MPI_Finalize(ierr)
         call exit(1)
     end if
     call read_config('Nchain',    Nchain)
@@ -905,7 +919,7 @@ program mainprogram
         call analyse_unified(radiuscontact = radius_contact, use_contact_probability = use_contact_probability, &
                 params = params, Niter = Niter, Nmeas = Nmeas, &
                 output_folder = output_folder, analyse_folder = analyse_folder, &
-                hic3d_factor = hic3d_factor, chrom = chrom, prefer_gpu=.true., force_method='auto', num_threads=0)
+                hic3d_factor = hic3d_factor, chrom = chrom, prefer_gpu=prefer_gpu, force_method=force_method, num_threads=num_threads)
         call log%info(crono%Tac('Finished analyse'))
     end if
 
