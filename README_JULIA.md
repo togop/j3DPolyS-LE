@@ -83,6 +83,8 @@ All scripts are executable and can be run directly:
 
 See `README_CLI.md` for detailed usage information.
 
+**Full user guide (install without clone/build, pure Julia API, batch modes, analysis, plots):** see [JULIA_USER_GUIDE.md](JULIA_USER_GUIDE.md).
+
 ### Programmatic Usage
 
 The main entry point is through `Runner3dpolysLe.main()`, which provides the same CLI interface as the Python version.
