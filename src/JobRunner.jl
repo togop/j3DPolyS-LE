@@ -21,27 +21,30 @@ const JobRunner = AbstractJobRunner
 
 function run_cmd(jr::AbstractJobRunner, cmd::String, dep_jobid::String, profile::String = "")::String
     start_cmd = _get_start_cmd(jr, dep_jobid, profile)
-    full_cmd = "$start_cmd $cmd"
+    full_cmd = isempty(start_cmd) ? cmd : "$start_cmd $cmd"
     
     jobid = ""
     if _cmd_run_shell(jr, profile)
         # Set MPI environment variables to avoid network interface errors
-        # Completely disable OFI and use only shared memory transport
-        env_vars = Dict(
-            "OMPI_MCA_btl" => "^openib,usnic,ofi,tcp",
-            "OMPI_MCA_btl_vader_single_copy_mechanism" => "none",
-            "OMPI_MCA_pml" => "ob1",
-            "OMPI_MCA_ofi_interface" => "",
-            "OMPI_MCA_btl_tcp_if_exclude" => "bridge101,lo,docker0"
-        )
-        result = run(setenv(`sh -c $full_cmd`, env_vars), wait = true)
+        # Merge with existing environment to preserve HOME, PATH, etc.
+        env = copy(ENV)
+        env["OMPI_MCA_btl"] = "^openib,usnic,ofi,tcp"
+        env["OMPI_MCA_btl_vader_single_copy_mechanism"] = "none"
+        env["OMPI_MCA_pml"] = "ob1"
+        env["OMPI_MCA_ofi_interface"] = ""
+        env["OMPI_MCA_btl_tcp_if_exclude"] = "bridge101,lo,docker0"
+
         @info "call: $full_cmd"
-        if result.exitcode == 0
-            jobout = read(result, String)
+        try
+            # Capture output and run the command with merged environment
+            jobout = read(setenv(`sh -c $full_cmd`, env), String)
             jobid = _get_jobid(jr, jobout, profile)
-            @info "JobID is: $jobid"
-        else
-            @error "Error submitting Job: $full_cmd"
+            if !isempty(jobid)
+                @info "JobID is: $jobid"
+            end
+        catch e
+            @error "Error executing command: $full_cmd" exception=(e, catch_backtrace())
+            rethrow()
         end
     elseif _cmd_run_stdout(jr, profile)
         println(full_cmd)

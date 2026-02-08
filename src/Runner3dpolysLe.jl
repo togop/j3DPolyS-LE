@@ -305,9 +305,23 @@ function run(runner::DccExtrusionRunner, dcc_args::DccExtrusionArgs;
     
     # Contact radius analysis
     stats_dep_jobid = jobid
-    if isempty(dcc_args.analyse) && !stats_only
-        dcc_args_analysis = deepcopy(dcc_args)
-        stats_dep_jobid = sim_contact_radius_analysis(runner, dcc_args_analysis, radii=radii, dep_jobid=jobid)
+    if isempty(dcc_args.analyse) && !stats_only && !isempty(radii)
+        # Filter out radii that match the simulation radius (no need to re-analyze)
+        sim_radius_str = string(dcc_args.radius_contact)
+        additional_radii = filter(r -> !startswith(r, sim_radius_str), radii)
+
+        # Only run additional radius analysis if batch mode is configured
+        # In shell mode, the Fortran program has issues with analysis-only mode
+        cmd_run = get_property(runner._job_runner, "", "cmd_run", "")
+        is_batch_mode = !isempty(cmd_run) && cmd_run != "shell" && cmd_run != "stdout"
+
+        if !isempty(additional_radii) && is_batch_mode
+            dcc_args_analysis = deepcopy(dcc_args)
+            stats_dep_jobid = sim_contact_radius_analysis(runner, dcc_args_analysis, radii=additional_radii, dep_jobid=jobid)
+        elseif !isempty(additional_radii) && !is_batch_mode
+            @warn "Skipping additional radius analysis ($(join(additional_radii, ", "))) in shell mode. " *
+                  "Set cmd_run to batch mode (e.g., 'sbatch') in config to enable multi-radius analysis."
+        end
     end
     
     # Statistics
@@ -326,10 +340,39 @@ function run(runner::DccExtrusionRunner, dcc_args::DccExtrusionArgs;
     return jobid
 end
 
+# Check if mpirun is available and get its full path
+function find_mpirun()::String
+    try
+        # Try to find mpirun in PATH
+        result = read(`which mpirun`, String)
+        mpirun_path = strip(result)
+        if !isempty(mpirun_path) && isfile(mpirun_path)
+            return mpirun_path
+        end
+    catch
+        # If which fails, try common locations
+        common_paths = [
+            "/usr/bin/mpirun",
+            "/usr/local/bin/mpirun",
+            "/opt/homebrew/bin/mpirun",
+            "/opt/local/bin/mpirun"
+        ]
+        for path in common_paths
+            if isfile(path)
+                return path
+            end
+        end
+    end
+    return ""  # MPI not available
+end
+
+# Cache the mpirun path to avoid repeated lookups
+const MPIRUN_PATH = find_mpirun()
+
 function get_cmd_prefix(runner::DccExtrusionRunner, dcc_args::DccExtrusionArgs; mpirun::Bool = false)::String
-    # TODO: implement cmd.sh path resolution
-    cmd_sh = "cmd.sh"
     container_prefix = get_property(runner._job_runner, "", "container_prefix", "")
+
+    # Only create cmd.sh wrapper if using a container
     if !isempty(container_prefix)
         cmd_sh = joinpath(dcc_args.output_folder, "cmd.sh")
         if !isfile(cmd_sh)
@@ -346,17 +389,31 @@ function get_cmd_prefix(runner::DccExtrusionRunner, dcc_args::DccExtrusionArgs; 
                 println(f, "\"\$@\"")  # Escape $ to prevent string interpolation
             end
         end
-    end
-    
-    # Build command prefix with MPI flags if using mpirun
-    if mpirun
-        # Use mpirun MCA flags to avoid network interface errors
-        # Completely disable OFI and use only shared memory transport
-        mpi_flags = "-mca btl ^openib,usnic,ofi,tcp -mca btl_vader_single_copy_mechanism none -mca pml ob1 -mca ofi_interface \"\""
-        cmd_prefix = "$cmd_sh mpirun $mpi_flags $container_prefix"
+
+        # Build command prefix with MPI flags if using mpirun
+        if mpirun
+            # In container mode, mpirun should be in the container's PATH
+            mpi_flags = "-mca btl ^openib,usnic,ofi,tcp -mca btl_vader_single_copy_mechanism none -mca pml ob1 -mca ofi_interface \"\""
+            cmd_prefix = "$cmd_sh mpirun $mpi_flags $container_prefix"
+        else
+            cmd_prefix = "$cmd_sh $container_prefix"
+        end
     else
-        cmd_prefix = "$cmd_sh $container_prefix"
+        # No container - execute directly
+        if mpirun
+            # Check if mpirun is available
+            if isempty(MPIRUN_PATH)
+                @warn "mpirun requested but not found in PATH. Running without MPI..."
+                cmd_prefix = ""
+            else
+                mpi_flags = "-mca btl ^openib,usnic,ofi,tcp -mca btl_vader_single_copy_mechanism none -mca pml ob1 -mca ofi_interface \"\""
+                cmd_prefix = "$MPIRUN_PATH $mpi_flags"
+            end
+        else
+            cmd_prefix = ""
+        end
     end
+
     return cmd_prefix
 end
 
@@ -369,6 +426,13 @@ function sim_contact_radius_analysis(runner::DccExtrusionRunner, dcc_args::DccEx
         dcc_args_r.radius_contact = r
         dcc_args_r.contact_probability = cp
         dcc_args_r.analyse = default_analysis_folder(dcc_args_r)
+
+        # Create analysis folder if it doesn't exist
+        # The Fortran program requires the folder to exist before running
+        if !isdir(dcc_args_r.analyse)
+            mkpath(dcc_args_r.analyse)
+        end
+
         last_jobid = run(runner, dcc_args_r, stats_only=false, radii=radii, dep_jobid=dep_jobid)
         last_jobid = run_multi_decay_plot(runner, dcc_args, last_jobid)
     end
