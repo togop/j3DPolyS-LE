@@ -101,7 +101,12 @@ cat > "${REPORT_FILE}" << 'EOF_HEADER'
 
 ## Executive Summary
 
-This report presents performance benchmarks for different parallelization methods in 3DPolyS-LE, comparing GPU/OpenACC, OpenMP/CPU, and MPI scaling with various process counts. All tests used the same seed value to verify reproducibility.
+This report presents performance benchmarks for different parallelization methods in 3DPolyS-LE, comparing:
+- **No MPI**: Direct execution using GPU or CPU only
+- **Single MPI Process**: GPU/OpenACC and OpenMP/CPU with single process
+- **Multi-process MPI**: Scaling with 2, 4, and 8 MPI processes
+
+All tests used the same seed value to verify reproducibility.
 
 ---
 
@@ -124,10 +129,17 @@ cat >> "${REPORT_FILE}" << EOF
 
 EOF
 
-# Extract config parameters from log
-if [ -f "${LOG_DIR}/gpu_default.log" ]; then
-    CONFIG_FILE=$(grep "Load initial parameters" "${LOG_DIR}/gpu_default.log" | head -1 | awk -F'from ' '{print $2}' | awk '{print $1}')
-    SEED=$(grep "Random seed set to:" "${LOG_DIR}/gpu_default.log" | head -1 | awk '{print $NF}')
+# Extract config parameters from log (check both no-MPI and MPI versions)
+LOG_FILE=""
+if [ -f "${LOG_DIR}/gpu_no_mpi.log" ]; then
+    LOG_FILE="${LOG_DIR}/gpu_no_mpi.log"
+elif [ -f "${LOG_DIR}/gpu_default.log" ]; then
+    LOG_FILE="${LOG_DIR}/gpu_default.log"
+fi
+
+if [ -n "${LOG_FILE}" ]; then
+    CONFIG_FILE=$(grep "Load initial parameters" "${LOG_FILE}" | head -1 | awk -F'from ' '{print $2}' | awk '{print $1}')
+    SEED=$(grep "Random seed set to:" "${LOG_FILE}" | head -1 | awk '{print $NF}')
 
     cat >> "${REPORT_FILE}" << EOF
 **Configuration File:** \`${CONFIG_FILE}\`
@@ -166,10 +178,16 @@ EOF
         # Store raw times for scaling calculations
         echo "${sim_time_raw}" > "${TEMP_DIR}/${test}.time"
 
-        # Store baselines
-        if [ "${test}" = "gpu_default" ]; then
+        # Store baselines (prefer no-MPI versions if available)
+        if [ "${test}" = "gpu_no_mpi" ]; then
             echo "${sim_time_raw}" > "${TEMP_DIR}/gpu_baseline.time"
-        elif [ "${test}" = "openmp_cpu" ]; then
+        elif [ "${test}" = "gpu_default" ] && [ ! -f "${TEMP_DIR}/gpu_baseline.time" ]; then
+            echo "${sim_time_raw}" > "${TEMP_DIR}/gpu_baseline.time"
+        fi
+
+        if [ "${test}" = "cpu_no_mpi" ]; then
+            echo "${sim_time_raw}" > "${TEMP_DIR}/openmp_baseline.time"
+        elif [ "${test}" = "openmp_cpu" ] && [ ! -f "${TEMP_DIR}/openmp_baseline.time" ]; then
             echo "${sim_time_raw}" > "${TEMP_DIR}/openmp_baseline.time"
         fi
 
@@ -191,10 +209,20 @@ EOF
         # Extract MPI process count from test name
         if [[ "${test}" =~ mpi_([0-9]+)proc ]]; then
             procs="${BASH_REMATCH[1]}"
+        elif [[ "${test}" =~ no_mpi ]]; then
+            procs="0"
         fi
 
         # Create human-readable description
-        if [ "${test}" = "gpu_default" ]; then
+        if [ "${test}" = "gpu_no_mpi" ]; then
+            desc="GPU only (no MPI)"
+        elif [ "${test}" = "cpu_no_mpi_t8" ]; then
+            desc="CPU only (no MPI) - 8 threads"
+        elif [[ "${test}" =~ cpu_no_mpi_t([0-9]+) ]]; then
+            desc="CPU only (no MPI) - ${BASH_REMATCH[1]} threads"
+        elif [ "${test}" = "cpu_no_mpi" ]; then
+            desc="CPU only (no MPI) - auto threads"
+        elif [ "${test}" = "gpu_default" ]; then
             desc="GPU/OpenACC (default)"
         elif [[ "${test}" =~ openmp_cpu_t([0-9]+) ]]; then
             desc="OpenMP (CPU) - ${BASH_REMATCH[1]} threads"
@@ -208,7 +236,13 @@ EOF
             desc="MPI ${BASH_REMATCH[1]} procs (GPU)"
         fi
 
-        echo "| ${desc} | ${procs} | ${para} | ${threads} | ${sim_time} | ${method} |" >> "${REPORT_FILE}"
+        # Display MPI process count (show "None" for non-MPI tests)
+        mpi_display="${procs}"
+        if [ "${procs}" = "0" ]; then
+            mpi_display="None"
+        fi
+
+        echo "| ${desc} | ${mpi_display} | ${para} | ${threads} | ${sim_time} | ${method} |" >> "${REPORT_FILE}"
     done
 
     # Add visual performance summary
