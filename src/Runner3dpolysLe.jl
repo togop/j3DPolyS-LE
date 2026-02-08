@@ -326,7 +326,7 @@ function run(runner::DccExtrusionRunner, dcc_args::DccExtrusionArgs;
     return jobid
 end
 
-function get_cmd_prefix(runner::DccExtrusionRunner, dcc_args::DccExtrusionArgs, mpirun::Bool = false)::String
+function get_cmd_prefix(runner::DccExtrusionRunner, dcc_args::DccExtrusionArgs; mpirun::Bool = false)::String
     # TODO: implement cmd.sh path resolution
     cmd_sh = "cmd.sh"
     container_prefix = get_property(runner._job_runner, "", "container_prefix", "")
