@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ################################################################################
 # 3DPolyS-LE Parallelization Methods Benchmark Script
 ################################################################################
@@ -66,12 +66,20 @@ run_benchmark() {
     local test_name=$1
     local mpi_procs=$2
     local extra_flags=$3
+    local threads=$4  # New parameter for thread count (optional, 0 = auto)
     local output_subdir="${RESULTS_DIR}/${test_name}"
     local log_file="${LOG_DIR}/${test_name}.log"
 
+    # Add thread flag if specified and > 0
+    local thread_flag=""
+    if [ -n "${threads}" ] && [ ${threads} -gt 0 ]; then
+        thread_flag="--threads:${threads}"
+    fi
+
     echo "Running: ${test_name}"
     echo "  MPI processes: ${mpi_procs}"
-    echo "  Extra flags: ${extra_flags}"
+    echo "  Threads: ${threads:-auto}"
+    echo "  Extra flags: ${extra_flags} ${thread_flag}"
     echo "  Output: ${output_subdir}"
 
     # Run the benchmark
@@ -79,6 +87,7 @@ run_benchmark() {
         --seed:${SEED} \
         -o:${output_subdir} \
         ${extra_flags} \
+        ${thread_flag} \
         ${CONFIG_FILE} \
         > "${log_file}" 2>&1
 
@@ -120,42 +129,67 @@ echo "" >> "${LOG_DIR}/checksums.txt"
 ################################################################################
 # Test 1: GPU/OpenACC (default) - Single MPI process
 ################################################################################
-run_benchmark "gpu_default" 1 ""
+run_benchmark "gpu_default" 1 "" 0
 
 ################################################################################
-# Test 2: OpenMP (CPU) - Single MPI process
+# Test 2: OpenMP (CPU) - Single MPI process, auto threads
 ################################################################################
-run_benchmark "openmp_cpu" 1 "--no-gpu-prefer"
+run_benchmark "openmp_cpu" 1 "--no-gpu-prefer" 0
 
 ################################################################################
-# Test 3: MPI 2 processes (GPU)
+# Test 3: OpenMP (CPU) - Single MPI process, 1 thread
 ################################################################################
-run_benchmark "mpi_2proc_gpu" 2 ""
+run_benchmark "openmp_cpu_t1" 1 "--no-gpu-prefer" 1
 
 ################################################################################
-# Test 4: MPI 4 processes (GPU)
+# Test 4: OpenMP (CPU) - Single MPI process, 2 threads
 ################################################################################
-run_benchmark "mpi_4proc_gpu" 4 ""
+run_benchmark "openmp_cpu_t2" 1 "--no-gpu-prefer" 2
 
 ################################################################################
-# Test 5: MPI 8 processes (GPU)
+# Test 5: OpenMP (CPU) - Single MPI process, 4 threads
 ################################################################################
-run_benchmark "mpi_8proc_gpu" 8 ""
+run_benchmark "openmp_cpu_t4" 1 "--no-gpu-prefer" 4
 
 ################################################################################
-# Test 6: MPI 2 processes (OpenMP/CPU)
+# Test 6: MPI 2 processes (GPU)
 ################################################################################
-run_benchmark "mpi_2proc_openmp" 2 "--no-gpu-prefer"
+run_benchmark "mpi_2proc_gpu" 2 "" 0
 
 ################################################################################
-# Test 7: MPI 4 processes (OpenMP/CPU)
+# Test 7: MPI 4 processes (GPU)
 ################################################################################
-run_benchmark "mpi_4proc_openmp" 4 "--no-gpu-prefer"
+run_benchmark "mpi_4proc_gpu" 4 "" 0
 
 ################################################################################
-# Test 8: MPI 8 processes (OpenMP/CPU)
+# Test 8: MPI 8 processes (GPU)
 ################################################################################
-run_benchmark "mpi_8proc_openmp" 8 "--no-gpu-prefer"
+run_benchmark "mpi_8proc_gpu" 8 "" 0
+
+################################################################################
+# Test 9: MPI 2 processes (OpenMP/CPU), auto threads
+################################################################################
+run_benchmark "mpi_2proc_openmp" 2 "--no-gpu-prefer" 0
+
+################################################################################
+# Test 10: MPI 4 processes (OpenMP/CPU), auto threads
+################################################################################
+run_benchmark "mpi_4proc_openmp" 4 "--no-gpu-prefer" 0
+
+################################################################################
+# Test 11: MPI 8 processes (OpenMP/CPU), auto threads
+################################################################################
+run_benchmark "mpi_8proc_openmp" 8 "--no-gpu-prefer" 0
+
+################################################################################
+# Test 12: MPI 2 processes (OpenMP/CPU), 2 threads
+################################################################################
+run_benchmark "mpi_2proc_openmp_t2" 2 "--no-gpu-prefer" 2
+
+################################################################################
+# Test 13: MPI 4 processes (OpenMP/CPU), 2 threads
+################################################################################
+run_benchmark "mpi_4proc_openmp_t2" 4 "--no-gpu-prefer" 2
 
 ################################################################################
 # Summary and verification
