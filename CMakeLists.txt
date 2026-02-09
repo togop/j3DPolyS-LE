@@ -3,6 +3,9 @@ cmake_policy(SET CMP0068 NEW)
 project(py3dpolys_le VERSION 2025.3 LANGUAGES Fortran)
 enable_language(Fortran C)
 
+# Prevent C++ from taking over link language for Fortran static libraries (CMake 3.22+ with C enabled)
+set(CMAKE_CXX_LINKER_PREFERENCE_PROPAGATES FALSE)
+
 # set default build paths
 #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PYTHONPATH})
 #set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
@@ -15,7 +18,7 @@ endif()
 
 set(TARGET 3dpolys_le)
 set(SOURCE_FOLDER sim_src)
-set(SOURCE_FILES ${SOURCE_FOLDER}/logging.f03 ${SOURCE_FOLDER}/randomnumber.f03 ${SOURCE_FOLDER}/kinds.f03 ${SOURCE_FOLDER}/timers.f03 ${SOURCE_FOLDER}/lattice_data.f03 ${SOURCE_FOLDER}/polymer_model.f03 ${SOURCE_FOLDER}/analyse.f03 ${SOURCE_FOLDER}/polymer_model_unified.f03 ${SOURCE_FOLDER}/analyse_unified.f03 ${SOURCE_FOLDER}/3dpolys_le.f03)
+set(SOURCE_FILES ${SOURCE_FOLDER}/logging.f03 ${SOURCE_FOLDER}/randomnumber.f03 ${SOURCE_FOLDER}/kinds.f03 ${SOURCE_FOLDER}/timers.f03 ${SOURCE_FOLDER}/lattice_data.f03 ${SOURCE_FOLDER}/polymer_model.f03 ${SOURCE_FOLDER}/analyse.f03 ${SOURCE_FOLDER}/3dpolys_le.f03)
 set(PACKAGE py3dpolys_le/bin)
 
 set(CMAKE_Fortran_SOURCE_FILE_EXTENSIONS f03;f90)
@@ -190,10 +193,22 @@ SET(POLYMER_MODEL polymer_model)
 ADD_LIBRARY(${POLYMER_MODEL} STATIC ${SOURCE_FOLDER}/polymer_model.f03)
 target_link_libraries(${POLYMER_MODEL} ${LOGGING} ${RANDOMNUMBER} ${TIMERS} ${KINDS} ${LIB_CONF})
 
+SET(POLYMER_MODEL_UNIFIED polymer_model_unified)
+ADD_LIBRARY(${POLYMER_MODEL_UNIFIED} STATIC ${SOURCE_FOLDER}/polymer_model_unified.f03)
+set_target_properties(${POLYMER_MODEL_UNIFIED} PROPERTIES LINKER_LANGUAGE Fortran)
+target_link_libraries(${POLYMER_MODEL_UNIFIED} ${TIMERS} ${LATTICE_DATA} ${LOGGING} ${LIB_CONF})
+
 SET(ANALYSE analyse)
 ADD_LIBRARY(${ANALYSE} STATIC ${SOURCE_FOLDER}/analyse.f03)
 target_include_directories(${ANALYSE} PRIVATE ${HDF5_INCLUDE_DIRS})
 target_link_libraries(${ANALYSE} PRIVATE ${LATTICE_DATA} ${POLYMER_MODEL} ${RANDOMNUMBER} ${TIMERS} ${KINDS} ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
+
+SET(ANALYSE_UNIFIED analyse_unified)
+ADD_LIBRARY(${ANALYSE_UNIFIED} STATIC ${SOURCE_FOLDER}/analyse_unified.f03)
+set_target_properties(${ANALYSE_UNIFIED} PROPERTIES LINKER_LANGUAGE Fortran)
+target_include_directories(${ANALYSE_UNIFIED} PRIVATE ${HDF5_INCLUDE_DIRS})
+add_dependencies(${ANALYSE_UNIFIED} ${ANALYSE})
+target_link_libraries(${ANALYSE_UNIFIED} PRIVATE ${LATTICE_DATA} ${POLYMER_MODEL} ${ANALYSE} ${RANDOMNUMBER} ${TIMERS} ${KINDS} ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
 
 
 # include_directories(src)
@@ -201,8 +216,8 @@ target_link_libraries(${ANALYSE} PRIVATE ${LATTICE_DATA} ${POLYMER_MODEL} ${RAND
 add_executable(${TARGET} ${SOURCE_FILES})
 ##target_include_directories(${TARGET} PRIVATE ${HDF5_INCLUDE_DIRS})
 # Ensure libraries are built before executable (for module files)
-add_dependencies(${TARGET} ${POLYMER_MODEL} ${ANALYSE} ${LATTICE_DATA} ${LIB_CONF} ${TIMERS} ${LOGGING} ${RANDOMNUMBER} ${KINDS})
-target_link_libraries(${TARGET} PRIVATE ${RANDOMNUMBER} ${KINDS} ${TIMERS} ${LIB_CONF} ${LATTICE_DATA} ${POLYMER_MODEL} ${ANALYSE} MPI::MPI_Fortran) ## ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
+add_dependencies(${TARGET} ${POLYMER_MODEL_UNIFIED} ${POLYMER_MODEL} ${ANALYSE} ${ANALYSE_UNIFIED} ${LATTICE_DATA} ${LIB_CONF} ${TIMERS} ${LOGGING} ${RANDOMNUMBER} ${KINDS})
+target_link_libraries(${TARGET} PRIVATE ${RANDOMNUMBER} ${KINDS} ${TIMERS} ${LIB_CONF} ${LATTICE_DATA} ${POLYMER_MODEL} ${POLYMER_MODEL_UNIFIED} ${ANALYSE} ${ANALYSE_UNIFIED} MPI::MPI_Fortran) ## ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
 
 # Link OpenMP if enabled (must be after executable is created)
 if(ENABLE_OPENMP AND OPENMP_FORTRAN_FOUND)
