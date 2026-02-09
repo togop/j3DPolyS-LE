@@ -217,6 +217,8 @@ EOF
             desc="GPU/OpenACC (no MPI) - auto threads"
         elif [ "${test}" = "cpu_no_mpi" ]; then
             desc="CPU only (no MPI) - auto threads"
+        elif [[ "${test}" =~ mpi_([0-9]+)proc_plain ]]; then
+            desc="MPI ${BASH_REMATCH[1]} procs (no OpenACC, no OpenMP)"
         elif [[ "${test}" =~ mpi_([0-9]+)proc_gpu_t([0-9]+) ]]; then
             desc="MPI ${BASH_REMATCH[1]} procs (GPU/OpenACC) - ${BASH_REMATCH[2]} threads"
         elif [[ "${test}" =~ mpi_([0-9]+)proc_gpu ]]; then
