@@ -57,9 +57,12 @@ module PolymerModel_unified_mod
         integer, dimension(:), allocatable :: interaction_sites_state
 
     contains
-        procedure, public :: init_unified, do_simulation_unified, detect_parallelization, output_parameters_unified, init_unified_base, output_unified
-        procedure, public :: trialmoveex_unified, trialmovetad_unified, trialbound_unified, trialunbound_unified, unbound_all_unified, erase_unified
-        procedure, private :: allocate_unified, cleanup_arrays_unified, initbitable_unified, initconfig4_unified, initconfig4_zigzag_unified, initconfig_sim_out_unified
+        procedure, public :: init_unified, do_simulation_unified, detect_parallelization, &
+            output_parameters_unified, init_unified_base, output_unified
+        procedure, public :: trialmoveex_unified, trialmovetad_unified, trialbound_unified, &
+            trialunbound_unified, unbound_all_unified, erase_unified
+        procedure, private :: allocate_unified, cleanup_arrays_unified, initbitable_unified, &
+            initconfig4_unified, initconfig4_zigzag_unified, initconfig_sim_out_unified
         final :: deallocate_unified
     end type PolymerModel_unified
 
@@ -157,13 +160,15 @@ contains
         if (allocated(self%loading_sites_factor)) then
             deallocate(self%loading_sites_factor, stat=dealloc_stat)
             if (dealloc_stat /= 0) then
-                call log%warn('cleanup_arrays_unified: Warning - failed to deallocate loading_sites_factor, stat=' // trim(str(dealloc_stat)))
+                call log%warn('cleanup_arrays_unified: Warning - failed to deallocate ' // &
+                    'loading_sites_factor, stat=' // trim(str(dealloc_stat)))
             end if
         end if
         if (allocated(self%interaction_sites_state)) then
             deallocate(self%interaction_sites_state, stat=dealloc_stat)
             if (dealloc_stat /= 0) then
-                call log%warn('cleanup_arrays_unified: Warning - failed to deallocate interaction_sites_state, stat=' // trim(str(dealloc_stat)))
+                call log%warn('cleanup_arrays_unified: Warning - failed to deallocate ' // &
+                    'interaction_sites_state, stat=' // trim(str(dealloc_stat)))
             end if
         end if
     end subroutine cleanup_arrays_unified
@@ -1296,7 +1301,7 @@ contains
             if (self%contact(1, n - 1).ne.0) then !if n-1 already occupied, try to swap
                 if (.not. self%z_loop) return
                 if ((self%contact(3, n - 1).eq.-1).or.(n.eq.2)) return !if same direction or at the end do not swap
-                if (connec(1, opp(self%config(2, n - 1)), self%contact(2, n - 1)).eq.0) return !if break the slip-link of n-1 do not swap
+                if (connec(1, opp(self%config(2, n - 1)), self%contact(2, n - 1)).eq.0) return  ! break slip-link n-1
                 con = self%contact(:, n - 1)
 
                 iv = connec(1, self%config(2, n - 1), self%contact(2, n))
