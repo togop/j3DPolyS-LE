@@ -10,13 +10,15 @@
 #   ./benchmark_parallelization.sh [options] [config_file] [seed] [output_dir]
 #
 # Options:
-#   --tests=TYPE     Select which tests to run:
-#                    all      - Run all tests (default)
-#                    no-mpi   - Run only non-MPI tests (GPU/CPU only)
-#                    single   - Run single MPI process tests
-#                    multi    - Run multi-process MPI tests
-#                    gpu      - Run GPU-based tests only
-#                    cpu      - Run CPU-based tests only
+#   --tests=TYPE         Select which tests to run:
+#                        all      - Run all tests (default)
+#                        no-mpi   - Run only non-MPI tests (GPU/CPU only)
+#                        single   - Run single MPI process tests
+#                        multi    - Run multi-process MPI tests
+#                        gpu      - Run GPU-based tests only
+#                        cpu      - Run CPU-based tests only
+#
+#   --max-process=NUM    Maximum number of MPI processes to use (default: all available CPUs)
 #
 # Arguments:
 #   config_file  - Path to simulation config file (default: ./test/test_tads_init_benchmark.cfg)
@@ -26,7 +28,8 @@
 # Examples:
 #   ./benchmark_parallelization.sh
 #   ./benchmark_parallelization.sh --tests=no-mpi
-#   ./benchmark_parallelization.sh --tests=gpu ./test/test_tads_init_benchmark.cfg 42 ./my_benchmarks
+#   ./benchmark_parallelization.sh --max-process=8
+#   ./benchmark_parallelization.sh --tests=gpu --max-process=16 ./test/test_tads_init_benchmark.cfg 42 ./my_benchmarks
 #
 ################################################################################
 
@@ -34,10 +37,15 @@ set -e  # Exit on error
 
 # Parse options
 TEST_SELECTION="all"
+MAX_PROCESS=""
 while [[ "$1" =~ ^-- ]]; do
     case "$1" in
         --tests=*)
             TEST_SELECTION="${1#*=}"
+            shift
+            ;;
+        --max-process=*)
+            MAX_PROCESS="${1#*=}"
             shift
             ;;
         *)
@@ -150,11 +158,29 @@ detect_hardware() {
     echo ""
 }
 
-# Detect max CPUs for MPI tests
+# Detect available CPUs
 if [[ "$(uname -s)" == "Darwin" ]]; then
-    MAX_CPUS=$(sysctl -n hw.logicalcpu 2>/dev/null || echo "8")
+    AVAILABLE_CPUS=$(sysctl -n hw.logicalcpu 2>/dev/null || echo "8")
 else
-    MAX_CPUS=$(nproc 2>/dev/null || echo "8")
+    AVAILABLE_CPUS=$(nproc 2>/dev/null || echo "8")
+fi
+
+# Set MAX_CPUS from parameter or use all available
+if [ -n "${MAX_PROCESS}" ]; then
+    MAX_CPUS="${MAX_PROCESS}"
+    # Validate that MAX_CPUS is a positive integer
+    if ! [[ "${MAX_CPUS}" =~ ^[0-9]+$ ]] || [ "${MAX_CPUS}" -lt 1 ]; then
+        echo "ERROR: --max-process must be a positive integer"
+        exit 1
+    fi
+    # Warn if exceeding available CPUs
+    if [ "${MAX_CPUS}" -gt "${AVAILABLE_CPUS}" ]; then
+        echo "WARNING: --max-process=${MAX_CPUS} exceeds available CPUs (${AVAILABLE_CPUS})"
+        echo "         This may lead to oversubscription and reduced performance."
+        echo ""
+    fi
+else
+    MAX_CPUS="${AVAILABLE_CPUS}"
 fi
 
 echo "=============================================================================="
@@ -165,7 +191,8 @@ echo "  Config file:     ${CONFIG_FILE}"
 echo "  Seed:            ${SEED}"
 echo "  Output dir:      ${BENCH_DIR}"
 echo "  Test selection:  ${TEST_SELECTION}"
-echo "  Max CPUs:        ${MAX_CPUS}"
+echo "  Available CPUs:  ${AVAILABLE_CPUS}"
+echo "  Max MPI procs:   ${MAX_CPUS}$([ "${MAX_CPUS}" != "${AVAILABLE_CPUS}" ] && echo " (custom)" || echo " (default)")"
 echo "=============================================================================="
 echo ""
 
@@ -275,39 +302,22 @@ TEST_COUNT=0
 
 # No-MPI tests
 if should_run_test "no-mpi-gpu"; then
-    echo "  [$((++TEST_COUNT))] GPU only (no MPI)"
+    echo "  [$((++TEST_COUNT))] GPU/OpenACC (no MPI) - auto threads"
 fi
 if should_run_test "no-mpi-cpu"; then
     echo "  [$((++TEST_COUNT))] CPU only (no MPI) - auto threads"
-    echo "  [$((++TEST_COUNT))] CPU only (no MPI) - 1 thread"
-    echo "  [$((++TEST_COUNT))] CPU only (no MPI) - 2 threads"
-    echo "  [$((++TEST_COUNT))] CPU only (no MPI) - 4 threads"
-    echo "  [$((++TEST_COUNT))] CPU only (no MPI) - 8 threads"
 fi
 
-# Single MPI process tests
-if should_run_test "single-gpu"; then
-    echo "  [$((++TEST_COUNT))] GPU/OpenACC (1 MPI process)"
-fi
-if should_run_test "single-cpu"; then
-    echo "  [$((++TEST_COUNT))] OpenMP/CPU (1 MPI process) - auto threads"
-    echo "  [$((++TEST_COUNT))] OpenMP/CPU (1 MPI process) - 1 thread"
-    echo "  [$((++TEST_COUNT))] OpenMP/CPU (1 MPI process) - 2 threads"
-    echo "  [$((++TEST_COUNT))] OpenMP/CPU (1 MPI process) - 4 threads"
-fi
-
-# Multi-process MPI tests
+# Multi-process MPI tests - GPU
 if should_run_test "multi-gpu"; then
-    echo "  [$((++TEST_COUNT))] MPI 2 processes (GPU)"
-    echo "  [$((++TEST_COUNT))] MPI 4 processes (GPU)"
-    echo "  [$((++TEST_COUNT))] MPI ${MAX_CPUS} processes (GPU)"
+    echo "  [$((++TEST_COUNT))] MPI ${MAX_CPUS} processes (GPU/OpenACC) - 1 thread"
+    echo "  [$((++TEST_COUNT))] MPI ${MAX_CPUS} processes (GPU/OpenACC) - auto threads"
 fi
+
+# Multi-process MPI tests - CPU
 if should_run_test "multi-cpu"; then
-    echo "  [$((++TEST_COUNT))] MPI 2 processes (OpenMP/CPU) - auto threads"
-    echo "  [$((++TEST_COUNT))] MPI 4 processes (OpenMP/CPU) - auto threads"
+    echo "  [$((++TEST_COUNT))] MPI ${MAX_CPUS} processes (OpenMP/CPU) - 1 thread"
     echo "  [$((++TEST_COUNT))] MPI ${MAX_CPUS} processes (OpenMP/CPU) - auto threads"
-    echo "  [$((++TEST_COUNT))] MPI 2 processes (OpenMP/CPU) - 2 threads"
-    echo "  [$((++TEST_COUNT))] MPI 4 processes (OpenMP/CPU) - 2 threads"
 fi
 
 echo ""
@@ -331,7 +341,7 @@ echo "Starting benchmark tests..."
 echo ""
 
 ################################################################################
-# Test 1: GPU only (no MPI)
+# Test 1: GPU/OpenACC (no MPI) - auto threads
 ################################################################################
 if should_run_test "no-mpi-gpu"; then
 run_benchmark "gpu_no_mpi" 0 "" 0
@@ -342,99 +352,30 @@ fi
 ################################################################################
 if should_run_test "no-mpi-cpu"; then
 run_benchmark "cpu_no_mpi" 0 "--no-gpu-prefer" 0
-
-################################################################################
-# Test 3: CPU only (no MPI), 1 thread
-################################################################################
-run_benchmark "cpu_no_mpi_t1" 0 "--no-gpu-prefer" 1
-
-################################################################################
-# Test 4: CPU only (no MPI), 2 threads
-################################################################################
-run_benchmark "cpu_no_mpi_t2" 0 "--no-gpu-prefer" 2
-
-################################################################################
-# Test 5: CPU only (no MPI), 4 threads
-################################################################################
-run_benchmark "cpu_no_mpi_t4" 0 "--no-gpu-prefer" 4
-
-################################################################################
-# Test 6: CPU only (no MPI), 8 threads
-################################################################################
-run_benchmark "cpu_no_mpi_t8" 0 "--no-gpu-prefer" 8
 fi
 
 ################################################################################
-# Test 7: GPU/OpenACC (default) - Single MPI process
-################################################################################
-if should_run_test "single-gpu"; then
-run_benchmark "gpu_default" 1 "" 0
-fi
-
-################################################################################
-# Test 8: OpenMP (CPU) - Single MPI process, auto threads
-################################################################################
-if should_run_test "single-cpu"; then
-run_benchmark "openmp_cpu" 1 "--no-gpu-prefer" 0
-
-################################################################################
-# Test 9: OpenMP (CPU) - Single MPI process, 1 thread
-################################################################################
-run_benchmark "openmp_cpu_t1" 1 "--no-gpu-prefer" 1
-
-################################################################################
-# Test 10: OpenMP (CPU) - Single MPI process, 2 threads
-################################################################################
-run_benchmark "openmp_cpu_t2" 1 "--no-gpu-prefer" 2
-
-################################################################################
-# Test 11: OpenMP (CPU) - Single MPI process, 4 threads
-################################################################################
-run_benchmark "openmp_cpu_t4" 1 "--no-gpu-prefer" 4
-fi
-
-################################################################################
-# Test 12: MPI 2 processes (GPU)
+# Test 3: MPI MAX_CPUS processes (GPU/OpenACC) - 1 thread
 ################################################################################
 if should_run_test "multi-gpu"; then
-run_benchmark "mpi_2proc_gpu" 2 "" 0
+run_benchmark "mpi_${MAX_CPUS}proc_gpu_t1" ${MAX_CPUS} "" 1
 
 ################################################################################
-# Test 13: MPI 4 processes (GPU)
-################################################################################
-run_benchmark "mpi_4proc_gpu" 4 "" 0
-
-################################################################################
-# Test 14: MPI MAX_CPUS processes (GPU)
+# Test 4: MPI MAX_CPUS processes (GPU/OpenACC) - auto threads
 ################################################################################
 run_benchmark "mpi_${MAX_CPUS}proc_gpu" ${MAX_CPUS} "" 0
 fi
 
 ################################################################################
-# Test 15: MPI 2 processes (OpenMP/CPU), auto threads
+# Test 5: MPI MAX_CPUS processes (OpenMP/CPU) - 1 thread
 ################################################################################
 if should_run_test "multi-cpu"; then
-run_benchmark "mpi_2proc_openmp" 2 "--no-gpu-prefer" 0
+run_benchmark "mpi_${MAX_CPUS}proc_openmp_t1" ${MAX_CPUS} "--no-gpu-prefer" 1
 
 ################################################################################
-# Test 16: MPI 4 processes (OpenMP/CPU), auto threads
-################################################################################
-run_benchmark "mpi_4proc_openmp" 4 "--no-gpu-prefer" 0
-
-################################################################################
-# Test 17: MPI MAX_CPUS processes (OpenMP/CPU), auto threads
+# Test 6: MPI MAX_CPUS processes (OpenMP/CPU) - auto threads
 ################################################################################
 run_benchmark "mpi_${MAX_CPUS}proc_openmp" ${MAX_CPUS} "--no-gpu-prefer" 0
-
-################################################################################
-# Test 18: MPI 2 processes (OpenMP/CPU), 2 threads
-################################################################################
-run_benchmark "mpi_2proc_openmp_t2" 2 "--no-gpu-prefer" 2
-
-################################################################################
-# Test 19: MPI 4 processes (OpenMP/CPU), 2 threads
-################################################################################
-run_benchmark "mpi_4proc_openmp_t2" 4 "--no-gpu-prefer" 2
 fi
 
 ################################################################################

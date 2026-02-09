@@ -129,12 +129,15 @@ cat >> "${REPORT_FILE}" << EOF
 
 EOF
 
-# Extract config parameters from log (check both no-MPI and MPI versions)
+# Extract config parameters from log
 LOG_FILE=""
 if [ -f "${LOG_DIR}/gpu_no_mpi.log" ]; then
     LOG_FILE="${LOG_DIR}/gpu_no_mpi.log"
-elif [ -f "${LOG_DIR}/gpu_default.log" ]; then
-    LOG_FILE="${LOG_DIR}/gpu_default.log"
+elif [ -f "${LOG_DIR}/cpu_no_mpi.log" ]; then
+    LOG_FILE="${LOG_DIR}/cpu_no_mpi.log"
+else
+    # Find first available log file
+    LOG_FILE=$(find "${LOG_DIR}" -name "*.log" -type f | head -1)
 fi
 
 if [ -n "${LOG_FILE}" ]; then
@@ -178,17 +181,13 @@ EOF
         # Store raw times for scaling calculations
         echo "${sim_time_raw}" > "${TEMP_DIR}/${test}.time"
 
-        # Store baselines (prefer no-MPI versions if available)
+        # Store baselines (prefer no-MPI versions)
         if [ "${test}" = "gpu_no_mpi" ]; then
-            echo "${sim_time_raw}" > "${TEMP_DIR}/gpu_baseline.time"
-        elif [ "${test}" = "gpu_default" ] && [ ! -f "${TEMP_DIR}/gpu_baseline.time" ]; then
             echo "${sim_time_raw}" > "${TEMP_DIR}/gpu_baseline.time"
         fi
 
         if [ "${test}" = "cpu_no_mpi" ]; then
-            echo "${sim_time_raw}" > "${TEMP_DIR}/openmp_baseline.time"
-        elif [ "${test}" = "openmp_cpu" ] && [ ! -f "${TEMP_DIR}/openmp_baseline.time" ]; then
-            echo "${sim_time_raw}" > "${TEMP_DIR}/openmp_baseline.time"
+            echo "${sim_time_raw}" > "${TEMP_DIR}/cpu_baseline.time"
         fi
 
         # Format times for display
@@ -215,23 +214,17 @@ EOF
 
         # Create human-readable description
         if [ "${test}" = "gpu_no_mpi" ]; then
-            desc="GPU only (no MPI)"
-        elif [[ "${test}" =~ cpu_no_mpi_t([0-9]+) ]]; then
-            desc="CPU only (no MPI) - ${BASH_REMATCH[1]} threads"
+            desc="GPU/OpenACC (no MPI) - auto threads"
         elif [ "${test}" = "cpu_no_mpi" ]; then
             desc="CPU only (no MPI) - auto threads"
-        elif [ "${test}" = "gpu_default" ]; then
-            desc="GPU/OpenACC (1 MPI process)"
-        elif [[ "${test}" =~ openmp_cpu_t([0-9]+) ]]; then
-            desc="OpenMP (CPU, 1 MPI process) - ${BASH_REMATCH[1]} threads"
-        elif [ "${test}" = "openmp_cpu" ]; then
-            desc="OpenMP (CPU, 1 MPI process) - auto threads"
-        elif [[ "${test}" =~ mpi_([0-9]+)proc_openmp_t([0-9]+) ]]; then
-            desc="MPI ${BASH_REMATCH[1]} procs (OpenMP) - ${BASH_REMATCH[2]} threads"
-        elif [[ "${test}" =~ mpi_([0-9]+)proc_openmp ]]; then
-            desc="MPI ${BASH_REMATCH[1]} procs (OpenMP)"
+        elif [[ "${test}" =~ mpi_([0-9]+)proc_gpu_t([0-9]+) ]]; then
+            desc="MPI ${BASH_REMATCH[1]} procs (GPU/OpenACC) - ${BASH_REMATCH[2]} threads"
         elif [[ "${test}" =~ mpi_([0-9]+)proc_gpu ]]; then
-            desc="MPI ${BASH_REMATCH[1]} procs (GPU)"
+            desc="MPI ${BASH_REMATCH[1]} procs (GPU/OpenACC) - auto threads"
+        elif [[ "${test}" =~ mpi_([0-9]+)proc_openmp_t([0-9]+) ]]; then
+            desc="MPI ${BASH_REMATCH[1]} procs (OpenMP/CPU) - ${BASH_REMATCH[2]} threads"
+        elif [[ "${test}" =~ mpi_([0-9]+)proc_openmp ]]; then
+            desc="MPI ${BASH_REMATCH[1]} procs (OpenMP/CPU) - auto threads"
         fi
 
         # Display MPI process count (show "None" for non-MPI tests)
@@ -250,161 +243,51 @@ EOF
 
 ## Visual Performance Summary
 
-### GPU/OpenACC Performance
 EOF
 
-    # Detect all process counts dynamically
-    all_proc_counts=$(find "${RESULTS_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; |
-                      grep -oE "mpi_[0-9]+proc" |
-                      sed 's/mpi_//;s/proc//' |
-                      sort -n -u)
-
-    # GPU scaling chart
+    # Get baselines
+    cpu_baseline=$(cat "${TEMP_DIR}/cpu_baseline.time" 2>/dev/null || echo "N/A")
     gpu_baseline=$(cat "${TEMP_DIR}/gpu_baseline.time" 2>/dev/null || echo "N/A")
-    if [ "${gpu_baseline}" != "N/A" ] && [ -n "${gpu_baseline}" ]; then
+
+    if [ "${cpu_baseline}" != "N/A" ] && [ -n "${cpu_baseline}" ]; then
+        echo "### Performance Comparison (Relative to CPU only - no MPI baseline)" >> "${REPORT_FILE}"
         echo "" >> "${REPORT_FILE}"
         echo "\`\`\`" >> "${REPORT_FILE}"
-        echo "Baseline (1 proc):  $(format_time ${gpu_baseline})" >> "${REPORT_FILE}"
+        echo "Baseline (CPU no-MPI):  $(format_time ${cpu_baseline})" >> "${REPORT_FILE}"
+        echo "" >> "${REPORT_FILE}"
 
-        for procs in ${all_proc_counts}; do
-            test_name="mpi_${procs}proc_gpu"
-            time_raw=$(cat "${TEMP_DIR}/${test_name}.time" 2>/dev/null || echo "N/A")
+        # Find all test results
+        for test_file in "${TEMP_DIR}"/*.time; do
+            test_name=$(basename "${test_file}" .time)
+
+            # Skip baseline and intermediate files
+            if [ "${test_name}" = "cpu_baseline" ] || [ "${test_name}" = "gpu_baseline" ] || [ "${test_name}" = "cpu_no_mpi" ]; then
+                continue
+            fi
+
+            time_raw=$(cat "${test_file}" 2>/dev/null || echo "N/A")
             if [ "${time_raw}" != "N/A" ] && [ -n "${time_raw}" ]; then
-                speedup=$(echo "scale=2; ${gpu_baseline} / ${time_raw}" | bc -l)
-                efficiency=$(echo "scale=1; (${speedup} / ${procs}) * 100" | bc -l)
+                speedup=$(echo "scale=2; ${cpu_baseline} / ${time_raw}" | bc -l)
                 bar_length=$(echo "${speedup} * 10" | bc -l | awk '{printf "%d", $1}')
                 bar=$(printf '█%.0s' $(seq 1 ${bar_length} 2>/dev/null || echo ""))
-                printf "MPI %d procs:      %s  %s (speedup: %.2fx, efficiency: %.1f%%)\n" \
-                    ${procs} "$(format_time ${time_raw})" "${bar}" ${speedup} ${efficiency} >> "${REPORT_FILE}"
+
+                # Format test name for display
+                display_name="${test_name}"
+
+                printf "%-40s %s  %s (%.2fx)\n" \
+                    "${display_name}:" "$(format_time ${time_raw})" "${bar}" ${speedup} >> "${REPORT_FILE}"
             fi
         done
+
         echo "\`\`\`" >> "${REPORT_FILE}"
     fi
 
-    cat >> "${REPORT_FILE}" << 'EOF'
-
-### OpenMP/CPU Performance
-EOF
-
-    # OpenMP scaling chart
-    openmp_baseline=$(cat "${TEMP_DIR}/openmp_baseline.time" 2>/dev/null || echo "N/A")
-    if [ "${openmp_baseline}" != "N/A" ] && [ -n "${openmp_baseline}" ]; then
-        echo "" >> "${REPORT_FILE}"
-        echo "\`\`\`" >> "${REPORT_FILE}"
-        echo "Baseline (1 proc):  $(format_time ${openmp_baseline})" >> "${REPORT_FILE}"
-
-        for procs in ${all_proc_counts}; do
-            test_name="mpi_${procs}proc_openmp"
-            time_raw=$(cat "${TEMP_DIR}/${test_name}.time" 2>/dev/null || echo "N/A")
-            if [ "${time_raw}" != "N/A" ] && [ -n "${time_raw}" ]; then
-                speedup=$(echo "scale=2; ${openmp_baseline} / ${time_raw}" | bc -l)
-                efficiency=$(echo "scale=1; (${speedup} / ${procs}) * 100" | bc -l)
-                bar_length=$(echo "${speedup} * 10" | bc -l | awk '{printf "%d", $1}')
-                bar=$(printf '█%.0s' $(seq 1 ${bar_length} 2>/dev/null || echo ""))
-                printf "MPI %d procs:      %s  %s (speedup: %.2fx, efficiency: %.1f%%)\n" \
-                    ${procs} "$(format_time ${time_raw})" "${bar}" ${speedup} ${efficiency} >> "${REPORT_FILE}"
-            fi
-        done
-        echo "\`\`\`" >> "${REPORT_FILE}"
-    fi
-
-    # Add scaling efficiency table
+    # Add analysis notes
     cat >> "${REPORT_FILE}" << 'EOF'
 
 ---
 
-## Scaling Efficiency Analysis
-
-### MPI Scaling Metrics
-
-| Configuration | Processes | Simulation Time | Speedup | Parallel Efficiency | Scaling Category |
-|--------------|-----------|----------------|---------|-------------------|-----------------|
-EOF
-
-    # Detect all process counts dynamically from test results
-    all_proc_counts=$(find "${RESULTS_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; |
-                      grep -oE "mpi_[0-9]+proc" |
-                      sed 's/mpi_//;s/proc//' |
-                      sort -n -u)
-
-    # GPU scaling efficiency
-    gpu_baseline=$(cat "${TEMP_DIR}/gpu_baseline.time" 2>/dev/null || echo "N/A")
-    if [ "${gpu_baseline}" != "N/A" ] && [ -n "${gpu_baseline}" ]; then
-        # Start with baseline
-        for procs in 1 ${all_proc_counts}; do
-            if [ ${procs} -eq 1 ]; then
-                test_name="gpu_default"
-            else
-                test_name="mpi_${procs}proc_gpu"
-            fi
-
-            time_raw=$(cat "${TEMP_DIR}/${test_name}.time" 2>/dev/null || echo "N/A")
-            if [ "${time_raw}" != "N/A" ] && [ -n "${time_raw}" ]; then
-                if [ ${procs} -eq 1 ]; then
-                    speedup="1.00"
-                    efficiency="100.0"
-                    category="Baseline"
-                else
-                    speedup=$(echo "scale=2; ${gpu_baseline} / ${time_raw}" | bc -l)
-                    efficiency=$(echo "scale=1; (${speedup} / ${procs}) * 100" | bc -l)
-
-                    # Categorize scaling
-                    if (( $(echo "${efficiency} >= 90" | bc -l) )); then
-                        category="Excellent (≥90%)"
-                    elif (( $(echo "${efficiency} >= 75" | bc -l) )); then
-                        category="Good (75-90%)"
-                    elif (( $(echo "${efficiency} >= 50" | bc -l) )); then
-                        category="Moderate (50-75%)"
-                    else
-                        category="Poor (<50%)"
-                    fi
-                fi
-
-                time_fmt=$(format_time "${time_raw}")
-                echo "| GPU/OpenACC | ${procs} | ${time_fmt} | ${speedup}x | ${efficiency}% | ${category} |" >> "${REPORT_FILE}"
-            fi
-        done
-    fi
-
-    # OpenMP scaling efficiency
-    openmp_baseline=$(cat "${TEMP_DIR}/openmp_baseline.time" 2>/dev/null || echo "N/A")
-    if [ "${openmp_baseline}" != "N/A" ] && [ -n "${openmp_baseline}" ]; then
-        for procs in 1 ${all_proc_counts}; do
-            if [ ${procs} -eq 1 ]; then
-                test_name="openmp_cpu"
-            else
-                test_name="mpi_${procs}proc_openmp"
-            fi
-
-            time_raw=$(cat "${TEMP_DIR}/${test_name}.time" 2>/dev/null || echo "N/A")
-            if [ "${time_raw}" != "N/A" ] && [ -n "${time_raw}" ]; then
-                if [ ${procs} -eq 1 ]; then
-                    speedup="1.00"
-                    efficiency="100.0"
-                    category="Baseline"
-                else
-                    speedup=$(echo "scale=2; ${openmp_baseline} / ${time_raw}" | bc -l)
-                    efficiency=$(echo "scale=1; (${speedup} / ${procs}) * 100" | bc -l)
-
-                    # Categorize scaling
-                    if (( $(echo "${efficiency} >= 90" | bc -l) )); then
-                        category="Excellent (≥90%)"
-                    elif (( $(echo "${efficiency} >= 75" | bc -l) )); then
-                        category="Good (75-90%)"
-                    elif (( $(echo "${efficiency} >= 50" | bc -l) )); then
-                        category="Moderate (50-75%)"
-                    else
-                        category="Poor (<50%)"
-                    fi
-                fi
-
-                time_fmt=$(format_time "${time_raw}")
-                echo "| OpenMP/CPU | ${procs} | ${time_fmt} | ${speedup}x | ${efficiency}% | ${category} |" >> "${REPORT_FILE}"
-            fi
-        done
-    fi
-
-    cat >> "${REPORT_FILE}" << 'EOF'
+## Performance Analysis
 
 ### Performance Metrics Definitions
 
@@ -412,39 +295,20 @@ EOF
 The wall-clock time (in seconds, minutes, or hours) required to complete the Monte Carlo simulation and LEF dynamics calculations. This excludes file I/O and merging operations.
 
 #### Speedup
-Measures how much faster the parallel execution is compared to the baseline single-process run:
+Measures how much faster each configuration is compared to the baseline (CPU only - no MPI):
 
 ```
-Speedup = Baseline Simulation Time / Parallel Simulation Time
+Speedup = Baseline Time / Configuration Time
 ```
 
-- **Speedup = 1.0x**: No improvement (same speed as baseline)
+- **Speedup = 1.0x**: Same speed as baseline
 - **Speedup = 2.0x**: Twice as fast as baseline
-- **Speedup < 1.0x**: Slower than baseline (negative scaling due to overhead)
+- **Speedup > 1.0x**: Faster than baseline
+- **Speedup < 1.0x**: Slower than baseline
 
-#### Parallel Efficiency
-Measures how effectively additional processors are being utilized:
-
-```
-Parallel Efficiency = (Speedup / Number of Processes) × 100%
-```
-
-Where **Number of Processes** is the MPI process count (1, 2, 4, or 8).
-
-**Example Calculation:**
-- Baseline (1 proc): 0.116 s
-- MPI 2 procs: 0.115 s
-- Speedup = 0.116 / 0.115 = 1.00x
-- Efficiency = (1.00 / 2) × 100% = 50.0%
-
-#### Efficiency Categories
-
-- **Excellent (≥90%)**: Nearly linear scaling - adding processors provides proportional speedup
-- **Good (75-90%)**: Strong scaling - efficient use of additional processors
-- **Moderate (50-75%)**: Acceptable scaling - some overhead but still beneficial
-- **Poor (<50%)**: Weak scaling - overhead dominates, consider fewer processors
-
-**Note:** For single-trajectory simulations (Niter=1), poor MPI scaling is expected since work cannot be effectively divided. MPI scaling improves significantly with multiple trajectories (Niter ≥ number of processes).
+#### Thread Configuration
+- **1 thread**: Single-threaded execution per MPI process
+- **auto threads**: System automatically determines optimal thread count based on available CPU cores
 
 EOF
 fi
