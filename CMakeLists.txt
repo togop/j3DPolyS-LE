@@ -21,6 +21,17 @@ set(PACKAGE py3dpolys_le/bin)
 set(CMAKE_Fortran_SOURCE_FILE_EXTENSIONS f03;f90)
 set_source_files_properties(${SOURCE_FILES} PROPERTIES LANGUAGE Fortran)
 
+# Explicit paths and Fortran language for unified libs (avoid "cannot determine link language" on some platforms)
+set(POLYMER_MODEL_UNIFIED_SRC ${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE_FOLDER}/polymer_model_unified.f03)
+set(ANALYSE_UNIFIED_SRC ${CMAKE_CURRENT_SOURCE_DIR}/${SOURCE_FOLDER}/analyse_unified.f03)
+if(NOT EXISTS "${POLYMER_MODEL_UNIFIED_SRC}")
+  message(FATAL_ERROR "Unified polymer source missing: ${POLYMER_MODEL_UNIFIED_SRC}")
+endif()
+if(NOT EXISTS "${ANALYSE_UNIFIED_SRC}")
+  message(FATAL_ERROR "Unified analyse source missing: ${ANALYSE_UNIFIED_SRC}")
+endif()
+set_source_files_properties(${POLYMER_MODEL_UNIFIED_SRC} ${ANALYSE_UNIFIED_SRC} PROPERTIES LANGUAGE Fortran)
+
 set(CMAKE_CXX_STANDARD 14)
 
 message( STATUS "PROJECT_SOURCE_DIR: ${PROJECT_SOURCE_DIR}")
@@ -191,8 +202,7 @@ ADD_LIBRARY(${POLYMER_MODEL} STATIC ${SOURCE_FOLDER}/polymer_model.f03)
 target_link_libraries(${POLYMER_MODEL} ${LOGGING} ${RANDOMNUMBER} ${TIMERS} ${KINDS} ${LIB_CONF})
 
 SET(POLYMER_MODEL_UNIFIED polymer_model_unified)
-ADD_LIBRARY(${POLYMER_MODEL_UNIFIED} STATIC ${SOURCE_FOLDER}/polymer_model_unified.f03)
-set_target_properties(${POLYMER_MODEL_UNIFIED} PROPERTIES LINKER_LANGUAGE Fortran)
+ADD_LIBRARY(${POLYMER_MODEL_UNIFIED} STATIC ${POLYMER_MODEL_UNIFIED_SRC})
 target_link_libraries(${POLYMER_MODEL_UNIFIED} ${TIMERS} ${LATTICE_DATA} ${LOGGING} ${LIB_CONF})
 
 SET(ANALYSE analyse)
@@ -201,8 +211,7 @@ target_include_directories(${ANALYSE} PRIVATE ${HDF5_INCLUDE_DIRS})
 target_link_libraries(${ANALYSE} PRIVATE ${LATTICE_DATA} ${POLYMER_MODEL} ${RANDOMNUMBER} ${TIMERS} ${KINDS} ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
 
 SET(ANALYSE_UNIFIED analyse_unified)
-ADD_LIBRARY(${ANALYSE_UNIFIED} STATIC ${SOURCE_FOLDER}/analyse_unified.f03)
-set_target_properties(${ANALYSE_UNIFIED} PROPERTIES LINKER_LANGUAGE Fortran)
+ADD_LIBRARY(${ANALYSE_UNIFIED} STATIC ${ANALYSE_UNIFIED_SRC})
 target_include_directories(${ANALYSE_UNIFIED} PRIVATE ${HDF5_INCLUDE_DIRS})
 add_dependencies(${ANALYSE_UNIFIED} ${ANALYSE})  # Ensure analyse_mod is compiled first
 target_link_libraries(${ANALYSE_UNIFIED} PRIVATE ${LATTICE_DATA} ${POLYMER_MODEL} ${ANALYSE} ${RANDOMNUMBER} ${TIMERS} ${KINDS} ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
