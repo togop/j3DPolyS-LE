@@ -72,7 +72,7 @@ function hic_to_cool(hic::Matrix, chr::String, resolution::Int, cool_file::Strin
         "bin-size" => resolution,
         "storage-mode" => "symmetric-upper",
         "genome-assembly" => "ce11",
-        "generated-by" => "j3DPolySLE-2025.3"
+        "generated-by" => "j3DPolySLE-2026.1"
     )
     
     create_cooler(cool_file, bins=bins, pixels=pixels_dic, dtypes=Dict("count" => "float64"), ordered=true, metadata=metadata)

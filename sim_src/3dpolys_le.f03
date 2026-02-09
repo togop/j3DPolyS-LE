@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2025.3'
+    character(*), parameter :: VERSION = '2026.1'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2025.3'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2026.1'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -98,7 +98,8 @@ subroutine print_help()
             & , s=<sim_out_folder> to continue from a finished simulation output folder.'
     print*, '   -z|--z_loop : Allow z_loop for LEFs move, where LEFs can traverse one another. Default: false'
     print*, '   -u|--unidirectional : Unidirectional mode for LEFs move otherwise bidirectional. Default: false=bidirectional'
-    print*, '   --no-gpu-prefer : Disable GPU preference for parallelization. Will use OpenMP if available instead of OpenACC. Default: GPU preferred'
+    print*, '   --no-gpu-prefer : Disable GPU preference for parallelization. Will use OpenMP if available &
+        &instead of OpenACC. Default: GPU preferred'
     print*, '   --force_method:<method> : Force analysis parallelization: auto, openacc, openmp, sequential. Default: auto'
     print*, '   --threads:<num_threads> : Set number of OpenMP threads for parallelization. Default: 0 (auto-detect)'
     print*, '   --seed:<seed_value> : Set the random seed for reproducibility. Default: random (based on system clock)'
@@ -932,7 +933,8 @@ program mainprogram
         call analyse_unified(radiuscontact = radius_contact, use_contact_probability = use_contact_probability, &
                 params = params, Niter = Niter, Nmeas = Nmeas, &
                 output_folder = output_folder, analyse_folder = analyse_folder, &
-                hic3d_factor = hic3d_factor, chrom = chrom, prefer_gpu=prefer_gpu, force_method=force_method, num_threads=num_threads)
+                hic3d_factor = hic3d_factor, chrom = chrom, prefer_gpu=prefer_gpu, &
+                force_method=force_method, num_threads=num_threads)
         call log%info(crono%Tac('Finished analyse'))
     end if
 

@@ -1,5 +1,11 @@
 # Release notes #
 
+## 2026.1
+
+### Added
+- experimental: extended Julia implementation of some Cooler functionality
+- experimental: added JuliaPackaging/Yggdrasil JLL package
+
 ## 2025.3
 
 ### Added
