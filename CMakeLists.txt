@@ -192,6 +192,7 @@ target_link_libraries(${POLYMER_MODEL} ${LOGGING} ${RANDOMNUMBER} ${TIMERS} ${KI
 
 SET(POLYMER_MODEL_UNIFIED polymer_model_unified)
 ADD_LIBRARY(${POLYMER_MODEL_UNIFIED} STATIC ${SOURCE_FOLDER}/polymer_model_unified.f03)
+set_target_properties(${POLYMER_MODEL_UNIFIED} PROPERTIES LINKER_LANGUAGE Fortran)
 target_link_libraries(${POLYMER_MODEL_UNIFIED} ${TIMERS} ${LATTICE_DATA} ${LOGGING} ${LIB_CONF})
 
 SET(ANALYSE analyse)
@@ -201,6 +202,7 @@ target_link_libraries(${ANALYSE} PRIVATE ${LATTICE_DATA} ${POLYMER_MODEL} ${RAND
 
 SET(ANALYSE_UNIFIED analyse_unified)
 ADD_LIBRARY(${ANALYSE_UNIFIED} STATIC ${SOURCE_FOLDER}/analyse_unified.f03)
+set_target_properties(${ANALYSE_UNIFIED} PROPERTIES LINKER_LANGUAGE Fortran)
 target_include_directories(${ANALYSE_UNIFIED} PRIVATE ${HDF5_INCLUDE_DIRS})
 add_dependencies(${ANALYSE_UNIFIED} ${ANALYSE})  # Ensure analyse_mod is compiled first
 target_link_libraries(${ANALYSE_UNIFIED} PRIVATE ${LATTICE_DATA} ${POLYMER_MODEL} ${ANALYSE} ${RANDOMNUMBER} ${TIMERS} ${KINDS} ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
