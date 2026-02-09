@@ -1,6 +1,7 @@
 .PHONY: all build debug env install test doc sif
 
 build:
+	rm -rf cmake-build
 	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build -S . -DENABLE_OPENMP=ON -DENABLE_OPENACC=ON
 	cmake --build cmake-build --target 3dpolys_le -- -j 6
 
