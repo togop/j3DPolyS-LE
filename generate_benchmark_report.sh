@@ -216,18 +216,16 @@ EOF
         # Create human-readable description
         if [ "${test}" = "gpu_no_mpi" ]; then
             desc="GPU only (no MPI)"
-        elif [ "${test}" = "cpu_no_mpi_t8" ]; then
-            desc="CPU only (no MPI) - 8 threads"
         elif [[ "${test}" =~ cpu_no_mpi_t([0-9]+) ]]; then
             desc="CPU only (no MPI) - ${BASH_REMATCH[1]} threads"
         elif [ "${test}" = "cpu_no_mpi" ]; then
             desc="CPU only (no MPI) - auto threads"
         elif [ "${test}" = "gpu_default" ]; then
-            desc="GPU/OpenACC (default)"
+            desc="GPU/OpenACC (1 MPI process)"
         elif [[ "${test}" =~ openmp_cpu_t([0-9]+) ]]; then
-            desc="OpenMP (CPU) - ${BASH_REMATCH[1]} threads"
+            desc="OpenMP (CPU, 1 MPI process) - ${BASH_REMATCH[1]} threads"
         elif [ "${test}" = "openmp_cpu" ]; then
-            desc="OpenMP (CPU) - auto threads"
+            desc="OpenMP (CPU, 1 MPI process) - auto threads"
         elif [[ "${test}" =~ mpi_([0-9]+)proc_openmp_t([0-9]+) ]]; then
             desc="MPI ${BASH_REMATCH[1]} procs (OpenMP) - ${BASH_REMATCH[2]} threads"
         elif [[ "${test}" =~ mpi_([0-9]+)proc_openmp ]]; then
@@ -255,6 +253,12 @@ EOF
 ### GPU/OpenACC Performance
 EOF
 
+    # Detect all process counts dynamically
+    all_proc_counts=$(find "${RESULTS_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; |
+                      grep -oE "mpi_[0-9]+proc" |
+                      sed 's/mpi_//;s/proc//' |
+                      sort -n -u)
+
     # GPU scaling chart
     gpu_baseline=$(cat "${TEMP_DIR}/gpu_baseline.time" 2>/dev/null || echo "N/A")
     if [ "${gpu_baseline}" != "N/A" ] && [ -n "${gpu_baseline}" ]; then
@@ -262,7 +266,7 @@ EOF
         echo "\`\`\`" >> "${REPORT_FILE}"
         echo "Baseline (1 proc):  $(format_time ${gpu_baseline})" >> "${REPORT_FILE}"
 
-        for procs in 2 4 8; do
+        for procs in ${all_proc_counts}; do
             test_name="mpi_${procs}proc_gpu"
             time_raw=$(cat "${TEMP_DIR}/${test_name}.time" 2>/dev/null || echo "N/A")
             if [ "${time_raw}" != "N/A" ] && [ -n "${time_raw}" ]; then
@@ -289,7 +293,7 @@ EOF
         echo "\`\`\`" >> "${REPORT_FILE}"
         echo "Baseline (1 proc):  $(format_time ${openmp_baseline})" >> "${REPORT_FILE}"
 
-        for procs in 2 4 8; do
+        for procs in ${all_proc_counts}; do
             test_name="mpi_${procs}proc_openmp"
             time_raw=$(cat "${TEMP_DIR}/${test_name}.time" 2>/dev/null || echo "N/A")
             if [ "${time_raw}" != "N/A" ] && [ -n "${time_raw}" ]; then
@@ -317,10 +321,17 @@ EOF
 |--------------|-----------|----------------|---------|-------------------|-----------------|
 EOF
 
+    # Detect all process counts dynamically from test results
+    all_proc_counts=$(find "${RESULTS_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; |
+                      grep -oE "mpi_[0-9]+proc" |
+                      sed 's/mpi_//;s/proc//' |
+                      sort -n -u)
+
     # GPU scaling efficiency
     gpu_baseline=$(cat "${TEMP_DIR}/gpu_baseline.time" 2>/dev/null || echo "N/A")
     if [ "${gpu_baseline}" != "N/A" ] && [ -n "${gpu_baseline}" ]; then
-        for procs in 1 2 4 8; do
+        # Start with baseline
+        for procs in 1 ${all_proc_counts}; do
             if [ ${procs} -eq 1 ]; then
                 test_name="gpu_default"
             else
@@ -358,7 +369,7 @@ EOF
     # OpenMP scaling efficiency
     openmp_baseline=$(cat "${TEMP_DIR}/openmp_baseline.time" 2>/dev/null || echo "N/A")
     if [ "${openmp_baseline}" != "N/A" ] && [ -n "${openmp_baseline}" ]; then
-        for procs in 1 2 4 8; do
+        for procs in 1 ${all_proc_counts}; do
             if [ ${procs} -eq 1 ]; then
                 test_name="openmp_cpu"
             else
