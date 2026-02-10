@@ -102,6 +102,7 @@ subroutine print_help()
         &instead of OpenACC. Default: GPU preferred'
     print*, '   --force_method:<method> : Force analysis parallelization: auto, openacc, openmp, sequential. Default: auto'
     print*, '   --threads:<num_threads> : Set number of OpenMP threads for parallelization. Default: 0 (auto-detect)'
+    print*, '   --no-openmp : Disable OpenMP; run simulation in sequential mode (single thread).'
     print*, '   --seed:<seed_value> : Set the random seed for reproducibility. Default: random (based on system clock)'
     print*, '<3dpolys_le.cfg file>: path to the inpit.dat file. Default: ./3dpolys_le.cfg'
     print*, '<output folder>: path to output folder. Default: the folder of the <3dpolys_le.cfg file>'
@@ -207,6 +208,7 @@ program mainprogram
     logical :: unidirectional = .false.
     logical :: file_exists
     logical :: prefer_gpu = .true.
+    logical :: no_openmp = .false.
     integer :: num_threads = 0
     character(20) :: force_method = 'auto'
     character(20) :: parallel_method = 'auto'
@@ -284,6 +286,11 @@ program mainprogram
                 READ(opt_s, *) num_threads
                 if (rank == 0) then
                     call log%info('OpenMP threads set to: ' // trim(str(num_threads)))
+                end if
+            elseif (index(input_options, '--no-openmp') > 0) then
+                no_openmp = .true.
+                if (rank == 0) then
+                    call log%info('OpenMP disabled; simulation will run in sequential mode')
                 end if
             elseif (index(input_options, '--seed:') > 0) then
                 i = index(input_options, ':')
@@ -858,7 +865,7 @@ program mainprogram
             call model%init_unified(L=L, Nchain=Nchain, iku=iku, ikm=ikm, ikb=ikb, Nleffree=Nlef, &
                     kb=kb, ku=ku, km=km, Ea=Ea, Ei=Ei, &
                     z_loop=z_loop, unidirectional=unidirectional, kint=kint, &
-                    prefer_gpu=prefer_gpu, num_threads=num_threads)
+                    prefer_gpu=prefer_gpu, no_openmp=no_openmp, num_threads=num_threads)
             
             if ((rank == 0).and.(i == 1)) then                ! do it only once
                 save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')

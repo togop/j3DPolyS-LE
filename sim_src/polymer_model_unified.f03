@@ -41,6 +41,7 @@ module PolymerModel_unified_mod
         logical :: use_openacc = .false.
         logical :: use_openmp = .false.
         logical :: prefer_gpu = .true.
+        logical :: no_openmp = .false.
         integer :: num_threads = 0
         
         ! Internal model - can be any implementation
@@ -101,8 +102,13 @@ contains
         
         ! Check for OpenMP support
         ! Try OpenMP if compiled (directives will be ignored if not compiled)
-        self%use_openmp = .true.
-        call log%info('PolymerModel_unified_mod - Using OpenMP (CPU) for simulation')
+        if (self%no_openmp) then
+            self%use_openmp = .false.
+            call log%info('PolymerModel_unified_mod - OpenMP disabled by --no-openmp, using sequential execution')
+        else
+            self%use_openmp = .true.
+            call log%info('PolymerModel_unified_mod - Using OpenMP (CPU) for simulation')
+        end if
     end subroutine detect_parallelization
 
     subroutine cleanup_arrays_unified(self)
@@ -290,14 +296,14 @@ contains
     end subroutine deallocate_unified
 
     subroutine init_unified(self, L, Nchain, iku, ikm, ikb, Nleffree, kb, ku, km, Ea, Ei, &
-            z_loop, unidirectional, kint, prefer_gpu, num_threads)
+            z_loop, unidirectional, kint, prefer_gpu, no_openmp, num_threads)
         implicit none
         class (PolymerModel_unified), intent(inout) :: self
         integer, intent(in) :: L, Nchain, iku, ikm, ikb, Nleffree
         real, intent(in) :: kb, ku, km, Ea, Ei
         logical, intent(in), optional :: z_loop, unidirectional
         real, intent(in), optional :: kint
-        logical, intent(in), optional :: prefer_gpu
+        logical, intent(in), optional :: prefer_gpu, no_openmp
         integer, intent(in), optional :: num_threads
 
         ! Clean up any existing OpenACC data regions before reallocating
@@ -346,6 +352,7 @@ contains
         if (present(unidirectional)) self%unidirectional = unidirectional
         if (present(kint)) self%kint = kint
         if (present(prefer_gpu)) self%prefer_gpu = prefer_gpu
+        if (present(no_openmp)) self%no_openmp = no_openmp
         if (present(num_threads)) self%num_threads = num_threads
 
         call self%allocate_unified()

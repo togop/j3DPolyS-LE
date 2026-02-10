@@ -238,6 +238,18 @@ EOF
         echo "| ${desc} | ${mpi_display} | ${para} | ${threads} | ${sim_time} | ${method} |" >> "${REPORT_FILE}"
     done
 
+    # Ensure "MPI max processes (no OpenACC, no OpenMP)" row is present (add if missing)
+    max_procs=""
+    for test in ${test_list}; do
+        if [[ "${test}" =~ mpi_([0-9]+)proc ]]; then
+            max_procs="${BASH_REMATCH[1]}"
+            break
+        fi
+    done
+    if [ -n "${max_procs}" ] && ! echo "${test_list}" | grep -q "mpi_${max_procs}proc_plain"; then
+        echo "| MPI ${max_procs} procs (no OpenACC, no OpenMP) | ${max_procs} | None | N/A | N/A | Not run |" >> "${REPORT_FILE}"
+    fi
+
     # Add visual performance summary
     cat >> "${REPORT_FILE}" << 'EOF'
 
@@ -280,6 +292,18 @@ EOF
                     "${display_name}:" "$(format_time ${time_raw})" "${bar}" ${speedup} >> "${REPORT_FILE}"
             fi
         done
+
+        # If "MPI max processes (no OpenACC, no OpenMP)" was not run, list it as Not run
+        plain_test=""
+        for t in ${test_list}; do
+            if [[ "${t}" =~ mpi_([0-9]+)proc ]]; then
+                plain_test="mpi_${BASH_REMATCH[1]}proc_plain"
+                break
+            fi
+        done
+        if [ -n "${plain_test}" ] && [ ! -f "${TEMP_DIR}/${plain_test}.time" ]; then
+            printf "%-40s %s\n" "${plain_test}:" "Not run" >> "${REPORT_FILE}"
+        fi
 
         echo "\`\`\`" >> "${REPORT_FILE}"
     fi
