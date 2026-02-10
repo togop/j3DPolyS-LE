@@ -167,6 +167,9 @@ EOF
     TEMP_DIR=$(mktemp -d)
     trap "rm -rf ${TEMP_DIR}" EXIT
 
+    # Test selection from benchmark run (mpi = use mpi_*_plain as baseline)
+    TEST_SELECTION=$(grep "^Test selection:" "${LOG_DIR}/timing_summary.txt" 2>/dev/null | sed 's/^Test selection:[[:space:]]*//' | tr -d '\r' || echo "all")
+
     # Extract timing for each test - find all test directories dynamically
     test_list=$(find "${RESULTS_DIR}" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort)
 
@@ -259,29 +262,45 @@ EOF
 
 EOF
 
-    # Get baselines
+    # Choose baseline: when only MPI tests were run, use mpi_*_plain as baseline
     cpu_baseline=$(cat "${TEMP_DIR}/cpu_baseline.time" 2>/dev/null || echo "N/A")
     gpu_baseline=$(cat "${TEMP_DIR}/gpu_baseline.time" 2>/dev/null || echo "N/A")
+    baseline_time=""
+    baseline_label=""
+    baseline_skip=""
 
-    if [ "${cpu_baseline}" != "N/A" ] && [ -n "${cpu_baseline}" ]; then
-        echo "### Performance Comparison (Relative to CPU only - no MPI baseline)" >> "${REPORT_FILE}"
+    if [ "${TEST_SELECTION}" = "mpi" ] && [ -n "${max_procs}" ] && [ -f "${TEMP_DIR}/mpi_${max_procs}proc_plain.time" ]; then
+        baseline_time=$(cat "${TEMP_DIR}/mpi_${max_procs}proc_plain.time" 2>/dev/null)
+        baseline_label="MPI ${max_procs} procs (no OpenACC, no OpenMP)"
+        baseline_skip="mpi_${max_procs}proc_plain"
+    elif [ "${cpu_baseline}" != "N/A" ] && [ -n "${cpu_baseline}" ]; then
+        baseline_time="${cpu_baseline}"
+        baseline_label="CPU only (no MPI)"
+        baseline_skip="cpu_no_mpi"
+    fi
+
+    if [ -n "${baseline_time}" ] && [ "${baseline_time}" != "N/A" ]; then
+        echo "### Performance Comparison (Relative to ${baseline_label} baseline)" >> "${REPORT_FILE}"
         echo "" >> "${REPORT_FILE}"
         echo "\`\`\`" >> "${REPORT_FILE}"
-        echo "Baseline (CPU no-MPI):  $(format_time ${cpu_baseline})" >> "${REPORT_FILE}"
+        echo "Baseline (${baseline_label}):  $(format_time ${baseline_time})" >> "${REPORT_FILE}"
         echo "" >> "${REPORT_FILE}"
 
         # Find all test results
         for test_file in "${TEMP_DIR}"/*.time; do
             test_name=$(basename "${test_file}" .time)
 
-            # Skip baseline and intermediate files
-            if [ "${test_name}" = "cpu_baseline" ] || [ "${test_name}" = "gpu_baseline" ] || [ "${test_name}" = "cpu_no_mpi" ]; then
+            # Skip synthetic baseline files and the baseline test itself
+            if [ "${test_name}" = "cpu_baseline" ] || [ "${test_name}" = "gpu_baseline" ]; then
+                continue
+            fi
+            if [ -n "${baseline_skip}" ] && [ "${test_name}" = "${baseline_skip}" ]; then
                 continue
             fi
 
             time_raw=$(cat "${test_file}" 2>/dev/null || echo "N/A")
             if [ "${time_raw}" != "N/A" ] && [ -n "${time_raw}" ]; then
-                speedup=$(echo "scale=2; ${cpu_baseline} / ${time_raw}" | bc -l)
+                speedup=$(echo "scale=2; ${baseline_time} / ${time_raw}" | bc -l)
                 bar_length=$(echo "${speedup} * 10" | bc -l | awk '{printf "%d", $1}')
                 bar=$(printf '█%.0s' $(seq 1 ${bar_length} 2>/dev/null || echo ""))
 
@@ -321,7 +340,9 @@ EOF
 The wall-clock time (in seconds, minutes, or hours) required to complete the Monte Carlo simulation and LEF dynamics calculations. This excludes file I/O and merging operations.
 
 #### Speedup
-Measures how much faster each configuration is compared to the baseline (CPU only - no MPI):
+Measures how much faster each configuration is compared to the baseline:
+- When only MPI tests were run, baseline = MPI N procs (no OpenACC, no OpenMP).
+- Otherwise baseline = CPU only (no MPI).
 
 ```
 Speedup = Baseline Time / Configuration Time
