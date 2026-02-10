@@ -293,6 +293,14 @@ run_benchmark() {
     echo "  Extra flags: ${extra_flags} ${thread_flag}"
     echo "  Output: ${output_subdir}"
 
+    # Build and print the exact command run
+    if [ ${mpi_procs} -eq 0 ]; then
+        RUN_CMD="/usr/bin/time -p ${EXECUTABLE} --seed:${SEED} -o:${output_subdir} ${extra_flags} ${thread_flag} ${CONFIG_FILE}"
+    else
+        RUN_CMD="/usr/bin/time -p mpirun -np ${mpi_procs} ${EXECUTABLE} --seed:${SEED} -o:${output_subdir} ${extra_flags} ${thread_flag} ${CONFIG_FILE}"
+    fi
+    echo "  Command: ${RUN_CMD}"
+
     # Run the benchmark
     if [ ${mpi_procs} -eq 0 ]; then
         # Run without MPI (direct execution)
