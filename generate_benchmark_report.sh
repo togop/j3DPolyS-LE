@@ -144,14 +144,58 @@ if [ -n "${LOG_FILE}" ]; then
     CONFIG_FILE=$(grep "Load initial parameters" "${LOG_FILE}" | head -1 | awk -F'from ' '{print $2}' | awk '{print $1}')
     SEED=$(grep "Random seed set to:" "${LOG_FILE}" | head -1 | awk '{print $NF}')
 
+    # Extract simulation parameters from log (format: "Nchain=3000" or "km=1.3e-03")
+    get_param() {
+        local name="$1"
+        grep "${name}=" "${LOG_FILE}" 2>/dev/null | head -1 | sed -n "s/.*${name}=\([^[:space:]]*\).*/\1/p"
+    }
+
+    NCHAIN=$(get_param "Nchain")
+    L=$(get_param "L")
+    NITER=$(get_param "Niter")
+    NMEAS=$(get_param "Nmeas")
+    NINTER=$(get_param "Ninter")
+    NLEF=$(get_param "Nlef")
+    KB=$(get_param "kb")
+    KU=$(get_param "ku")
+    KM=$(get_param "km")
+    EA=$(get_param "Ea")
+    EI=$(get_param "Ei")
+    BURNIN=$(get_param "burnin")
+    BURNOUT=$(get_param "burnout")
+    BURNOUTM=$(get_param "burnoutM")
+    INIT_MODE=$(get_param "init_mode")
+    Z_LOOP=$(get_param "z_loop")
+    UNIDIRECTIONAL=$(get_param "unidirectional")
+
     cat >> "${REPORT_FILE}" << EOF
 **Configuration File:** \`${CONFIG_FILE}\`
 
 **Seed Value:** ${SEED}
 
-**Parameters** (extracted from simulation logs):
-- Seed: ${SEED}
-- All other parameters from configuration file
+### Simulation Parameters
+
+Parameters used for the benchmark (from simulation logs):
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| Nchain | ${NCHAIN:-—} | Polymer chain length (monomers of 2 kb) |
+| L | ${L:-—} | Compartment box size |
+| Niter | ${NITER:-—} | Number of independent trajectories |
+| Nmeas | ${NMEAS:-—} | Number of measurement snapshots |
+| Ninter | ${NINTER:-—} | Monte Carlo steps between snapshots |
+| Nlef | ${NLEF:-—} | Max bound LEFs |
+| kb | ${KB:-—} | LEF binding rate |
+| ku | ${KU:-—} | LEF half-unbinding rate |
+| km | ${KM:-—} | LEF movement rate |
+| Ea | ${EA:-—} | Extrusion energy |
+| Ei | ${EI:-—} | Interaction energy |
+| burnin | ${BURNIN:-—} | Steps before introducing LEFs |
+| burnout | ${BURNOUT:-—} | Steps after last measurement (LEFs removed) |
+| burnoutM | ${BURNOUTM:-—} | Measurements at end with LEFs removed |
+| init_mode | ${INIT_MODE:-—} | Initial folding (z=zigzag, h=helices, s=continue) |
+| z_loop | ${Z_LOOP:-—} | Allow LEFs to traverse |
+| unidirectional | ${UNIDIRECTIONAL:-—} | LEF direction mode |
 
 ---
 
