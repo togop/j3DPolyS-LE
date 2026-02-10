@@ -258,6 +258,20 @@ echo ""
 # Display hardware configuration
 detect_hardware
 
+# Format seconds as human-readable time (round to min/h when appropriate)
+format_elapsed() {
+    local secs="$1"
+    if [[ ! "$secs" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+        echo "N/A"
+        return
+    fi
+    awk -v s="$secs" 'BEGIN {
+        if (s >= 3600) printf "%.1f h\n", s/3600
+        else if (s >= 60) printf "%.1f min\n", s/60
+        else printf "%.1f s\n", s
+    }'
+}
+
 # Function to run benchmark and capture timing
 run_benchmark() {
     local test_name=$1
@@ -301,6 +315,17 @@ run_benchmark() {
     fi
 
     local exit_code=$?
+
+    # Show elapsed time (from time -p "real" line), rounded to s/min/h
+    local real_secs=""
+    if [ -f "${log_file}" ]; then
+        real_secs=$(grep '^real ' "${log_file}" 2>/dev/null | awk '{print $2}')
+    fi
+    if [ -n "${real_secs}" ]; then
+        echo "  Time: $(format_elapsed "${real_secs}")"
+    else
+        echo "  Time: N/A"
+    fi
 
     if [ ${exit_code} -eq 0 ]; then
         echo "  ✓ Completed successfully"
