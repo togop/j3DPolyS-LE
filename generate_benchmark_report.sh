@@ -114,15 +114,61 @@ All tests used the same seed value to verify reproducibility.
 
 EOF_HEADER
 
+# Detect GPU information - first try from simulation logs
+GPU_INFO="Not detected"
+GPU_LOG_INFO=""
+
+# Check logs for GPU information
+for log_file in "${LOG_DIR}"/*.log; do
+    if [ -f "${log_file}" ]; then
+        # Try to extract GPU info from log (common patterns)
+        if grep -q "GPU" "${log_file}" 2>/dev/null; then
+            GPU_LOG_INFO=$(grep -i "GPU\|OpenACC\|device" "${log_file}" | grep -v "no-gpu" | head -3)
+        fi
+        break
+    fi
+done
+
+# Try system-level detection
+if command -v nvidia-smi &> /dev/null; then
+    GPU_INFO=$(nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader 2>/dev/null | head -1 || echo "NVIDIA GPU detected but unable to query")
+elif [[ "$(uname -s)" == "Darwin" ]]; then
+    GPU_MODEL=$(system_profiler SPDisplaysDataType 2>/dev/null | grep "Chipset Model:" | head -1 | cut -d: -f2 | xargs || echo "Unknown")
+    if [ -n "${GPU_MODEL}" ] && [ "${GPU_MODEL}" != "Unknown" ]; then
+        GPU_VRAM=$(system_profiler SPDisplaysDataType 2>/dev/null | grep "VRAM" | head -1 | cut -d: -f2 | xargs || echo "Unknown")
+        if [ -n "${GPU_VRAM}" ] && [ "${GPU_VRAM}" != "Unknown" ]; then
+            GPU_INFO="${GPU_MODEL}, ${GPU_VRAM}"
+        else
+            GPU_INFO="${GPU_MODEL}"
+        fi
+    fi
+fi
+
 # Add system information
 cat >> "${REPORT_FILE}" << EOF
 - **Hostname:** ${HOSTNAME}
 - **Operating System:** ${OS} ${OS_VERSION}
 - **Architecture:** ${ARCH}
 - **CPU Cores:** ${NPROC}
+- **GPU:** ${GPU_INFO}
 - **Test Date:** $(date)
 - **Benchmark Directory:** ${BENCH_DIR}
 
+EOF
+
+# Add GPU details from log if available
+if [ -n "${GPU_LOG_INFO}" ]; then
+    cat >> "${REPORT_FILE}" << EOF
+### GPU Information from Simulation Logs
+
+\`\`\`
+${GPU_LOG_INFO}
+\`\`\`
+
+EOF
+fi
+
+cat >> "${REPORT_FILE}" << EOF
 ---
 
 ## Test Configuration
