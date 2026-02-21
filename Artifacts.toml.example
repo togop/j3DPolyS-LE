@@ -1,0 +1,45 @@
+# Example Artifacts.toml for 3dpolys_le binary (macOS and Linux)
+#
+# After building with Yggdrasil/BinaryBuilder (see YGGDRASIL_BINARYBUILDER.md),
+# copy this file to Artifacts.toml and fill in:
+#   - git-tree-sha1 (from build output; can be per-platform)
+#   - url (e.g. GitHub Releases URL for each tarball)
+#   - sha256 (from build output)
+#
+# Then in Julia: artifact"3dpolys_le" gives the artifact root; bin/3dpolys_le is the executable.
+# Use: joinpath(artifact"3dpolys_le", "bin", "3dpolys_le")
+
+[3dpolys_le]
+# Linux x86_64 (glibc)
+[[3dpolys_le.download]]
+url = "REPLACE_WITH_LINUX_X86_64_TARBALL_URL"
+sha256 = "REPLACE_WITH_SHA256"
+git-tree-sha1 = "REPLACE_WITH_SHA1"
+arch = "x86_64"
+os = "linux"
+libc = "glibc"
+
+# Linux aarch64 (glibc)
+[[3dpolys_le.download]]
+url = "REPLACE_WITH_LINUX_AARCH64_TARBALL_URL"
+sha256 = "REPLACE_WITH_SHA256"
+git-tree-sha1 = "REPLACE_WITH_SHA1"
+arch = "aarch64"
+os = "linux"
+libc = "glibc"
+
+# macOS x86_64 (Intel)
+[[3dpolys_le.download]]
+url = "REPLACE_WITH_MACOS_X86_64_TARBALL_URL"
+sha256 = "REPLACE_WITH_SHA256"
+git-tree-sha1 = "REPLACE_WITH_SHA1"
+arch = "x86_64"
+os = "macos"
+
+# macOS aarch64 (Apple Silicon)
+[[3dpolys_le.download]]
+url = "REPLACE_WITH_MACOS_AARCH64_TARBALL_URL"
+sha256 = "REPLACE_WITH_SHA256"
+git-tree-sha1 = "REPLACE_WITH_SHA1"
+arch = "aarch64"
+os = "macos"

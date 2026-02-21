@@ -98,11 +98,6 @@ subroutine print_help()
             & , s=<sim_out_folder> to continue from a finished simulation output folder.'
     print*, '   -z|--z_loop : Allow z_loop for LEFs move, where LEFs can traverse one another. Default: false'
     print*, '   -u|--unidirectional : Unidirectional mode for LEFs move otherwise bidirectional. Default: false=bidirectional'
-    print*, '   --no-gpu-prefer : Disable GPU preference for parallelization. Will use OpenMP if available &
-        &instead of OpenACC. Default: GPU preferred'
-    print*, '   --force_method:<method> : Force analysis parallelization: auto, openacc, openmp, sequential. Default: auto'
-    print*, '   --threads:<num_threads> : Set number of OpenMP threads for parallelization. Default: 0 (auto-detect)'
-    print*, '   --no-openmp : Disable OpenMP; run simulation in sequential mode (single thread).'
     print*, '   --seed:<seed_value> : Set the random seed for reproducibility. Default: random (based on system clock)'
     print*, '<3dpolys_le.cfg file>: path to the inpit.dat file. Default: ./3dpolys_le.cfg'
     print*, '<output folder>: path to output folder. Default: the folder of the <3dpolys_le.cfg file>'
@@ -146,9 +141,8 @@ end subroutine check_iostat
 program mainprogram
     use Timers
     use lattice_data_mod
-    use PolymerModel_mod, only: ModelParameters  ! For analyse function
-    use PolymerModel_unified_mod
-    use analyse_unified_mod
+    use PolymerModel_mod
+    use analyse_mod
     use mpi
     use logging_mod
     use lib_conf
@@ -188,7 +182,7 @@ program mainprogram
     real :: basal_loading_factor = -1. ! not defined
     integer :: boundary_direction = -9 ! not defned direction
     integer, parameter :: resolution_factor = 2000
-    type(PolymerModel_unified) :: model
+    type(PolymerModel) :: model
     type(ModelParameters) :: params
     real :: radius_contact = 0 !in lattice unit (recall: 1 lattice unit=70nm)
     logical :: use_contact_probability = .false.
@@ -207,11 +201,6 @@ program mainprogram
     logical :: z_loop = .false.
     logical :: unidirectional = .false.
     logical :: file_exists
-    logical :: prefer_gpu = .true.
-    logical :: no_openmp = .false.
-    integer :: num_threads = 0
-    character(20) :: force_method = 'auto'
-    character(20) :: parallel_method = 'auto'
 
     type :: BoundarySite
         character(len = 20) :: name
@@ -269,29 +258,6 @@ program mainprogram
                 global_log_level = str2loglevel(trim(input_options(i + 1:)))
                 !print*, 'log_level', global_log_level
                 call log%set_level(global_log_level)
-            elseif (index(input_options, '--no-gpu-prefer') > 0) then
-                prefer_gpu = .false.
-                if (rank == 0) then
-                    call log%info('GPU preference disabled, will use OpenMP if available')
-                end if
-            elseif (index(input_options, '--force_method:') > 0) then
-                i = index(input_options, ':')
-                force_method = trim(adjustl(input_options(i + 1:)))
-                if (rank == 0) then
-                    call log%info('Force analysis method: ' // trim(force_method))
-                end if
-            elseif (index(input_options, '--threads:') > 0) then
-                i = index(input_options, ':')
-                opt_s = trim(input_options(i + 1:))
-                READ(opt_s, *) num_threads
-                if (rank == 0) then
-                    call log%info('OpenMP threads set to: ' // trim(str(num_threads)))
-                end if
-            elseif (index(input_options, '--no-openmp') > 0) then
-                no_openmp = .true.
-                if (rank == 0) then
-                    call log%info('OpenMP disabled; simulation will run in sequential mode')
-                end if
             elseif (index(input_options, '--seed:') > 0) then
                 i = index(input_options, ':')
                 opt_s = trim(input_options(i + 1:))
@@ -861,29 +827,37 @@ program mainprogram
             trajectory_i = rank * rank_Niter + i
             !call crono%Tic()
 
-            ! Initialize unified model
-            call model%init_unified(L=L, Nchain=Nchain, iku=iku, ikm=ikm, ikb=ikb, Nleffree=Nlef, &
-                    kb=kb, ku=ku, km=km, Ea=Ea, Ei=Ei, &
-                    z_loop=z_loop, unidirectional=unidirectional, kint=kint, &
-                    prefer_gpu=prefer_gpu, no_openmp=no_openmp, num_threads=num_threads)
-            
             if ((rank == 0).and.(i == 1)) then                ! do it only once
                 save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')
                 call log%info('Save parameters in file: ' // save_input_cfg_file)
 
                 open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
-                call model%output_parameters_unified(20, init_mode, interaction_sites, boundary_file, lef_loading_sites, &
+                call model%output_parameters(20, init_mode, interaction_sites, boundary_file, lef_loading_sites, &
                         basal_loading_factor, boundary_direction, &
                         Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact,  &
                         kb_a = kb_a, ku_a = ku_a, km_a = km_a)
                 close(20)
             end if
 
-            ! Initialize base configuration
-            call model%init_unified_base(boundary, loading_sites_factor, interaction_sites_state, init_mode, trajectory_i)
+            ! generate initial configuration: Set model parameters, then initialize (PolymerModel)
+            model%L = L
+            model%Nchain = Nchain
+            model%iku = iku
+            model%ikm = ikm
+            model%ikb = ikb
+            model%Nleffree = Nlef
+            model%kb = kb
+            model%ku = ku
+            model%km = km
+            model%Ea = Ea
+            model%Ei = Ei
+            model%kint = kint
+            model%z_loop = z_loop
+            model%unidirectional = unidirectional
 
-            ! call model%do_simulation(trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
-            call model%do_simulation_unified(trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
+            call model%init(boundary, loading_sites_factor, interaction_sites_state, init_mode, trajectory_i)
+
+            call model%do_simulation(trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
 
             !call log%info(crono%Tac(info = ' tajectory ' // trim(str(trajectory_i)) // ' for rank ' // trim(str(rank))))
         end do
@@ -933,15 +907,10 @@ program mainprogram
         status = SYSTEM('mkdir -p ' // trim(analyse_folder))
 
         call crono%Tic()
-        ! call analyse(radiuscontact = radius_contact, use_contact_probability = use_contact_probability, &
-        !        params = params, Niter = Niter, Nmeas = Nmeas, &
-        !        output_folder = output_folder, analyse_folder = analyse_folder, &
-        !        hic3d_factor = hic3d_factor, chrom = chrom)
-        call analyse_unified(radiuscontact = radius_contact, use_contact_probability = use_contact_probability, &
+        call analyse(radiuscontact = radius_contact, use_contact_probability = use_contact_probability, &
                 params = params, Niter = Niter, Nmeas = Nmeas, &
                 output_folder = output_folder, analyse_folder = analyse_folder, &
-                hic3d_factor = hic3d_factor, chrom = chrom, prefer_gpu=prefer_gpu, &
-                force_method=force_method, num_threads=num_threads)
+                hic3d_factor = hic3d_factor, chrom = chrom)
         call log%info(crono%Tac('Finished analyse'))
     end if
 
