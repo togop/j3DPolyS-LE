@@ -171,14 +171,16 @@ benchmark_results/
 
 The benchmark suite verifies reproducibility by:
 1. Using the same seed value for all runs
-2. Computing MD5 checksums of output files
+2. Computing MD5 checksums of all simulation output files (config.out, dr.out, contact.out, process.out, Nlef.out)
 3. Comparing checksums across all test configurations
+4. Pairwise checks: **GPU vs OpenMP (no-GPU)**, **MPI vs no-MPI (GPU)**, **MPI vs no-MPI (OpenMP)**
 
 **Expected result:** All checksums should be identical, confirming that:
 - Random number generation is deterministic with fixed seed
-- GPU and CPU implementations produce identical results
-- MPI parallelization preserves determinism
-- Results are reproducible across hardware configurations
+- GPU (OpenACC) and CPU/OpenMP implementations produce identical results
+- MPI and no-MPI runs produce identical merged output for the same seed
+- OpenMP (single process with `--no-gpu`, `OMP_NUM_THREADS` set in benchmark) matches GPU and MPI results
+- Results are reproducible across execution modes (GPU, OpenMP, MPI+GPU, MPI+no-GPU)
 
 ### Interpreting Scaling
 

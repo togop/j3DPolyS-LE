@@ -74,7 +74,7 @@ subroutine print_help()
     print*, '   -h|--help   Display this information.'
     print*, '   --log:<log level> Sets the log output level: OFF, FATAL, ERROR, WARN, INFO, DEBUG, TRACE. Default: INFO'
     print*, '   --hic3d:<hic3d_factor>    Produce hic3d-map with the given factor (resolution) on the last measurement &
-            & otherwise do not. Deafault: not'
+            & otherwise do not. Default: not'
     print*, '   -o|--output_folder:<output folder> Path to a simulation output folder. Default: the folder of the &
             & 3dpolys_le.cfg file.'
     print*, '   -a|--analyse:<analyse folder> Perform analyse step on an already done simulation&
@@ -90,8 +90,8 @@ subroutine print_help()
     print*, '   -cp|--contact_probability Together with the contact radius use contact probability with the formula&
             & (1 - <actual_radius_contact>^2 / <radius_contact param>^2),&
             & Default: false - uniform distributed.'
-    print*, '   -l|-nlef:<Nlef_val>: Nlef value, overwriting the one from the inpiut.dat'
-    print*, '   -m|--km:<km_val>: km value, overwriting the one from the inpiut.dat'
+    print*, '   -l|-nlef:<Nlef_val>: Nlef value, overwriting the one from the input config.'
+    print*, '   -m|--km:<km_val>: km value, overwriting the one from the input config.'
     print*, '   -bd|--boundary_direction:<boundary_direction>: impermeability direction applied to all boundaries:&
             & -1:opposite direction, 0:both, 1:same direction. Default: 0'
     print*, '   -im|--init_mode:<init_mode>: Initial folding mode: h for helices-like, z for zigzag-like polymer state &
@@ -99,9 +99,10 @@ subroutine print_help()
     print*, '   -z|--z_loop : Allow z_loop for LEFs move, where LEFs can traverse one another. Default: false'
     print*, '   -u|--unidirectional : Unidirectional mode for LEFs move otherwise bidirectional. Default: false=bidirectional'
     print*, '   --seed:<seed_value> : Set the random seed for reproducibility. Default: random (based on system clock)'
-    print*, '<3dpolys_le.cfg file>: path to the inpit.dat file. Default: ./3dpolys_le.cfg'
+    print*, '   --no-gpu           : Disable GPU (OpenACC) acceleration; run on CPU only. No effect if built without OpenACC.'
+    print*, '<3dpolys_le.cfg file>: path to the config file. Default: ./3dpolys_le.cfg'
     print*, '<output folder>: path to output folder. Default: the folder of the <3dpolys_le.cfg file>'
-    print*, 'inpiut.cfg format:'
+    print*, 'Config file format:'
     print*, '<name>=<value>'
     print*, 'parameters in a configuration file (3dpolys_le.cfg):'
     print*, 'Nchain     Polymer chain length in monomers of 2kb.'
@@ -142,6 +143,9 @@ program mainprogram
     use Timers
     use lattice_data_mod
     use PolymerModel_mod
+    use gpu_replica_mod
+    use gpu_flat_mod
+    use repro_rng_mod
     use analyse_mod
     use mpi
     use logging_mod
@@ -183,6 +187,7 @@ program mainprogram
     integer :: boundary_direction = -9 ! not defned direction
     integer, parameter :: resolution_factor = 2000
     type(PolymerModel) :: model
+    type(PolymerModel), allocatable :: replicas(:)
     type(ModelParameters) :: params
     real :: radius_contact = 0 !in lattice unit (recall: 1 lattice unit=70nm)
     logical :: use_contact_probability = .false.
@@ -200,6 +205,7 @@ program mainprogram
     integer :: hic3d_factor = 0
     logical :: z_loop = .false.
     logical :: unidirectional = .false.
+    logical :: use_gpu = .true.   ! set .false. by --no-gpu to disable OpenACC/GPU
     logical :: file_exists
 
     type :: BoundarySite
@@ -365,6 +371,11 @@ program mainprogram
                 init_mode = trim(input_options(i + 1:))
                 if (rank == 0) then
                     call log%info('Init folding mode: ' // init_mode)
+                end if
+            elseif ((index(input_options, '--no-gpu') > 0)) then
+                use_gpu = .false.
+                if (rank == 0) then
+                    call log%info('GPU (OpenACC) disabled by user (--no-gpu)')
                 end if
             elseif ((index(input_options, '--help') > 0).or.(index(input_options, '-h') > 0)) then
                 if (rank == 0) call print_help()
@@ -823,44 +834,95 @@ program mainprogram
         call log%debug('L:' // trim(str(L)) // ', Nchain:' // trim(str(Nchain)) // ' Nchain:' // trim(str(Niter)) &
                 // ' Nmeas:' // trim(str(Nmeas)))
 
-        do i = 1, rank_Niter
-            trajectory_i = rank * rank_Niter + i
-            !call crono%Tic()
+        ! Portable RNG: same sequence on GPU and CPU for reproducibility (base_seed=0 when no --seed)
+        if (random_seed_value /= -1) then
+            call repro_rng_set_base_seed(random_seed_value)
+        else
+            call repro_rng_set_base_seed(0)
+        end if
 
-            if ((rank == 0).and.(i == 1)) then                ! do it only once
+        if (use_gpu .and. rank_Niter > 0) then
+            ! Replica-parallel path (OpenACC when built with -acc): one trajectory per replica, output on host after each measurement
+            allocate(replicas(rank_Niter))
+
+            do i = 1, rank_Niter
+                trajectory_i = rank * rank_Niter + i
+
+                replicas(i)%L = L
+                replicas(i)%Nchain = Nchain
+                replicas(i)%iku = iku
+                replicas(i)%ikm = ikm
+                replicas(i)%ikb = ikb
+                replicas(i)%Nleffree = Nlef
+                replicas(i)%kb = kb
+                replicas(i)%ku = ku
+                replicas(i)%km = km
+                replicas(i)%Ea = Ea
+                replicas(i)%Ei = Ei
+                replicas(i)%kint = kint
+                replicas(i)%z_loop = z_loop
+                replicas(i)%unidirectional = unidirectional
+
+                call replicas(i)%init(boundary, loading_sites_factor, interaction_sites_state, init_mode, trajectory_i)
+            end do
+
+            if (rank == 0) then
                 save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')
                 call log%info('Save parameters in file: ' // save_input_cfg_file)
-
                 open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
-                call model%output_parameters(20, init_mode, interaction_sites, boundary_file, lef_loading_sites, &
+                call replicas(1)%output_parameters(20, init_mode, interaction_sites, boundary_file, lef_loading_sites, &
                         basal_loading_factor, boundary_direction, &
                         Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact,  &
                         kb_a = kb_a, ku_a = ku_a, km_a = km_a)
                 close(20)
             end if
 
-            ! generate initial configuration: Set model parameters, then initialize (PolymerModel)
-            model%L = L
-            model%Nchain = Nchain
-            model%iku = iku
-            model%ikm = ikm
-            model%ikb = ikb
-            model%Nleffree = Nlef
-            model%kb = kb
-            model%ku = ku
-            model%km = km
-            model%Ea = Ea
-            model%Ei = Ei
-            model%kint = kint
-            model%z_loop = z_loop
-            model%unidirectional = unidirectional
+            call log%info('Start replica batch (rank ' // trim(str(rank)) // ', ' // trim(str(rank_Niter)) // ' replicas)')
+            if (use_gpu) then
+                call do_simulation_replicas_flat(replicas, rank_Niter, Ninter, Nmeas, burnin, burnout, burnoutM)
+            else
+                call do_simulation_replicas(replicas, rank_Niter, Ninter, Nmeas, burnin, burnout, burnoutM, .false.)
+            end if
 
-            call model%init(boundary, loading_sites_factor, interaction_sites_state, init_mode, trajectory_i)
+            deallocate(replicas)
+        else
+            ! Sequential path: one trajectory at a time (same portable RNG seed per trajectory as GPU when seed set)
+            do i = 1, rank_Niter
+                trajectory_i = rank * rank_Niter + i
 
-            call model%do_simulation(trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
+                if ((rank == 0).and.(i == 1)) then                ! do it only once
+                    save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')
+                    call log%info('Save parameters in file: ' // save_input_cfg_file)
 
-            !call log%info(crono%Tac(info = ' tajectory ' // trim(str(trajectory_i)) // ' for rank ' // trim(str(rank))))
-        end do
+                    open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
+                    call model%output_parameters(20, init_mode, interaction_sites, boundary_file, lef_loading_sites, &
+                            basal_loading_factor, boundary_direction, &
+                            Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact,  &
+                            kb_a = kb_a, ku_a = ku_a, km_a = km_a)
+                    close(20)
+                end if
+
+                ! generate initial configuration: Set model parameters, then initialize (PolymerModel)
+                model%L = L
+                model%Nchain = Nchain
+                model%iku = iku
+                model%ikm = ikm
+                model%ikb = ikb
+                model%Nleffree = Nlef
+                model%kb = kb
+                model%ku = ku
+                model%km = km
+                model%Ea = Ea
+                model%Ei = Ei
+                model%kint = kint
+                model%z_loop = z_loop
+                model%unidirectional = unidirectional
+
+                call model%init(boundary, loading_sites_factor, interaction_sites_state, init_mode, trajectory_i)
+
+                call model%do_simulation(trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
+            end do
+        end if
 
         close(10)
         close(11)

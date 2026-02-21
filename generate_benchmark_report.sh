@@ -3,13 +3,15 @@
 # Generate Benchmark Report from Results
 ################################################################################
 #
-# This script generates a markdown report from benchmark results.
+# Generates a markdown report from benchmark_parallelization.sh results.
+# Compares simulation modes: with GPU/OpenACC vs without GPU (--no-gpu).
+# Supports MPI and single-process tests.
 #
 # Usage:
 #   ./generate_benchmark_report.sh <benchmark_dir>
 #
 # Arguments:
-#   benchmark_dir - Directory containing benchmark results
+#   benchmark_dir - Directory containing benchmark results (e.g. ./benchmark_results/YYYYMMDD_HHMMSS)
 #
 ################################################################################
 
@@ -78,6 +80,11 @@ extract_timing() {
         merge_time=$(grep "Merged files Elapsed time" "${log_file}" | tail -1 | awk '{print $NF}')
         method=$(grep "Method:" "${log_file}" | tail -1 | awk -F'Method:' '{print $2}' | tr -d ' ')
 
+        # If log shows GPU disabled by user, treat as CPU (no GPU) run
+        if grep -q "GPU (OpenACC) disabled by user" "${log_file}"; then
+            method="CPU (no GPU)"
+        fi
+
         # Extract thread count information
         threads="auto"
         if grep -q "OpenMP threads set to:" "${log_file}"; then
@@ -85,7 +92,7 @@ extract_timing() {
         elif grep -q "OpenMP enabled with default thread count:" "${log_file}"; then
             threads=$(grep "OpenMP enabled with default thread count:" "${log_file}" | head -1 | awk '{print $NF}')
             threads="${threads} (auto)"
-        elif [ "${method}" = "OpenACC" ]; then
+        elif [ "${method}" = "OpenACC" ] || [ "${method}" = "GPU/OpenACC" ]; then
             threads="N/A (GPU)"
         fi
 
@@ -102,9 +109,10 @@ cat > "${REPORT_FILE}" << 'EOF_HEADER'
 ## Executive Summary
 
 This report presents performance benchmarks for different parallelization methods in 3DPolyS-LE, comparing:
-- **No MPI**: Direct execution using GPU or CPU only
-- **Single MPI Process**: GPU/OpenACC and OpenMP/CPU with single process
-- **Multi-process MPI**: Scaling with 2, 4, and 8 MPI processes
+- **With vs without GPU/OpenACC**: Same binary run with default (GPU when available) vs \`--no-gpu\` (CPU only)
+- **No MPI**: Direct execution — with GPU/OpenACC or without GPU (\`--no-gpu\`)
+- **Single MPI Process**: With GPU/OpenACC or without GPU (\`--no-gpu\`)
+- **Multi-process MPI**: Scaling with N MPI processes (with GPU or without GPU per process)
 
 All tests used the same seed value to verify reproducibility.
 
@@ -179,6 +187,8 @@ EOF
 LOG_FILE=""
 if [ -f "${LOG_DIR}/gpu_no_mpi.log" ]; then
     LOG_FILE="${LOG_DIR}/gpu_no_mpi.log"
+elif [ -f "${LOG_DIR}/no_gpu_no_mpi.log" ]; then
+    LOG_FILE="${LOG_DIR}/no_gpu_no_mpi.log"
 elif [ -f "${LOG_DIR}/cpu_no_mpi.log" ]; then
     LOG_FILE="${LOG_DIR}/cpu_no_mpi.log"
 else
@@ -257,7 +267,7 @@ EOF
     TEMP_DIR=$(mktemp -d)
     trap "rm -rf ${TEMP_DIR}" EXIT
 
-    # Test selection from benchmark run (mpi = use mpi_*_plain as baseline)
+    # Test selection from benchmark run (mpi = use mpi_*_no_gpu as baseline)
     TEST_SELECTION=$(grep "^Test selection:" "${LOG_DIR}/timing_summary.txt" 2>/dev/null | sed 's/^Test selection:[[:space:]]*//' | tr -d '\r' || echo "all")
 
     # Extract timing for each test - find all test directories dynamically
@@ -274,12 +284,12 @@ EOF
         # Store raw times for scaling calculations
         echo "${sim_time_raw}" > "${TEMP_DIR}/${test}.time"
 
-        # Store baselines (prefer no-MPI versions)
+        # Store baselines (prefer no-MPI versions) for GPU vs no-GPU comparison
         if [ "${test}" = "gpu_no_mpi" ]; then
             echo "${sim_time_raw}" > "${TEMP_DIR}/gpu_baseline.time"
         fi
 
-        if [ "${test}" = "cpu_no_mpi" ]; then
+        if [ "${test}" = "no_gpu_no_mpi" ] || [ "${test}" = "cpu_no_mpi" ]; then
             echo "${sim_time_raw}" > "${TEMP_DIR}/cpu_baseline.time"
         fi
 
@@ -292,10 +302,12 @@ EOF
         para="${method}"
 
         # Determine parallelization type from method
-        if [ "${method}" = "OpenACC" ]; then
+        if [ "${method}" = "OpenACC" ] || [ "${method}" = "GPU/OpenACC" ]; then
             para="GPU/OpenACC"
         elif [ "${method}" = "OpenMP" ]; then
             para="OpenMP/CPU"
+        elif [ "${method}" = "CPU (no GPU)" ]; then
+            para="CPU (--no-gpu)"
         fi
 
         # Extract MPI process count from test name
@@ -307,19 +319,15 @@ EOF
 
         # Create human-readable description
         if [ "${test}" = "gpu_no_mpi" ]; then
-            desc="GPU/OpenACC (no MPI) - auto threads"
+            desc="With GPU/OpenACC (no MPI)"
+        elif [ "${test}" = "no_gpu_no_mpi" ]; then
+            desc="Without GPU (--no-gpu, no MPI)"
         elif [ "${test}" = "cpu_no_mpi" ]; then
-            desc="CPU only (no MPI) - auto threads"
-        elif [[ "${test}" =~ mpi_([0-9]+)proc_plain ]]; then
-            desc="MPI ${BASH_REMATCH[1]} procs (no OpenACC, no OpenMP)"
-        elif [[ "${test}" =~ mpi_([0-9]+)proc_gpu_t([0-9]+) ]]; then
-            desc="MPI ${BASH_REMATCH[1]} procs (GPU/OpenACC) - ${BASH_REMATCH[2]} threads"
+            desc="Without GPU (--no-gpu, no MPI)"
         elif [[ "${test}" =~ mpi_([0-9]+)proc_gpu ]]; then
-            desc="MPI ${BASH_REMATCH[1]} procs (GPU/OpenACC) - auto threads"
-        elif [[ "${test}" =~ mpi_([0-9]+)proc_openmp_t([0-9]+) ]]; then
-            desc="MPI ${BASH_REMATCH[1]} procs (OpenMP/CPU) - ${BASH_REMATCH[2]} threads"
-        elif [[ "${test}" =~ mpi_([0-9]+)proc_openmp ]]; then
-            desc="MPI ${BASH_REMATCH[1]} procs (OpenMP/CPU) - auto threads"
+            desc="MPI ${BASH_REMATCH[1]} procs, with GPU/OpenACC"
+        elif [[ "${test}" =~ mpi_([0-9]+)proc_no_gpu ]]; then
+            desc="MPI ${BASH_REMATCH[1]} procs, without GPU/OpenACC (--no-gpu)"
         fi
 
         # Display MPI process count (show "None" for non-MPI tests)
@@ -331,7 +339,7 @@ EOF
         echo "| ${desc} | ${mpi_display} | ${para} | ${threads} | ${sim_time} | ${method} |" >> "${REPORT_FILE}"
     done
 
-    # Ensure "MPI max processes (no OpenACC, no OpenMP)" row is present (add if missing)
+    # Ensure MPI no-GPU row is present if missing (for backwards compatibility with older runs)
     max_procs=""
     for test in ${test_list}; do
         if [[ "${test}" =~ mpi_([0-9]+)proc ]]; then
@@ -339,8 +347,33 @@ EOF
             break
         fi
     done
-    if [ -n "${max_procs}" ] && ! echo "${test_list}" | grep -q "mpi_${max_procs}proc_plain"; then
-        echo "| MPI ${max_procs} procs (no OpenACC, no OpenMP) | ${max_procs} | None | N/A | N/A | Not run |" >> "${REPORT_FILE}"
+    if [ -n "${max_procs}" ] && ! echo "${test_list}" | grep -q "mpi_${max_procs}proc_no_gpu"; then
+        echo "| MPI ${max_procs} procs, without GPU/OpenACC (--no-gpu) | ${max_procs} | — | — | N/A | Not run |" >> "${REPORT_FILE}"
+    fi
+
+    # Add GPU vs no-GPU comparison section when both single-process tests exist
+    gpu_time=$(cat "${TEMP_DIR}/gpu_no_mpi.time" 2>/dev/null || echo "N/A")
+    no_gpu_time=$(cat "${TEMP_DIR}/no_gpu_no_mpi.time" 2>/dev/null || cat "${TEMP_DIR}/cpu_no_mpi.time" 2>/dev/null || echo "N/A")
+    if [ -n "${gpu_time}" ] && [ "${gpu_time}" != "N/A" ] && [ -n "${no_gpu_time}" ] && [ "${no_gpu_time}" != "N/A" ]; then
+        gpu_vs_speedup=$(echo "scale=2; ${no_gpu_time} / ${gpu_time}" | bc -l 2>/dev/null || echo "N/A")
+        cat >> "${REPORT_FILE}" << EOF
+
+---
+
+## GPU vs no-GPU Comparison (single process)
+
+Same binary and config; only difference is \`--no-gpu\` for the CPU-only run.
+
+| Mode | Simulation time | Relative |
+|------|-----------------|----------|
+| **With GPU/OpenACC** | $(format_time ${gpu_time}) | baseline |
+| **Without GPU (--no-gpu)** | $(format_time ${no_gpu_time}) | $(echo "scale=2; ${no_gpu_time} / ${gpu_time}" | bc -l 2>/dev/null || echo "N/A")x slower |
+
+EOF
+        if [ "${gpu_vs_speedup}" != "N/A" ] && [ -n "${gpu_vs_speedup}" ]; then
+            echo "With GPU is **${gpu_vs_speedup}x** faster than with \`--no-gpu\` (single process)." >> "${REPORT_FILE}"
+            echo "" >> "${REPORT_FILE}"
+        fi
     fi
 
     # Add visual performance summary
@@ -352,21 +385,25 @@ EOF
 
 EOF
 
-    # Choose baseline: when only MPI tests were run, use mpi_*_plain as baseline
+    # Choose baseline: when only MPI tests were run, use mpi_*_no_gpu as baseline
     cpu_baseline=$(cat "${TEMP_DIR}/cpu_baseline.time" 2>/dev/null || echo "N/A")
     gpu_baseline=$(cat "${TEMP_DIR}/gpu_baseline.time" 2>/dev/null || echo "N/A")
     baseline_time=""
     baseline_label=""
     baseline_skip=""
 
-    if [ "${TEST_SELECTION}" = "mpi" ] && [ -n "${max_procs}" ] && [ -f "${TEMP_DIR}/mpi_${max_procs}proc_plain.time" ]; then
-        baseline_time=$(cat "${TEMP_DIR}/mpi_${max_procs}proc_plain.time" 2>/dev/null)
-        baseline_label="MPI ${max_procs} procs (no OpenACC, no OpenMP)"
-        baseline_skip="mpi_${max_procs}proc_plain"
+    if [ "${TEST_SELECTION}" = "mpi" ] && [ -n "${max_procs}" ] && [ -f "${TEMP_DIR}/mpi_${max_procs}proc_no_gpu.time" ]; then
+        baseline_time=$(cat "${TEMP_DIR}/mpi_${max_procs}proc_no_gpu.time" 2>/dev/null)
+        baseline_label="MPI ${max_procs} procs, without GPU/OpenACC"
+        baseline_skip="mpi_${max_procs}proc_no_gpu"
     elif [ "${cpu_baseline}" != "N/A" ] && [ -n "${cpu_baseline}" ]; then
         baseline_time="${cpu_baseline}"
-        baseline_label="CPU only (no MPI)"
-        baseline_skip="cpu_no_mpi"
+        baseline_label="Without GPU (no MPI)"
+        if [ -f "${TEMP_DIR}/no_gpu_no_mpi.time" ]; then
+            baseline_skip="no_gpu_no_mpi"
+        else
+            baseline_skip="cpu_no_mpi"
+        fi
     fi
 
     if [ -n "${baseline_time}" ] && [ "${baseline_time}" != "N/A" ]; then
@@ -402,16 +439,16 @@ EOF
             fi
         done
 
-        # If "MPI max processes (no OpenACC, no OpenMP)" was not run, list it as Not run
-        plain_test=""
+        # If MPI no-GPU test was not run, list it as Not run
+        no_gpu_mpi_test=""
         for t in ${test_list}; do
             if [[ "${t}" =~ mpi_([0-9]+)proc ]]; then
-                plain_test="mpi_${BASH_REMATCH[1]}proc_plain"
+                no_gpu_mpi_test="mpi_${BASH_REMATCH[1]}proc_no_gpu"
                 break
             fi
         done
-        if [ -n "${plain_test}" ] && [ ! -f "${TEMP_DIR}/${plain_test}.time" ]; then
-            printf "%-40s %s\n" "${plain_test}:" "Not run" >> "${REPORT_FILE}"
+        if [ -n "${no_gpu_mpi_test}" ] && [ ! -f "${TEMP_DIR}/${no_gpu_mpi_test}.time" ]; then
+            printf "%-40s %s\n" "${no_gpu_mpi_test}:" "Not run" >> "${REPORT_FILE}"
         fi
 
         echo "\`\`\`" >> "${REPORT_FILE}"
@@ -431,8 +468,8 @@ The wall-clock time (in seconds, minutes, or hours) required to complete the Mon
 
 #### Speedup
 Measures how much faster each configuration is compared to the baseline:
-- When only MPI tests were run, baseline = MPI N procs (no OpenACC, no OpenMP).
-- Otherwise baseline = CPU only (no MPI).
+- When only MPI tests were run, baseline = MPI N procs, without GPU/OpenACC.
+- Otherwise baseline = without GPU (no MPI).
 
 ```
 Speedup = Baseline Time / Configuration Time
@@ -443,19 +480,29 @@ Speedup = Baseline Time / Configuration Time
 - **Speedup > 1.0x**: Faster than baseline
 - **Speedup < 1.0x**: Slower than baseline
 
-#### Thread Configuration
-- **1 thread**: Single-threaded execution per MPI process
-- **auto threads**: System automatically determines optimal thread count based on available CPU cores
+#### Test Modes
+- **With GPU/OpenACC**: Simulation uses GPU when the program was built with OpenACC.
+- **Without GPU (--no-gpu)**: Simulation runs on CPU only; use for comparison or when no GPU is available.
 
 EOF
 fi
 
 # Add reproducibility verification
+REPRO_OUTPUT_FILES="config.out dr.out contact.out process.out Nlef.out"
+
 cat >> "${REPORT_FILE}" << 'EOF'
 
 ---
 
 ## Reproducibility Verification
+
+Reproducibility is checked across all run types (same seed required):
+- **GPU (OpenACC)** — single process or MPI
+- **OpenMP (no-GPU)** — single process with `--no-gpu`, uses OpenMP for replica parallelism
+- **MPI + GPU** — multiple processes with GPU
+- **MPI + no-GPU** — multiple processes, CPU/OpenMP per process
+
+When all runs use the same seed, output files (config.out, dr.out, contact.out, process.out, Nlef.out) must be byte-identical across GPU, OpenMP, MPI, and no-MPI.
 
 ### MD5 Checksums
 
@@ -469,26 +516,92 @@ cat >> "${REPORT_FILE}" << 'EOF'
 
 EOF
 
-# Check checksums (excluding header lines)
-unique_checksums=$(grep -v "===" "${LOG_DIR}/checksums.txt" | grep "config.out" | awk '{print $1}' | sort -u | wc -l)
+# Check reproducibility per output file (checksums format: test_name  file  md5)
+REPRO_FAIL=0
+for outfile in ${REPRO_OUTPUT_FILES}; do
+    unique=$(awk -v f="${outfile}" '$2 == f {print $3}' "${LOG_DIR}/checksums.txt" 2>/dev/null | sort -u | wc -l)
+    total=$(awk -v f="${outfile}" '$2 == f {print $3}' "${LOG_DIR}/checksums.txt" 2>/dev/null | wc -l)
+    if [ "${total}" -eq 0 ]; then
+        continue
+    fi
+    if [ "${unique}" -eq 1 ]; then
+        echo "- **${outfile}:** ✓ identical across all runs (${total} runs)" >> "${REPORT_FILE}"
+    else
+        echo "- **${outfile}:** ⚠ ${unique} distinct checksums (expected 1)" >> "${REPORT_FILE}"
+        REPRO_FAIL=1
+    fi
+done
 
-if [ ${unique_checksums} -eq 1 ]; then
+# Pairwise checks (GPU vs OpenMP, MPI vs no-MPI)
+compare_result_dirs_report() {
+    local dir1="$1"
+    local dir2="$2"
+    local label="$3"
+    local same=1
+    for outfile in ${REPRO_OUTPUT_FILES}; do
+        [ -f "${dir1}/${outfile}" ] && [ -f "${dir2}/${outfile}" ] || continue
+        c1=$(md5sum "${dir1}/${outfile}" 2>/dev/null | awk '{print $1}')
+        c2=$(md5sum "${dir2}/${outfile}" 2>/dev/null | awk '{print $1}')
+        if [ -n "${c1}" ] && [ -n "${c2}" ] && [ "${c1}" != "${c2}" ]; then
+            same=0
+            break
+        fi
+    done
+    if [ "${same}" -eq 1 ]; then
+        echo "- **${label}:** ✓ byte-identical" >> "${REPORT_FILE}"
+    else
+        echo "- **${label}:** ⚠ outputs differ" >> "${REPORT_FILE}"
+        return 1
+    fi
+}
+
+echo "" >> "${REPORT_FILE}"
+echo "**Pairwise checks (same seed):**" >> "${REPORT_FILE}"
+if [ -f "${RESULTS_DIR}/gpu_no_mpi/config.out" ] && [ -f "${RESULTS_DIR}/no_gpu_no_mpi/config.out" ]; then
+    compare_result_dirs_report "${RESULTS_DIR}/gpu_no_mpi" "${RESULTS_DIR}/no_gpu_no_mpi" "GPU vs OpenMP (no-GPU)" || REPRO_FAIL=1
+fi
+# MPI vs no-MPI (discover MAX_CPUS from existing mpi_* dirs)
+for mpi_gpu in "${RESULTS_DIR}"/mpi_*proc_gpu; do
+    [ -d "${mpi_gpu}" ] || continue
+    base=$(basename "${mpi_gpu}" _gpu)
+    nprocs="${base#mpi_}"
+    nprocs="${nprocs%proc}"
+    if [ -f "${mpi_gpu}/config.out" ] && [ -f "${RESULTS_DIR}/gpu_no_mpi/config.out" ]; then
+        compare_result_dirs_report "${mpi_gpu}" "${RESULTS_DIR}/gpu_no_mpi" "MPI (${nprocs} proc) GPU vs no-MPI GPU" || REPRO_FAIL=1
+        break
+    fi
+done
+for mpi_cpu in "${RESULTS_DIR}"/mpi_*proc_no_gpu; do
+    [ -d "${mpi_cpu}" ] || continue
+    base=$(basename "${mpi_cpu}" _no_gpu)
+    nprocs="${base#mpi_}"
+    nprocs="${nprocs%proc}"
+    if [ -f "${mpi_cpu}/config.out" ] && [ -f "${RESULTS_DIR}/no_gpu_no_mpi/config.out" ]; then
+        compare_result_dirs_report "${mpi_cpu}" "${RESULTS_DIR}/no_gpu_no_mpi" "MPI (${nprocs} proc) OpenMP vs no-MPI OpenMP" || REPRO_FAIL=1
+        break
+    fi
+done
+
+echo "" >> "${REPORT_FILE}"
+if [ ${REPRO_FAIL} -eq 0 ]; then
     cat >> "${REPORT_FILE}" << 'EOF'
 ✓ **REPRODUCIBILITY VERIFIED**
 
-All test runs produced byte-for-byte identical results. The MD5 checksums for all output files are identical, confirming perfect reproducibility across all parallelization methods when using the same seed.
+All test runs produced byte-for-byte identical results for the same seed across:
+GPU (OpenACC), OpenMP (no-GPU), MPI+GPU, and MPI+no-GPU. Determinism is confirmed for all execution modes.
 
 EOF
 else
     cat >> "${REPORT_FILE}" << 'EOF'
 ⚠ **WARNING: Different Checksums Detected**
 
-The test runs produced different checksums. This may indicate:
+Some output files differ across runs. This may indicate:
 - Non-deterministic behavior in the simulation
-- Different random number sequences
-- Hardware-specific variations
+- Different random number sequences between GPU and CPU/OpenMP paths
+- MPI vs no-MPI ordering or seeding differences
+- Hardware-specific or compiler-specific variations
 
-Please review the logs for more details.
+Ensure the same seed is used (e.g. \`--seed:42\`) and review the logs for details.
 
 EOF
 fi
@@ -518,15 +631,15 @@ This benchmark report provides:
 ### Interpreting Results
 
 - **Simulation Time:** Core computation time (Monte Carlo + LEF dynamics)
-- **Method:** Parallelization method used (OpenACC/GPU or OpenMP/CPU)
-- **Threads:** Number of OpenMP threads (N/A for GPU tests, "auto" for system default)
+- **Method:** With GPU/OpenACC or without GPU (CPU only, e.g. when run with \`--no-gpu\`)
+- **Threads:** Shown where applicable (N/A for GPU runs)
 
 ### Recommendations
 
 Based on your results:
-- Compare single-process GPU vs OpenMP performance
-- Evaluate MPI scaling efficiency (speedup vs number of processes)
-- Use the configuration with best performance for your problem size
+- Compare single-process runs: with GPU/OpenACC vs without GPU (\`--no-gpu\`) for a direct speedup.
+- Compare MPI runs: with GPU vs without GPU at the same process count.
+- Use the configuration with best performance for your problem size and hardware.
 
 ---
 

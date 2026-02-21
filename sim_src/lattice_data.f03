@@ -9,6 +9,7 @@ module lattice_data_mod
     real, dimension(13, 13) :: costhet
     integer :: voisnn(13, 13, 13), connec(13, 13, 13)
     integer :: lv4(12, 4)  ! 4: size of the second ring
+    !$acc declare copyin(opp, voisxyz, costhet, voisnn, connec, lv4)
 
     public :: lattice_load, lattice_init
 
@@ -450,6 +451,7 @@ module lattice_data_mod
                 costhet(1, i) = x;
                 costhet(i, 1) = x;
             end do
+            !$acc update device(opp, costhet)
         end subroutine lattice_init
 
 end module lattice_data_mod

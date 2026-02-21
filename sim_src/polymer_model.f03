@@ -5,9 +5,15 @@ module PolymerModel_mod
     use lattice_data_mod
     use logging_mod
     use lib_conf
+    use repro_rng_mod, only: repro_rng_use_portable, repro_rng_init_from_trajectory, repro_rng_next
 
     implicit none
     private
+    interface
+        function randomnumber()
+            real(8) :: randomnumber
+        end function randomnumber
+    end interface
     public :: PolymerModel, ModelParameters, MonomerConfig
     type(Logger) :: log = Logger('PolymerModel_mod', LOG_INFO)
 
@@ -37,10 +43,16 @@ module PolymerModel_mod
         real, dimension(:, :), allocatable :: boundary
         real, dimension(:), allocatable :: loading_sites_factor
         integer, dimension(:), allocatable :: interaction_sites_state
+        ! Per-replica RNG: portable (seed set) or compiler (no seed)
+        integer, dimension(:), allocatable, private :: rng_state
+        integer(8), dimension(:), allocatable, private :: rng_state_rep
 
     contains
-        procedure, public :: init, do_simulation, trialmoveex, trialmovetad, trialbound, trialunbound, unbound_all, &
-                erase, output, output_parameters
+        procedure, public :: init, do_simulation, advance_one_measurement_interval, trialmoveex, trialmovetad, &
+                trialbound, trialunbound, unbound_all, erase, output, output_parameters
+        procedure, public :: run_burnin_phase, run_burnout_only_phase, run_burnoutM_one_phase
+        procedure, public :: export_state_flat, import_state_flat
+        procedure, private :: get_random
         procedure :: allocate, initbitable, initconfig4, initconfig4_zigzag, initconfig_sim_out
         final :: deallocate
     end type PolymerModel
@@ -96,6 +108,23 @@ contains
         self%contact = 0
         self%dr = 0.
 
+        ! Per-replica RNG: portable (GPU/CPU match when seed set) or compiler state
+        if (repro_rng_use_portable) then
+            if (allocated(self%rng_state)) deallocate(self%rng_state)
+            if (allocated(self%rng_state_rep)) deallocate(self%rng_state_rep)
+            allocate(self%rng_state_rep(1))
+            call repro_rng_init_from_trajectory(trajectory_i, self%rng_state_rep(1))
+        else
+            block
+                integer :: sz
+                call random_seed(size=sz)
+                if (allocated(self%rng_state_rep)) deallocate(self%rng_state_rep)
+                if (allocated(self%rng_state)) deallocate(self%rng_state)
+                allocate(self%rng_state(sz))
+                call random_seed(get=self%rng_state)
+            end block
+        end if
+
         return
     end subroutine
 
@@ -106,11 +135,21 @@ contains
 
         ! include 'global.f03'
 
+        ! Deallocate if already allocated (e.g. re-init for next trajectory in single process)
+        if (allocated(self%config)) deallocate(self%config)
+        if (allocated(self%bittable)) deallocate(self%bittable)
+        if (allocated(self%dr)) deallocate(self%dr)
+        if (allocated(self%contact)) deallocate(self%contact)
+        if (allocated(self%boundary)) deallocate(self%boundary)
+        if (allocated(self%loading_sites_factor)) deallocate(self%loading_sites_factor)
+        if (allocated(self%interaction_sites_state)) deallocate(self%interaction_sites_state)
+        if (allocated(self%rng_state)) deallocate(self%rng_state)
+        if (allocated(self%rng_state_rep)) deallocate(self%rng_state_rep)
+
         bittable_t = 4 * (self%L**3)
 
         call log%debug('allocate self%Nchain: ' // trim(str(self%Nchain)) // ' bittable_t: ' // trim(str(bittable_t)))
 
-        ! call deallocate(self) ! make sure it's free
         allocate (self%config(2, self%Nchain))
         allocate (self%bittable(14, bittable_t))
         allocate (self%dr(3, self%Nchain))
@@ -133,6 +172,8 @@ contains
         if (allocated(self%boundary)) deallocate(self%boundary)
         if (allocated(self%loading_sites_factor)) deallocate(self%loading_sites_factor)
         if (allocated(self%interaction_sites_state)) deallocate(self%interaction_sites_state)
+        if (allocated(self%rng_state)) deallocate(self%rng_state)
+        if (allocated(self%rng_state_rep)) deallocate(self%rng_state_rep)
     end subroutine deallocate
 
     subroutine initbitable(self)
@@ -144,7 +185,7 @@ contains
 
         ! include 'global.f03'
 
-        !initialize the bittable (periodic boundary conditions) bittable(1,a)=number of monomers on lattice node a, bittable(2:13,a)=adresses of the 12 NN
+        ! initialize bittable (periodic BC): bittable(1,a)=monomers on node a, bittable(2:13,a)=adresses of 12 NN
         self%bittable = 0
         L2 = self%L ** 2
         call log%debug('initialize the bittable (periodic boundary conditions) for L: ' // trim(str(self%L)))
@@ -184,7 +225,6 @@ contains
         class (PolymerModel), intent(inout) :: self
         ! include 'global.f03'
         integer :: turn1(7), turn2(7), turn(7), lim, a, n, i, j, t, nv1, nv2, iv, en2, v, b, c(2, self%Nchain)
-        real*8 :: randomnumber
 
         !generate initial configuration without knots (do not change)
 
@@ -196,7 +236,7 @@ contains
         lim = self%L / 2
 
         self%config = 0
-        a = int(4 * self%L**3 * randomnumber()) + 1
+        a = int(4 * self%L**3 * self%get_random()) + 1
         self%config(1, 1) = a
         self%bittable(1, a) = 1
         n = 2
@@ -220,8 +260,8 @@ contains
         n = n - 1
 
         do while (n.ne.self%Nchain)
-            t = int((n - 1) * randomnumber()) + 1
-            iv = int((voisnn(1, 1, self%config(2, t)) - 1) * randomnumber()) + 1
+            t = int((n - 1) * self%get_random()) + 1
+            iv = int((voisnn(1, 1, self%config(2, t)) - 1) * self%get_random()) + 1
             nv1 = voisnn(2 * iv, 1, self%config(2, t))
             nv2 = voisnn(2 * iv + 1, 1, self%config(2, t))
             en2 = self%config(1, t)
@@ -264,11 +304,10 @@ contains
         implicit none
         class (PolymerModel), intent(inout) :: self
         integer :: a, n, i, t, nv1, nv2, iv, en2, v, b, c(2, self%Nchain), lim, v1, v2
-        real*8 :: randomnumber
 
         lim = 2 * self%L - 2
 
-        i = int(6 * randomnumber()) + 1
+        i = int(6 * self%get_random()) + 1
         select case(i)
         case(1)
             a = 3 * self%L**2 - self%L / 2
@@ -327,8 +366,8 @@ contains
         n = n - 1
 
         do while (n.ne.self%Nchain)
-            t = int((n - 1) * randomnumber()) + 1
-            iv = int((voisnn(1, 1, self%config(2, t)) - 1) * randomnumber()) + 1
+            t = int((n - 1) * self%get_random()) + 1
+            iv = int((voisnn(1, 1, self%config(2, t)) - 1) * self%get_random()) + 1
             nv1 = voisnn(2 * iv, 1, self%config(2, t))
             nv2 = voisnn(2 * iv + 1, 1, self%config(2, t))
             en2 = self%config(1, t)
@@ -445,6 +484,7 @@ contains
     end subroutine initconfig_sim_out
 
     subroutine trialmoveex(self)
+        !$acc routine seq
         ! trial move to move a LEF leg
         implicit none
         class (PolymerModel), intent(inout) :: self
@@ -452,11 +492,11 @@ contains
         ! include 'global.f03'
 
         integer :: n, iv, s, id, con(3), strand
-        real*8 :: randomnumber, fc
+        real*8 :: fc
         real :: impermeability
 
         !choose randomly a monomer
-        n = int(self%Nchain * randomnumber()) + 1
+        n = int(self%Nchain * self%get_random()) + 1
 
         s = self%contact(3, n)
 
@@ -472,7 +512,7 @@ contains
         !    print*, 'fc[n:', n,'] = ', fc, ', impermeability=', impermeability
         !end if
         do iv = 1, self%ikm
-            if (randomnumber().ge.(self%km * fc)) return
+            if (self%get_random().ge.(self%km * fc)) return
         end do
 
         if (s.eq.-1) then !if a (-) direction leg move to n-1
@@ -481,8 +521,10 @@ contains
             if (self%contact(1, n - 1).ne.0) then !if n-1 already occupied, try to swap
                 if (.not. self%z_loop) return
                 !if n-1 already occupied & z-loop, try to swap
-                if ((self%contact(3, n - 1).eq.-1).or.(n.eq.2)) return !if same direction or at the end do not swap
-                if (connec(1, opp(self%config(2, n - 1)), self%contact(2, n - 1)).eq.0) return !if break the slip-link of n-1 do not swap
+                if ((self%contact(3, n - 1).eq.-1).or.(n.eq.2)) return ! same dir or end: no swap
+                ! if break slip-link of n-1 do not swap
+                if (connec(1, opp(self%config(2, n - 1)), self%contact(2, n - 1)).eq.0) &
+                    return
                 con = self%contact(:, n - 1)
 
                 iv = connec(1, self%config(2, n - 1), self%contact(2, n))
@@ -564,6 +606,7 @@ contains
     ! *************
 
     subroutine trialmovetad(self)
+        !$acc routine seq
         !trial move for monomer
         implicit none
         class (PolymerModel), intent(inout) :: self
@@ -572,10 +615,9 @@ contains
 
         integer :: n, iv, v, b, j, nv1, nv2, nm2, np1, en, cn2, cn3, cm2, en2, id, cc, a
         real :: dE
-        real*8 :: randomnumber
 
         !choose randomly a monomer
-        n = int(self%Nchain * randomnumber()) + 1
+        n = int(self%Nchain * self%get_random()) + 1
         en = self%config(1, n)
 
         !display interaction states
@@ -599,7 +641,7 @@ contains
                 cm2 = cn2
                 cn2 = self%config(2, 2)
             end if
-            iv = int(11 * randomnumber()) + 1
+            iv = int(11 * self%get_random()) + 1
             if (iv.ge.cn2) iv = iv + 1
             if (iv.ge.cm2) iv = iv + 1
 
@@ -641,7 +683,7 @@ contains
                     if (connec(iv, self%contact(2, n + 1), 1).ne.0) dE = dE + self%Ea
                 end if
 
-                if (randomnumber().lt.exp(-dE)) then
+                if (self%get_random().lt.exp(-dE)) then
                     self%bittable(1, en) = self%bittable(1, en) - 1
                     self%bittable(1, v) = self%bittable(1, v) + 1
 
@@ -680,7 +722,7 @@ contains
                 cn2 = opp(self%config(2, self%Nchain - 2))
             end if
 
-            iv = int(11 * randomnumber()) + 1
+            iv = int(11 * self%get_random()) + 1
             if (iv.ge.cn2) iv = iv + 1
             if (iv.ge.cm2) iv = iv + 1
 
@@ -724,7 +766,7 @@ contains
                     if (connec(iv, self%contact(2, n - 1), 1).ne.0) dE = dE + self%Ea
                 end if
 
-                if (randomnumber().lt.exp(-dE)) then
+                if (self%get_random().lt.exp(-dE)) then
                     self%bittable(1, en) = self%bittable(1, en) - 1
                     self%bittable(1, v) = self%bittable(1, v) + 1
 
@@ -760,7 +802,7 @@ contains
             !print*, 'size voisnn, cm2, cn2, voisnn(1, 1, 1) ', shape(voisnn), cm2, cn2, voisnn(1, 1, 1)
 
             if (voisnn(1, cm2, cn2).gt.1) then
-                iv = int((voisnn(1, cm2, cn2) - 1) * randomnumber()) + 1
+                iv = int((voisnn(1, cm2, cn2) - 1) * self%get_random()) + 1
                 if (voisnn(2 * iv, cm2, cn2).ge.cm2) iv = iv + 1
                 nv1 = voisnn(2 * iv, cm2, cn2)
                 nv2 = voisnn(2 * iv + 1, cm2, cn2)
@@ -819,7 +861,7 @@ contains
                         if (connec(nv1, self%contact(2, n - 1), 1).ne.0) dE = dE + self%Ea
                     end if
 
-                    if (randomnumber().lt.exp(-dE)) then
+                    if (self%get_random().lt.exp(-dE)) then
                         self%bittable(1, en) = self%bittable(1, en) - 1
                         self%bittable(1, v) = self%bittable(1, v) + 1
 
@@ -855,24 +897,24 @@ contains
     ! ****************
 
     subroutine trialbound(self)
+        !$acc routine seq
         !trial move for binding LEF
         implicit none
         class (PolymerModel), intent(inout) :: self
 
         integer :: n, id, j, d
         real :: kbp
-        real*8 :: randomnumber
 
         !choose randomly a monomer
-        n = int(self%Nchain * randomnumber()) + 1
+        n = int(self%Nchain * self%get_random()) + 1
 
         id = self%contact(1, n)
         if (id==0) then !if the bin is not occupied by a leg, try to randomly insert a LEF to NN sites
             kbp = self%kb * (  self%loading_sites_factor(n)**(1./real(self%ikb)) )
             do j = 1, self%ikb
-                if (randomnumber()>=kbp) return
+                if (self%get_random()>=kbp) return
             end do
-            d = int(2 * randomnumber()) + 1
+            d = int(2 * self%get_random()) + 1
             if (d==1) then
                 if (n>1) then
                     if (self%contact(1, n - 1)==0) then
@@ -881,7 +923,7 @@ contains
                         self%contact(1, n - 1) = n
                         self%contact(2, n - 1) = self%config(2, n - 1)
                         if (self%unidirectional) then
-                            if (randomnumber()<0.5) then
+                            if (self%get_random()<0.5) then
                                 self%contact(3, n) = 2
                                 self%contact(3, n - 1) = -1
                             else
@@ -902,7 +944,7 @@ contains
                     self%contact(1, n + 1) = n
                     self%contact(2, n + 1) = opp(self%config(2, n))
                     if (self%unidirectional) then
-                        if (randomnumber()<0.5) then
+                        if (self%get_random()<0.5) then
                             self%contact(3, n) = -2
                             self%contact(3, n + 1) = 1
                         else
@@ -925,6 +967,7 @@ contains
     ! ******
 
     subroutine trialunbound(self)
+        !$acc routine seq
         !trial move for unbinding LEF
         implicit none
         class (PolymerModel), intent(inout) :: self
@@ -932,15 +975,14 @@ contains
         ! include 'global.f03'
 
         integer :: n, id, j
-        real*8 :: randomnumber
 
         !choose randomly a monomer
-        n = int(self%Nchain * randomnumber()) + 1
+        n = int(self%Nchain * self%get_random()) + 1
 
         id = self%contact(1, n)
         if (id.gt.0) then !if the monomer is occupied by a leg, try to remove it
             do j = 1, self%iku
-                if (randomnumber().ge.self%ku) return
+                if (self%get_random().ge.self%ku) return
             end do
             self%contact(:, n) = 0
             self%contact(:, id) = 0
@@ -1000,9 +1042,9 @@ contains
 
         do j = 1, self%Nchain
             ! TODO maybe possible to write thw whole chain in one round
-            write(10, *) self%config(:, j) !the configuration: config(1,j)=node where monomer j is located, config(2,j)=direction of the vector between j and j+1
-            write(11, *) self%dr(:, j) !the displacement: vector (x,y,z in lattice unit) of displacement of monomer j between time 0 and current time
-            write(12, *) self%contact(:, j) !the extruder occupancy and information: contact(1,j) \ne 0 if one lef of a extruder is in j, contact(1,j)=the monomer where the other lef is, contact(2,j)=the vector between the two legs, contact(3,j)=-1 (resp. +1) if it's a lef walking in the (-) direction (resp. (+) direction)
+            write(10, *) self%config(:, j) ! config(1,j)=node of monomer j, config(2,j)=dir j->j+1
+            write(11, *) self%dr(:, j) ! displacement (x,y,z) of monomer j from t=0 to now
+            write(12, *) self%contact(:, j) ! contact(1,j)/=0: LEG at j; (1,j)=other LEG; (2,j)=vec; (3,j)=+/-1 dir
         end do
         write(14, *) self%Nleffree !number of free (unbound) extruders
 
@@ -1086,6 +1128,154 @@ contains
         return
     end subroutine
 
+    subroutine export_state_flat(self, config, bittable, contact, dr, boundary, &
+            interaction_sites_state, loading_sites_factor, rng_state, Nleffree)
+        implicit none
+        class (PolymerModel), intent(in) :: self
+        integer, intent(out), dimension(2, *) :: config
+        integer, intent(out), dimension(14, *) :: bittable
+        integer, intent(out), dimension(3, *) :: contact
+        real, intent(out), dimension(3, *) :: dr
+        real, intent(out), dimension(2, *) :: boundary
+        integer, intent(out), dimension(*) :: interaction_sites_state
+        real, intent(out), dimension(*) :: loading_sites_factor
+        integer(8), intent(out), dimension(*) :: rng_state
+        integer, intent(out) :: Nleffree
+        integer :: nch, nbt
+        nch = self%Nchain
+        nbt = size(self%bittable, 2)
+        config(1:2, 1:nch) = self%config
+        bittable(1:14, 1:nbt) = self%bittable
+        contact(1:3, 1:nch) = self%contact
+        dr(1:3, 1:nch) = self%dr
+        boundary(1:2, 1:nch) = self%boundary
+        interaction_sites_state(1:nch) = self%interaction_sites_state
+        loading_sites_factor(1:nch) = self%loading_sites_factor
+        Nleffree = self%Nleffree
+        if (allocated(self%rng_state_rep)) rng_state(1) = self%rng_state_rep(1)
+    end subroutine export_state_flat
+
+    subroutine import_state_flat(self, config, bittable, contact, dr, boundary, &
+            interaction_sites_state, loading_sites_factor, rng_state, Nleffree)
+        implicit none
+        class (PolymerModel), intent(inout) :: self
+        integer, intent(in), dimension(2, *) :: config
+        integer, intent(in), dimension(14, *) :: bittable
+        integer, intent(in), dimension(3, *) :: contact
+        real, intent(in), dimension(3, *) :: dr
+        real, intent(in), dimension(2, *) :: boundary
+        integer, intent(in), dimension(*) :: interaction_sites_state
+        real, intent(in), dimension(*) :: loading_sites_factor
+        integer(8), intent(in), dimension(*) :: rng_state
+        integer, intent(in) :: Nleffree
+        integer :: nch, nbt
+        nch = self%Nchain
+        nbt = size(self%bittable, 2)
+        self%config = config(1:2, 1:nch)
+        self%bittable = bittable(1:14, 1:nbt)
+        self%contact = contact(1:3, 1:nch)
+        self%dr = dr(1:3, 1:nch)
+        self%boundary = boundary(1:2, 1:nch)
+        self%interaction_sites_state = interaction_sites_state(1:nch)
+        self%loading_sites_factor = loading_sites_factor(1:nch)
+        self%Nleffree = Nleffree
+        if (allocated(self%rng_state_rep)) self%rng_state_rep(1) = rng_state(1)
+    end subroutine import_state_flat
+
+    real(8) function get_random(self)
+        !$acc routine seq
+        class (PolymerModel), intent(inout) :: self
+        if (allocated(self%rng_state_rep)) then
+            get_random = repro_rng_next(self%rng_state_rep(1))
+        else
+            if (allocated(self%rng_state)) call random_seed(put=self%rng_state)
+            get_random = randomnumber()
+            if (allocated(self%rng_state)) call random_seed(get=self%rng_state)
+        end if
+        !get_random = randomnumber()
+    end function get_random
+
+    subroutine advance_one_measurement_interval(self, Ninter)
+        !$acc routine seq
+        ! Advance state by one measurement interval (Ninter * Ntrial steps). No I/O.
+        implicit none
+        class (PolymerModel), intent(inout) :: self
+        integer, intent(in) :: Ninter
+        integer :: k, v, Ntrial
+        real :: pt
+        real*8 :: r
+
+        Ntrial = 3 * self%Nchain + self%Nleffree
+        pt = real(self%Nchain) / real(Ntrial)
+        do k = 1, Ninter
+            do v = 1, Ntrial
+                r = self%get_random()
+                if (r.lt.pt) then
+                    call self%trialmovetad()
+                elseif (r.lt.2 * pt) then
+                    call self%trialmoveex()
+                elseif (r.lt.3 * pt) then
+                    call self%trialunbound()
+                else
+                    call self%trialbound()
+                end if
+            end do
+        end do
+        return
+    end subroutine advance_one_measurement_interval
+
+    subroutine run_burnin_phase(self, burnin)
+        !$acc routine seq
+        ! Run burn-in: simburnin = burnin + int(r*burnin), then simburnin*Nchain trialmovetad. No I/O.
+        implicit none
+        class (PolymerModel), intent(inout) :: self
+        integer, intent(in) :: burnin
+        integer :: j, v, simburnin
+
+        simburnin = burnin + int(self%get_random() * burnin)
+        do j = 1, simburnin
+            do v = 1, self%Nchain
+                call self%trialmovetad()
+            end do
+        end do
+        return
+    end subroutine run_burnin_phase
+
+    subroutine run_burnout_only_phase(self, burnout)
+        !$acc routine seq
+        ! Run burnout block: unbound_all + burnout*Nchain trialmovetad. No I/O.
+        implicit none
+        class (PolymerModel), intent(inout) :: self
+        integer, intent(in) :: burnout
+        integer :: j, v
+
+        if (burnout <= 0) return
+        call self%unbound_all()
+        do j = 1, burnout
+            do v = 1, self%Nchain
+                call self%trialmovetad()
+            end do
+        end do
+        return
+    end subroutine run_burnout_only_phase
+
+    subroutine run_burnoutM_one_phase(self, Ninter)
+        !$acc routine seq
+        ! Run one burnoutM step: unbound_all + Ninter*Nchain trialmovetad. No I/O.
+        implicit none
+        class (PolymerModel), intent(inout) :: self
+        integer, intent(in) :: Ninter
+        integer :: k, v
+
+        call self%unbound_all()
+        do k = 1, Ninter
+            do v = 1, self%Nchain
+                call self%trialmovetad()
+            end do
+        end do
+        return
+    end subroutine run_burnoutM_one_phase
+
     subroutine do_simulation(self, trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
         implicit none
         class (PolymerModel), intent(inout) :: self
@@ -1098,7 +1288,7 @@ contains
         integer :: burn_Nmeas, simburnin
         integer :: j, k, v, Ntrial
         real :: pt
-        real*8 :: randomnumber, r
+        real*8 :: r
 
         burn_Nmeas = 0
         simburnin = 0
@@ -1116,7 +1306,7 @@ contains
 
             ! choose rondome simulation burn-in time = initial_burnin + random_fraction * initial_burnin
             ! add random time (a fraction) after the initial burn-in time
-            r = randomnumber()
+            r = self%get_random()
             simburnin = burnin + int(r * burnin)
 
             do j = 1, simburnin
@@ -1139,22 +1329,7 @@ contains
         end if
 
         do j = 1, Nmeas - 1 - burn_Nmeas  ! account for the initial, burn-in and burn-out measurements
-            do k = 1, Ninter
-                Ntrial = 3 * self%Nchain + self%Nleffree
-                pt = real(self%Nchain) / real(Ntrial)
-                do v = 1, Ntrial
-                    r = randomnumber()
-                    if (r.lt.pt) then
-                        call self%trialmovetad() !trial move for monomers
-                    elseif (r.lt.2 * pt) then
-                        call self%trialmoveex() !trial move for LEF movement
-                    elseif (r.lt.3 * pt) then
-                        call self%trialunbound() !trial move for unbinding event
-                    else
-                        call self%trialbound() !trial move for binding event
-                    end if
-                end do
-            end do
+            call self%advance_one_measurement_interval(Ninter)
             call log%info('Trajectory: ' // trim(str(trajectory_i)) // ', Measurement:' // trim(str(j)))
             call flush(6)
             call self%output()

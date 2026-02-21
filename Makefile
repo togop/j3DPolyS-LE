@@ -1,12 +1,29 @@
-.PHONY: all build debug env install test doc sif
+.PHONY: all build build-gcc build-gcc-noacc debug env install test doc sif
 
 build:
 	rm -rf cmake-build
-	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build -S . -DENABLE_OPENMP=ON -DENABLE_OPENACC=ON
+	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build -S . -DENABLE_OPENACC=ON
+	cmake --build cmake-build --target 3dpolys_le -- -j 6
+
+# Build with gfortran/gcc only (no nvfortran). Use when mpifort expects nvfortran but it is not in PATH.
+# Load gcc, openmpi, and hdf5: e.g. "module purge && module load gcc openmpi hdf5 && make build-gcc"
+build-gcc:
+	rm -rf cmake-build
+	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build -S . -DENABLE_OPENACC=ON \
+		-DCMAKE_Fortran_COMPILER=gfortran -DCMAKE_C_COMPILER=gcc
+	cmake --build cmake-build --target 3dpolys_le -- -j 6
+
+# Same as build-gcc but without OpenACC. Use if build-gcc fails with "mkoffload: -fopenacc must be set" at link.
+# Produces a CPU-only binary (no GPU offload).
+build-gcc-noacc:
+	rm -rf cmake-build
+	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build -S . -DENABLE_OPENACC=OFF \
+		-DCMAKE_Fortran_COMPILER=gfortran -DCMAKE_C_COMPILER=gcc
 	cmake --build cmake-build --target 3dpolys_le -- -j 6
 
 debug:
-	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build-debug -S . -DCMAKE_BUILD_TYPE=Debug
+	rm -rf cmake-build-debug
+	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build-debug -S . -DENABLE_OPENACC=ON -DCMAKE_BUILD_TYPE=Debug
 	cmake --build cmake-build-debug --target 3dpolys_le -- -j 6
 
 venv:

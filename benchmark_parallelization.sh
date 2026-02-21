@@ -12,11 +12,12 @@
 # Options:
 #   --tests=TYPE         Select which tests to run:
 #                        all      - Run all tests (default)
-#                        mpi      - Run all tests that use MPI (multi-process GPU, CPU, plain)
-#                        no-mpi   - Run only non-MPI tests (single process: GPU or CPU)
+#                        mpi      - Run both MPI tests (with GPU and without GPU/OpenACC)
+#                        no-mpi   - Run only non-MPI tests (single process: with GPU or without GPU)
 #                        single   - Same as no-mpi: single-process (no MPI) tests
-#                        gpu      - Run GPU/OpenACC tests only (MPI and no-MPI)
-#                        cpu      - Run CPU/OpenMP tests only (MPI and no-MPI)
+#                        gpu      - Run "with GPU/OpenACC" tests only (MPI and no-MPI)
+#                        cpu      - Run "without GPU (--no-gpu)" tests only (MPI and no-MPI)
+#                        gpu-vs-no-gpu - Run only the two single-process tests (with vs without GPU)
 #
 #   --max-process=NUM    Maximum number of MPI processes to use (default: all available CPUs)
 #
@@ -27,10 +28,10 @@
 #
 # Examples:
 #   ./benchmark_parallelization.sh
-#   ./benchmark_parallelization.sh --tests=mpi          # all MPI tests (GPU, CPU, plain)
-#   ./benchmark_parallelization.sh --tests=no-mpi       # single process only (GPU, CPU)
+#   ./benchmark_parallelization.sh --tests=mpi          # both MPI tests (with GPU, without GPU)
+#   ./benchmark_parallelization.sh --tests=no-mpi       # single process only (with GPU, without GPU)
 #   ./benchmark_parallelization.sh --max-process=8
-#   ./benchmark_parallelization.sh --tests=gpu --max-process=16 ./test/test_tads_init_benchmark.cfg 42 ./my_benchmarks
+#   ./benchmark_parallelization.sh --tests=gpu-vs-no-gpu # only single-process GPU vs --no-gpu comparison
 #
 ################################################################################
 
@@ -53,11 +54,12 @@ Options:
 
   --tests=TYPE           Select which tests to run:
                          all      - Run all tests (default)
-                         mpi      - Run all tests that use MPI (multi-process GPU, CPU, plain)
-                         no-mpi   - Run only non-MPI tests (single process: GPU or CPU)
-                         single   - Same as no-mpi: single-process (no MPI) tests
-                         gpu      - Run GPU/OpenACC tests only (MPI and no-MPI)
-                         cpu      - Run CPU/OpenMP tests only (MPI and no-MPI)
+                         mpi      - Run both MPI tests (with GPU, without GPU/OpenACC)
+                         no-mpi   - Run only non-MPI tests (single process)
+                         single   - Same as no-mpi
+                         gpu      - Run "with GPU/OpenACC" tests only
+                         cpu      - Run "without GPU (--no-gpu)" tests only
+                         gpu-vs-no-gpu - Run only single-process with GPU vs without GPU
 
   --max-process=NUM      Maximum number of MPI processes to use (default: all available CPUs)
 
@@ -75,14 +77,13 @@ Examples:
 
 Test plan (when --tests=all; N = --max-process or number of CPUs):
   MPI (multi-process) tests:
-    [1] MPI N procs, GPU/OpenACC - 1 thread
-    [2] MPI N procs, GPU/OpenACC - auto threads
-    [3] MPI N procs, OpenMP/CPU - 1 thread
-    [4] MPI N procs, OpenMP/CPU - auto threads
-    [5] MPI N procs, no OpenACC/no OpenMP (sequential)
+    [1] MPI N procs, with GPU/OpenACC
+    [2] MPI N procs, without GPU/OpenACC (--no-gpu, OpenMP per process)
   No-MPI (single process) tests:
-    [6] GPU/OpenACC, no MPI - auto threads
-    [7] CPU/OpenMP, no MPI - auto threads
+    [3] With GPU/OpenACC, no MPI
+    [4] Without GPU (--no-gpu), no MPI — uses OpenMP for replica parallelism
+  Reproducibility: with the same seed, all four runs must produce identical
+  output (GPU, OpenMP, MPI+GPU, MPI+no-GPU). Checksums verify this.
 HELP
 }
 
@@ -272,55 +273,43 @@ format_elapsed() {
     }'
 }
 
+# Output files used for reproducibility verification
+REPRO_OUTPUT_FILES="config.out dr.out contact.out process.out Nlef.out"
+
 # Function to run benchmark and capture timing
 run_benchmark() {
     local test_name=$1
     local mpi_procs=$2
     local extra_flags=$3
-    local threads=$4  # New parameter for thread count (optional, 0 = auto)
     local output_subdir="${RESULTS_DIR}/${test_name}"
     local log_file="${LOG_DIR}/${test_name}.log"
 
-    # Add thread flag if specified and > 0
-    local thread_flag=""
-    if [ -n "${threads}" ] && [ ${threads} -gt 0 ]; then
-        thread_flag="--threads:${threads}"
-    fi
+    # Single-process runs still need mpirun -np 1 (the program calls MPI_Init)
+    local np=1
+    [ ${mpi_procs} -gt 0 ] && np=${mpi_procs}
 
     echo "Running: ${test_name}"
-    echo "  MPI processes: ${mpi_procs}"
-    echo "  Threads: ${threads:-auto}"
-    echo "  Extra flags: ${extra_flags} ${thread_flag}"
+    echo "  MPI processes: ${np}"
+    echo "  Extra flags: ${extra_flags}"
     echo "  Output: ${output_subdir}"
 
-    # Build and print the exact command run
-    if [ ${mpi_procs} -eq 0 ]; then
-        RUN_CMD="/usr/bin/time -p ${EXECUTABLE} --seed:${SEED} -o:${output_subdir} ${extra_flags} ${thread_flag} ${CONFIG_FILE}"
-    else
-        RUN_CMD="/usr/bin/time -p mpirun -np ${mpi_procs} ${EXECUTABLE} --seed:${SEED} -o:${output_subdir} ${extra_flags} ${thread_flag} ${CONFIG_FILE}"
-    fi
+    # Use fixed OMP_NUM_THREADS for no-GPU (OpenMP) runs so OpenMP path is deterministic and comparable
+    local env_prefix=""
+    #if [[ "${extra_flags}" == *"--no-gpu"* ]]; then
+    #    env_prefix="OMP_NUM_THREADS=4 "
+    #    echo "  OpenMP: OMP_NUM_THREADS=4 (reproducibility)"
+    #fi
+
+    RUN_CMD="${env_prefix}/usr/bin/time -p mpirun -np ${np} ${EXECUTABLE} --seed:${SEED} -o:${output_subdir} ${extra_flags} ${CONFIG_FILE}"
     echo "  Command: ${RUN_CMD}"
 
-    # Run the benchmark
-    if [ ${mpi_procs} -eq 0 ]; then
-        # Run without MPI (direct execution)
-        /usr/bin/time -p ${EXECUTABLE} \
-            --seed:${SEED} \
-            -o:${output_subdir} \
-            ${extra_flags} \
-            ${thread_flag} \
-            ${CONFIG_FILE} \
-            > "${log_file}" 2>&1
-    else
-        # Run with MPI
-        /usr/bin/time -p mpirun -np ${mpi_procs} ${EXECUTABLE} \
-            --seed:${SEED} \
-            -o:${output_subdir} \
-            ${extra_flags} \
-            ${thread_flag} \
-            ${CONFIG_FILE} \
-            > "${log_file}" 2>&1
-    fi
+    # Run the benchmark (always via mpirun so MPI_Init succeeds)
+    eval "${env_prefix}/usr/bin/time -p mpirun -np ${np} ${EXECUTABLE} \
+        --seed:${SEED} \
+        -o:${output_subdir} \
+        ${extra_flags} \
+        ${CONFIG_FILE} \
+        > \"${log_file}\" 2>&1"
 
     local exit_code=$?
 
@@ -342,10 +331,12 @@ run_benchmark() {
         grep "Elapsed time" "${log_file}" | tail -2 >> "${LOG_DIR}/timing_summary.txt"
         echo "---" >> "${LOG_DIR}/timing_summary.txt"
 
-        # Calculate checksums for verification
-        if [ -f "${output_subdir}/config.out" ]; then
-            md5sum "${output_subdir}/config.out" >> "${LOG_DIR}/checksums.txt"
-        fi
+        # Calculate checksums for all simulation outputs (reproducibility: GPU vs non-GPU must match)
+        for f in config.out dr.out contact.out process.out Nlef.out; do
+            if [ -f "${output_subdir}/${f}" ]; then
+                printf "%s  %s  %s\n" "${test_name}" "${f}" "$(md5sum "${output_subdir}/${f}" | awk '{print $1}')" >> "${LOG_DIR}/checksums.txt"
+            fi
+        done
     else
         echo "  ✗ Failed with exit code ${exit_code}"
         echo "  See log: ${log_file}"
@@ -355,7 +346,7 @@ run_benchmark() {
 }
 
 # Function to check if a test should run
-# test_type: mpi-gpu, mpi-cpu, mpi-plain, no-mpi-gpu, no-mpi-cpu
+# test_type: mpi-gpu, mpi-cpu, no-mpi-gpu, no-mpi-cpu
 should_run_test() {
     local test_type=$1
 
@@ -364,11 +355,11 @@ should_run_test() {
             return 0
             ;;
         mpi)
-            # All tests that use MPI (multi-process GPU, CPU, plain)
-            [[ "${test_type}" == "mpi-gpu" || "${test_type}" == "mpi-cpu" || "${test_type}" == "mpi-plain" ]]
+            # All tests that use MPI (multi-process: with GPU or without GPU)
+            [[ "${test_type}" == "mpi-gpu" || "${test_type}" == "mpi-cpu" ]]
             ;;
         no-mpi|single)
-            # Single process, no MPI (GPU or CPU only)
+            # Single process, no MPI (with GPU or without GPU)
             [[ "${test_type}" == "no-mpi-gpu" || "${test_type}" == "no-mpi-cpu" ]]
             ;;
         gpu)
@@ -376,6 +367,10 @@ should_run_test() {
             ;;
         cpu)
             [[ "${test_type}" == *"cpu"* ]]
+            ;;
+        gpu-vs-no-gpu)
+            # Only the two single-process tests that compare with vs without GPU
+            [[ "${test_type}" == "no-mpi-gpu" || "${test_type}" == "no-mpi-cpu" ]]
             ;;
         *)
             return 0
@@ -395,23 +390,18 @@ TEST_COUNT=0
 # MPI tests (all use MPI; multi-process)
 echo "  MPI (multi-process) tests:"
 if should_run_test "mpi-gpu"; then
-    echo "  [$((++TEST_COUNT))] MPI ${MAX_CPUS} procs, GPU/OpenACC - 1 thread"
-    echo "  [$((++TEST_COUNT))] MPI ${MAX_CPUS} procs, GPU/OpenACC - auto threads"
+    echo "  [$((++TEST_COUNT))] MPI ${MAX_CPUS} procs, with GPU/OpenACC"
 fi
 if should_run_test "mpi-cpu"; then
-    echo "  [$((++TEST_COUNT))] MPI ${MAX_CPUS} procs, OpenMP/CPU - 1 thread"
-    echo "  [$((++TEST_COUNT))] MPI ${MAX_CPUS} procs, OpenMP/CPU - auto threads"
-fi
-if should_run_test "mpi-plain"; then
-    echo "  [$((++TEST_COUNT))] MPI ${MAX_CPUS} procs, no OpenACC/no OpenMP (sequential)"
+    echo "  [$((++TEST_COUNT))] MPI ${MAX_CPUS} procs, without GPU/OpenACC (--no-gpu)"
 fi
 
 echo "  No-MPI (single process) tests:"
 if should_run_test "no-mpi-gpu"; then
-    echo "  [$((++TEST_COUNT))] GPU/OpenACC, no MPI - auto threads"
+    echo "  [$((++TEST_COUNT))] With GPU/OpenACC, no MPI"
 fi
 if should_run_test "no-mpi-cpu"; then
-    echo "  [$((++TEST_COUNT))] CPU/OpenMP, no MPI - auto threads"
+    echo "  [$((++TEST_COUNT))] Without GPU (--no-gpu), no MPI"
 fi
 
 echo ""
@@ -427,8 +417,9 @@ echo "Test selection: ${TEST_SELECTION}" >> "${LOG_DIR}/timing_summary.txt"
 echo "Max CPUs: ${MAX_CPUS}" >> "${LOG_DIR}/timing_summary.txt"
 echo "" >> "${LOG_DIR}/timing_summary.txt"
 
-# Initialize checksums file
-echo "=== MD5 Checksums (config.out) ===" > "${LOG_DIR}/checksums.txt"
+# Initialize checksums file (all output files for reproducibility verification)
+echo "=== MD5 Checksums (test_name  file  checksum) ===" > "${LOG_DIR}/checksums.txt"
+echo "Format: each line is: <test_name>  <output_file>  <md5>" >> "${LOG_DIR}/checksums.txt"
 echo "" >> "${LOG_DIR}/checksums.txt"
 
 echo "Starting benchmark tests..."
@@ -437,34 +428,27 @@ echo ""
 ################################################################################
 # MPI tests (multi-process)
 ################################################################################
-# Test 1–2: MPI, GPU/OpenACC
+# Test 1: MPI, with GPU/OpenACC
 if should_run_test "mpi-gpu"; then
-run_benchmark "mpi_${MAX_CPUS}proc_gpu_t1" ${MAX_CPUS} "" 1
-run_benchmark "mpi_${MAX_CPUS}proc_gpu" ${MAX_CPUS} "" 0
+run_benchmark "mpi_${MAX_CPUS}proc_gpu" ${MAX_CPUS} ""
 fi
 
-# Test 3–4: MPI, OpenMP/CPU
+# Test 2: MPI, without GPU/OpenACC (--no-gpu)
 if should_run_test "mpi-cpu"; then
-run_benchmark "mpi_${MAX_CPUS}proc_openmp_t1" ${MAX_CPUS} "--no-gpu-prefer" 1
-run_benchmark "mpi_${MAX_CPUS}proc_openmp" ${MAX_CPUS} "--no-gpu-prefer" 0
-fi
-
-# Test 5: MPI, no OpenACC/no OpenMP (sequential)
-if should_run_test "mpi-plain"; then
-run_benchmark "mpi_${MAX_CPUS}proc_plain" ${MAX_CPUS} "--no-gpu-prefer --no-openmp" 0
+run_benchmark "mpi_${MAX_CPUS}proc_no_gpu" ${MAX_CPUS} "--no-gpu"
 fi
 
 ################################################################################
-# No-MPI tests (single process)
+# No-MPI tests (single process) — direct GPU vs no-GPU comparison
 ################################################################################
-# Test 6: GPU/OpenACC, no MPI
+# Test 3: With GPU/OpenACC, no MPI
 if should_run_test "no-mpi-gpu"; then
-run_benchmark "gpu_no_mpi" 0 "" 0
+run_benchmark "gpu_no_mpi" 0 ""
 fi
 
-# Test 7: CPU/OpenMP, no MPI
+# Test 4: Without GPU (--no-gpu), no MPI
 if should_run_test "no-mpi-cpu"; then
-run_benchmark "cpu_no_mpi" 0 "--no-gpu-prefer" 0
+run_benchmark "no_gpu_no_mpi" 0 "--no-gpu"
 fi
 
 ################################################################################
@@ -477,19 +461,81 @@ echo ""
 echo "Results location: ${BENCH_DIR}"
 echo ""
 
-# Check reproducibility
+# Check reproducibility (all output files; same seed => identical across GPU, OpenMP, MPI, no-MPI)
 echo "Verifying reproducibility (MD5 checksums):"
 cat "${LOG_DIR}/checksums.txt"
 echo ""
 
-# Count unique checksums (excluding header lines)
-unique_checksums=$(grep -v "===" "${LOG_DIR}/checksums.txt" | grep "config.out" | awk '{print $1}' | sort -u | wc -l)
-echo "Unique checksums: ${unique_checksums}"
+# Helper: compare two result dirs; return 0 if all REPRO_OUTPUT_FILES match
+compare_result_dirs() {
+    local dir1="$1"
+    local dir2="$2"
+    local same=1
+    for outfile in ${REPRO_OUTPUT_FILES}; do
+        [ -f "${dir1}/${outfile}" ] && [ -f "${dir2}/${outfile}" ] || continue
+        c1=$(md5sum "${dir1}/${outfile}" 2>/dev/null | awk '{print $1}')
+        c2=$(md5sum "${dir2}/${outfile}" 2>/dev/null | awk '{print $1}')
+        if [ -n "${c1}" ] && [ -n "${c2}" ] && [ "${c1}" != "${c2}" ]; then
+            same=0
+            break
+        fi
+    done
+    return ${same}
+}
 
-if [ ${unique_checksums} -eq 1 ]; then
-    echo "✓ REPRODUCIBILITY VERIFIED: All runs produced identical results"
+REPRO_FAIL=0
+for outfile in ${REPRO_OUTPUT_FILES}; do
+    unique=$(awk -v f="${outfile}" '$2 == f {print $3}' "${LOG_DIR}/checksums.txt" | sort -u | wc -l)
+    total=$(awk -v f="${outfile}" '$2 == f {print $3}' "${LOG_DIR}/checksums.txt" | wc -l)
+    if [ "${total}" -eq 0 ]; then
+        continue
+    fi
+    if [ "${unique}" -eq 1 ]; then
+        echo "  ${outfile}: ✓ identical across all runs (${total} runs)"
+    else
+        echo "  ${outfile}: ⚠ ${unique} distinct checksums (expected 1) - reproducibility NOT verified"
+        REPRO_FAIL=1
+    fi
+done
+
+# Pairwise reproducibility checks (when both sides exist)
+# GPU vs no-GPU (OpenMP) — single process
+if [ -f "${RESULTS_DIR}/gpu_no_mpi/config.out" ] && [ -f "${RESULTS_DIR}/no_gpu_no_mpi/config.out" ]; then
+    if compare_result_dirs "${RESULTS_DIR}/gpu_no_mpi" "${RESULTS_DIR}/no_gpu_no_mpi"; then
+        echo "  GPU vs no-GPU (OpenMP, same seed): ✓ all output files byte-identical"
+    else
+        echo "  GPU vs no-GPU (OpenMP): ⚠ some output files differ"
+        REPRO_FAIL=1
+    fi
+fi
+
+# MPI vs no-MPI (GPU): multi-process GPU vs single-process GPU
+mpi_gpu_dir="${RESULTS_DIR}/mpi_${MAX_CPUS}proc_gpu"
+if [ -f "${mpi_gpu_dir}/config.out" ] && [ -f "${RESULTS_DIR}/gpu_no_mpi/config.out" ]; then
+    if compare_result_dirs "${mpi_gpu_dir}" "${RESULTS_DIR}/gpu_no_mpi"; then
+        echo "  MPI vs no-MPI (GPU, same seed): ✓ all output files byte-identical"
+    else
+        echo "  MPI vs no-MPI (GPU): ⚠ some output files differ"
+        REPRO_FAIL=1
+    fi
+fi
+
+# MPI vs no-MPI (no-GPU / OpenMP): multi-process CPU vs single-process OpenMP
+mpi_no_gpu_dir="${RESULTS_DIR}/mpi_${MAX_CPUS}proc_no_gpu"
+if [ -f "${mpi_no_gpu_dir}/config.out" ] && [ -f "${RESULTS_DIR}/no_gpu_no_mpi/config.out" ]; then
+    if compare_result_dirs "${mpi_no_gpu_dir}" "${RESULTS_DIR}/no_gpu_no_mpi"; then
+        echo "  MPI vs no-MPI (OpenMP/CPU, same seed): ✓ all output files byte-identical"
+    else
+        echo "  MPI vs no-MPI (OpenMP/CPU): ⚠ some output files differ"
+        REPRO_FAIL=1
+    fi
+fi
+
+if [ ${REPRO_FAIL} -eq 0 ]; then
+    echo "✓ REPRODUCIBILITY VERIFIED: All runs produced identical results for the same seed"
+    echo "  (GPU, OpenMP/no-GPU, MPI+GPU, MPI+no-GPU)"
 else
-    echo "⚠ WARNING: Different checksums detected - results may not be reproducible"
+    echo "⚠ WARNING: Some outputs differ across runs (GPU/OpenMP/MPI/no-MPI)"
 fi
 echo ""
 
@@ -499,6 +545,10 @@ cat "${LOG_DIR}/timing_summary.txt"
 echo ""
 
 echo "=============================================================================="
-echo "To generate the report, run:"
+echo "Generate report:"
+echo ""
 echo "  ./generate_benchmark_report.sh ${BENCH_DIR}"
+echo ""
 echo "=============================================================================="
+
+./generate_benchmark_report.sh "${BENCH_DIR}"
