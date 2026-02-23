@@ -1,5 +1,84 @@
 # Setting Up Dependencies for j3DPolySLE
 
+## Binary artifacts (macOS and Linux)
+
+To use **prebuilt** Fortran binaries without building from source, see **[YGGDRASIL_BINARYBUILDER.md](YGGDRASIL_BINARYBUILDER.md)**. It describes building deployable `3dpolys_le` artifacts with Yggdrasil/BinaryBuilder and adding them via `Artifacts.toml` or the future `3DPolyS_LE_jll` package.
+
+## GPU Support with NVIDIA HPC SDK (NVHPC)
+
+For **GPU acceleration with OpenACC**, you need:
+- NVIDIA GPU with compute capability ≥ 6.0 (Pascal or newer)
+- Linux with NVIDIA drivers installed
+- NVIDIA HPC SDK (provides `nvfortran` compiler)
+
+### Installing NVIDIA HPC SDK
+
+**Linux (Debian/Ubuntu/RHEL/CentOS):**
+```bash
+# Download and install NVHPC from NVIDIA:
+# https://developer.nvidia.com/hpc-sdk-downloads
+
+# Or via package manager (if available):
+# Ubuntu/Debian example:
+wget https://developer.download.nvidia.com/hpc-sdk/ubuntu/DEB-GPG-KEY-NVIDIA-HPC-SDK
+sudo apt-key add DEB-GPG-KEY-NVIDIA-HPC-SDK
+echo "deb [trusted=yes] https://developer.download.nvidia.com/hpc-sdk/ubuntu/amd64 /" | \
+    sudo tee /etc/apt/sources.list.d/nvhpc.list
+sudo apt-get update
+sudo apt-get install nvhpc-23-11  # or latest version
+
+# Set up environment (add to ~/.bashrc):
+export PATH=/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/bin:$PATH
+export LD_LIBRARY_PATH=/opt/nvidia/hpc_sdk/Linux_x86_64/23.11/compilers/lib:$LD_LIBRARY_PATH
+```
+
+**HPC Clusters with Module System:**
+```bash
+# Load NVHPC module (check available modules first)
+module avail nvhpc
+module load nvhpc/23.11  # or latest version
+module load openmpi hdf5  # ensure MPI and HDF5 are compatible
+```
+
+### Building with GPU Support
+
+**Automatic GPU detection (recommended):**
+```bash
+make build-nvhpc
+```
+
+**For specific GPU architectures:**
+```bash
+# NVIDIA A100 (most common in HPC)
+make build-nvhpc-a100
+
+# NVIDIA V100
+make build-nvhpc-v100
+
+# NVIDIA P100
+make build-nvhpc-p100
+
+# NVIDIA H100
+make build-nvhpc-h100
+
+# Custom compute capability
+make build-nvhpc GPU_ARCH=cc75  # for Turing GPUs
+```
+
+**Verifying GPU support:**
+```bash
+# Check if binary has GPU support
+ldd py3dpolys_le/bin/3dpolys_le | grep -i cuda
+
+# Run with GPU
+./bin/3dpolys_le --config test/test_tads_init_benchmark.cfg
+
+# Run without GPU (CPU only)
+./bin/3dpolys_le --no-gpu --config test/test_tads_init_benchmark.cfg
+```
+
+**Note:** macOS with Apple Silicon does NOT support OpenACC/NVIDIA GPUs. Use CPU-only build with `make build-gcc-noacc` on macOS.
+
 ## System Dependencies
 
 ### HDF5

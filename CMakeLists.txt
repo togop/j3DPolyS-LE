@@ -19,7 +19,26 @@ endif()
 set(TARGET 3dpolys_le)
 set(SOURCE_FOLDER sim_src)
 # Unified sources compiled into executable only (no static libs from same sources = no duplicate symbol linker errors)
-set(SOURCE_FILES ${SOURCE_FOLDER}/logging.f03 ${SOURCE_FOLDER}/randomnumber.f03 ${SOURCE_FOLDER}/repro_rng_mod.f03 ${SOURCE_FOLDER}/kinds.f03 ${SOURCE_FOLDER}/timers.f03 ${SOURCE_FOLDER}/lib_conf.f90 ${SOURCE_FOLDER}/lattice_data.f03 ${SOURCE_FOLDER}/polymer_model.f03 ${SOURCE_FOLDER}/gpu_replica_mod.f03 ${SOURCE_FOLDER}/gpu_flat_mod.f03 ${SOURCE_FOLDER}/analyse.f03 ${SOURCE_FOLDER}/3dpolys_le.f03)
+# Base source files (always included)
+set(SOURCE_FILES
+    ${SOURCE_FOLDER}/logging.f03
+    ${SOURCE_FOLDER}/randomnumber.f03
+    ${SOURCE_FOLDER}/repro_rng_mod.f03
+    ${SOURCE_FOLDER}/kinds.f03
+    ${SOURCE_FOLDER}/timers.f03
+    ${SOURCE_FOLDER}/lib_conf.f90
+    ${SOURCE_FOLDER}/lattice_data.f03
+    ${SOURCE_FOLDER}/polymer_model.f03
+    ${SOURCE_FOLDER}/gpu_flat_mod.f03
+    ${SOURCE_FOLDER}/3dpolys_le.f03
+)
+
+# Conditionally add files based on compiler
+if(NOT (CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI"))
+    # gpu_replica_mod uses type-bound procedures in OpenACC (not supported by NVHPC)
+    # analyse.f03 requires HDF5 (module incompatibility with NVHPC)
+    list(APPEND SOURCE_FILES ${SOURCE_FOLDER}/gpu_replica_mod.f03 ${SOURCE_FOLDER}/analyse.f03)
+endif()
 set(PACKAGE py3dpolys_le/bin)
 
 set(CMAKE_Fortran_SOURCE_FILE_EXTENSIONS f03;f90)
@@ -46,28 +65,41 @@ message( STATUS "CMAKE_RUNTIME_OUTPUT_DIRECTORY: ${CMAKE_RUNTIME_OUTPUT_DIRECTOR
 message( STATUS "CMAKE_BINARY_DIR: ${CMAKE_BINARY_DIR}")
 message( STATUS "Build type: " ${CMAKE_BUILD_TYPE})
 
-# Default to gfortran/gcc only when not already using MPI wrappers (e.g. on HPC with FC=mpifort)
-if(NOT CMAKE_Fortran_COMPILER MATCHES ".*(mpifort|mpif90|mpiifort).*")
+# Default to gfortran/gcc only when not already using MPI wrappers or explicitly set compiler (e.g. nvfortran)
+# Skip if CMAKE_Fortran_COMPILER was explicitly provided via -DCMAKE_Fortran_COMPILER=...
+if(NOT CMAKE_Fortran_COMPILER MATCHES ".*(mpifort|mpif90|mpiifort|nvfortran).*"
+   AND NOT CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC"
+   AND NOT CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
   set(CMAKE_Fortran_COMPILER "gfortran")
   set(CMAKE_C_COMPILER "gcc")
 endif()
 
 # Optional OpenACC (GPU). OFF by default; set -DENABLE_OPENACC=ON to build with OpenACC when compiler supports it.
 option(ENABLE_OPENACC "Build with OpenACC for GPU acceleration" OFF)
+
+# Option to specify target GPU architecture (for NVHPC compiler)
+set(GPU_ARCH "cc80" CACHE STRING "Target GPU compute capability (e.g., cc80 for A100, cc70 for V100, cc60 for P100)")
+
 if(ENABLE_OPENACC)
   if(CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     set(OPENACC_Fortran_FLAGS "-fopenacc")
+    message(STATUS "OpenACC enabled with GNU compiler")
+    message(WARNING "GNU OpenACC support is limited and may not work on all platforms (especially macOS/ARM)")
   elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
-    set(OPENACC_Fortran_FLAGS "-acc -Minfo=accel")
+    # NVHPC/PGI compiler with full GPU support
+    # Note: NVHPC 26.x syntax: -acc=gpu enables OpenACC, -gpu flag is separate for GPU options
+    # NVHPC 26.x: managed memory is now -gpu=mem:managed (not -gpu=managed)
+    # Use list to ensure proper flag separation
+    set(OPENACC_Fortran_FLAGS_LIST "-acc=gpu" "-gpu=${GPU_ARCH},mem:managed" "-Minfo=accel" "-fast")
+    list(JOIN OPENACC_Fortran_FLAGS_LIST " " OPENACC_Fortran_FLAGS)
+    message(STATUS "OpenACC enabled with NVHPC/PGI compiler for GPU architecture: ${GPU_ARCH}")
+    message(STATUS "NVHPC OpenACC flags: ${OPENACC_Fortran_FLAGS}")
   else()
     message(WARNING "ENABLE_OPENACC=ON but OpenACC flags unknown for ${CMAKE_Fortran_COMPILER_ID}; trying -fopenacc")
     set(OPENACC_Fortran_FLAGS "-fopenacc")
   endif()
-  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${OPENACC_Fortran_FLAGS}")
-  set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} ${OPENACC_Fortran_FLAGS}")
-  set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} ${OPENACC_Fortran_FLAGS}")
-  # Link step needs -fopenacc so mkoffload/offload linking succeeds (GCC)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OPENACC_Fortran_FLAGS}")
+
+  # Flags will be applied to target later (see add_executable section)
   message(STATUS "OpenACC enabled: ${OPENACC_Fortran_FLAGS}")
 else()
   message(STATUS "OpenACC disabled (use -DENABLE_OPENACC=ON to enable)")
@@ -81,21 +113,27 @@ message( STATUS "CMAKE_Fortran_MODULE_DIRECTORY: " ${CMAKE_Fortran_MODULE_DIRECT
 find_package(OpenMP)
 
 # Use HDF5 from environment when set by module (e.g. on Compute Canada: module load hdf5)
-if(DEFINED ENV{HDF5_ROOT} AND NOT HDF5_ROOT)
-  set(HDF5_ROOT "$ENV{HDF5_ROOT}")
-endif()
-if(DEFINED ENV{HDF5_DIR} AND NOT HDF5_DIR)
-  set(HDF5_DIR "$ENV{HDF5_DIR}")
-endif()
-find_package(HDF5 REQUIRED COMPONENTS Fortran)
+# Skip HDF5 for NVHPC builds due to module incompatibility (system HDF5 compiled with gfortran)
+if(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+  message(STATUS "Skipping HDF5 for NVHPC/PGI compiler (module incompatibility)")
+  set(HDF5_FOUND FALSE)
+else()
+  if(DEFINED ENV{HDF5_ROOT} AND NOT HDF5_ROOT)
+    set(HDF5_ROOT "$ENV{HDF5_ROOT}")
+  endif()
+  if(DEFINED ENV{HDF5_DIR} AND NOT HDF5_DIR)
+    set(HDF5_DIR "$ENV{HDF5_DIR}")
+  endif()
+  find_package(HDF5 REQUIRED COMPONENTS Fortran)
 
-message( STATUS "HDF5_FOUND: " ${HDF5_FOUND} )
-message( STATUS "HDF5_Fortran_LIBRARIES: " ${HDF5_Fortran_LIBRARIES})  # /usr/local/Cellar/hdf5/1.10.5_1/lib/
-message( STATUS "HDF5_Fortran_HL_LIBRARIES: " ${HDF5_Fortran_HL_LIBRARIES} )
-message( STATUS "HDF5_INCLUDE_DIRS: " ${HDF5_INCLUDE_DIRS} )
-message( STATUS "HDF5_Fortran_INCLUDE_DIRS: " ${HDF5_Fortran_INCLUDE_DIRS} )
-message( STATUS "HDF5_LIBRARIES: " ${HDF5_LIBRARIES} )
-message( STATUS "HDF5_LIBRARY_DIRS: " ${HDF5_LIBRARY_DIRS} )
+  message( STATUS "HDF5_FOUND: " ${HDF5_FOUND} )
+  message( STATUS "HDF5_Fortran_LIBRARIES: " ${HDF5_Fortran_LIBRARIES})  # /usr/local/Cellar/hdf5/1.10.5_1/lib/
+  message( STATUS "HDF5_Fortran_HL_LIBRARIES: " ${HDF5_Fortran_HL_LIBRARIES} )
+  message( STATUS "HDF5_INCLUDE_DIRS: " ${HDF5_INCLUDE_DIRS} )
+  message( STATUS "HDF5_Fortran_INCLUDE_DIRS: " ${HDF5_Fortran_INCLUDE_DIRS} )
+  message( STATUS "HDF5_LIBRARIES: " ${HDF5_LIBRARIES} )
+  message( STATUS "HDF5_LIBRARY_DIRS: " ${HDF5_LIBRARY_DIRS} )
+endif()
 
 SET(CMAKE_Fortran_MODULE_DIRECTORY "${CMAKE_Fortran_MODULE_DIRECTORY}")
 
@@ -122,11 +160,27 @@ if(CMAKE_Fortran_COMPILER MATCHES "gfortran*")
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 
     #Compiler gfortran Flags
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -fimplicit-none")   #  -lhdf5_fortran -fintrinsic-modules-path ${HDF5_INCLUDE_DIRS}") # /usr/local/include") #  TODO find metter way to include ${HDF5_INCLUDE_DIRS}")  #/usr/local/include")  # -lhdf5hl_fortran")          # -std=f2003 ${CMAKE_Fortran_FLAGS}
-    set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -g -O0 -Wall -fbacktrace -fbounds-check")  #   -fcheck=bounds
-    set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O3  -Wall -static")
-
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -fimplicit-none")
+    set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -g -O0 -Wall -fbacktrace -fbounds-check")
+    set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -O3 -Wall -static")
     set(CMAKE_C_FLAGS "-c")
+
+elseif(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI" OR CMAKE_Fortran_COMPILER MATCHES "nvfortran*")
+    # NVHPC/PGI compiler flags for optimal GPU performance
+    set(CMAKE_SKIP_BUILD_RPATH            FALSE)
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH    TRUE)
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+    # Base optimization flags for NVHPC
+    # -Mpreprocess enables preprocessing, -DNVHPC_BUILD defines the macro
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -O3 -Minfo=opt -Mpreprocess -DNVHPC_BUILD")
+    set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} -g -O0 -Mbounds -traceback -Mpreprocess -DNVHPC_BUILD")
+    set(CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE} -fast -O3 -Mpreprocess -DNVHPC_BUILD")
+
+    # C compiler flags for NVHPC
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
+
+    message(STATUS "Using NVHPC/PGI compiler with GPU-optimized flags")
 endif()
 
 if (${CMAKE_BUILD_TYPE} MATCHES "Release")
@@ -147,9 +201,14 @@ if(OpenMP_Fortran_FOUND)
 endif()
 target_link_libraries(${TARGET} PRIVATE ${LIBS_PRIVATE})
 if(ENABLE_OPENACC)
-  target_compile_options(${TARGET} PRIVATE ${OPENACC_Fortran_FLAGS})
-  target_link_options(${TARGET} PRIVATE ${OPENACC_Fortran_FLAGS})
-  set_target_properties(${TARGET} PROPERTIES LINK_FLAGS "${OPENACC_Fortran_FLAGS}")
+  # Apply OpenACC flags as separate arguments to target
+  if(CMAKE_Fortran_COMPILER_ID STREQUAL "NVHPC" OR CMAKE_Fortran_COMPILER_ID STREQUAL "PGI")
+    target_compile_options(${TARGET} PRIVATE ${OPENACC_Fortran_FLAGS_LIST})
+    target_link_options(${TARGET} PRIVATE ${OPENACC_Fortran_FLAGS_LIST})
+  else()
+    target_compile_options(${TARGET} PRIVATE ${OPENACC_Fortran_FLAGS})
+    target_link_options(${TARGET} PRIVATE ${OPENACC_Fortran_FLAGS})
+  endif()
 endif()
 set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE Fortran)
 

@@ -143,10 +143,12 @@ program mainprogram
     use Timers
     use lattice_data_mod
     use PolymerModel_mod
+#ifndef NVHPC_BUILD
     use gpu_replica_mod
+    use analyse_mod
+#endif
     use gpu_flat_mod
     use repro_rng_mod
-    use analyse_mod
     use mpi
     use logging_mod
     use lib_conf
@@ -199,6 +201,7 @@ program mainprogram
     integer :: trajectory_i
     !real*8 :: start, finish
     integer*4 :: status = 0
+    integer*4 :: SYSTEM  ! Declare SYSTEM intrinsic function
     integer :: rc
     character(len = 20) :: col1, col2, col3, col4
     type(Logger) :: log = Logger(source = '3dpolys_le', level = LOG_INFO)
@@ -881,7 +884,12 @@ program mainprogram
             if (use_gpu) then
                 call do_simulation_replicas_flat(replicas, rank_Niter, Ninter, Nmeas, burnin, burnout, burnoutM)
             else
+#ifndef NVHPC_BUILD
                 call do_simulation_replicas(replicas, rank_Niter, Ninter, Nmeas, burnin, burnout, burnoutM, .false.)
+#else
+                call log%error('GPU replica mode (use_gpu=.false.) not available in NVHPC build. Use GPU flat mode (use_gpu=.true.)')
+                call exit(1)
+#endif
             end if
 
             deallocate(replicas)
@@ -950,20 +958,21 @@ program mainprogram
         if (.NOT.file_exists) then
             call log%info('Merge files to collect all results together from ' // trim(output_folder) // ' ...')
             status = SYSTEM('cat ' // trim(output_folder) // 'config_*.out > ' // trim(output_folder) // 'config.out')
-            if (status .eq. 0) CALL SYSTEM('rm ' // trim(output_folder) // 'config_*.out')   ! maybe keep config files but in one file are again more then one!
+            if (status .eq. 0) status = SYSTEM('rm ' // trim(output_folder) // 'config_*.out')   ! maybe keep config files but in one file are again more then one!
             status = SYSTEM('cat ' // trim(output_folder) // 'dr_*.out > ' // trim(output_folder) // 'dr.out')
-            if (status == 0) CALL SYSTEM('rm ' // trim(output_folder) // 'dr_*.out')
+            if (status == 0) status = SYSTEM('rm ' // trim(output_folder) // 'dr_*.out')
             status = SYSTEM('cat ' // trim(output_folder) // 'contact_*.out > ' // trim(output_folder) // 'contact.out')
-            if (status == 0) CALL SYSTEM('rm ' // trim(output_folder) // 'contact_*.out')
+            if (status == 0) status = SYSTEM('rm ' // trim(output_folder) // 'contact_*.out')
             status = SYSTEM('cat ' // trim(output_folder) // 'process_*.out > ' // trim(output_folder) // 'process.out')
-            if (status == 0) CALL SYSTEM('rm ' // trim(output_folder) // 'process_*.out')
+            if (status == 0) status = SYSTEM('rm ' // trim(output_folder) // 'process_*.out')
             status = SYSTEM('cat ' // trim(output_folder) // 'Nlef_*.out > ' // trim(output_folder) // 'Nlef.out')
-            if (status == 0) CALL SYSTEM('rm ' // trim(output_folder) // 'Nlef_*.out')
+            if (status == 0) status = SYSTEM('rm ' // trim(output_folder) // 'Nlef_*.out')
             call log%info(crono%Tac('Merged files'))
         end if
     end if
 
     if ((rank == 0).and.do_analyse) then
+#ifndef NVHPC_BUILD
         call log%info('MPI root rank final analyse ...')
 
         status = SYSTEM('mkdir -p ' // trim(analyse_folder))
@@ -973,6 +982,9 @@ program mainprogram
                 params = params, Niter = Niter, Nmeas = Nmeas, &
                 output_folder = output_folder, analyse_folder = analyse_folder, &
                 hic3d_factor = hic3d_factor, chrom = chrom)
+#else
+        call log%warn('Analysis (HDF5 output) not available in NVHPC build')
+#endif
         call log%info(crono%Tac('Finished analyse'))
     end if
 

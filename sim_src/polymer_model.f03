@@ -484,7 +484,7 @@ contains
     end subroutine initconfig_sim_out
 
     subroutine trialmoveex(self)
-        !$acc routine seq
+        ! Note: Removed !$acc routine seq - not used in GPU flat array path
         ! trial move to move a LEF leg
         implicit none
         class (PolymerModel), intent(inout) :: self
@@ -606,7 +606,7 @@ contains
     ! *************
 
     subroutine trialmovetad(self)
-        !$acc routine seq
+        ! Note: Removed !$acc routine seq - not used in GPU flat array path
         !trial move for monomer
         implicit none
         class (PolymerModel), intent(inout) :: self
@@ -897,7 +897,7 @@ contains
     ! ****************
 
     subroutine trialbound(self)
-        !$acc routine seq
+        ! Note: Removed !$acc routine seq - not used in GPU flat array path
         !trial move for binding LEF
         implicit none
         class (PolymerModel), intent(inout) :: self
@@ -967,7 +967,7 @@ contains
     ! ******
 
     subroutine trialunbound(self)
-        !$acc routine seq
+        ! Note: Removed !$acc routine seq - not used in GPU flat array path
         !trial move for unbinding LEF
         implicit none
         class (PolymerModel), intent(inout) :: self
@@ -1183,7 +1183,8 @@ contains
     end subroutine import_state_flat
 
     real(8) function get_random(self)
-        !$acc routine seq
+        ! Note: Removed !$acc routine seq because random_seed() intrinsic
+        ! is not supported in NVHPC OpenACC device code
         class (PolymerModel), intent(inout) :: self
         if (allocated(self%rng_state_rep)) then
             get_random = repro_rng_next(self%rng_state_rep(1))
@@ -1196,7 +1197,7 @@ contains
     end function get_random
 
     subroutine advance_one_measurement_interval(self, Ninter)
-        !$acc routine seq
+        ! Note: Removed !$acc routine seq - not used in GPU flat array path
         ! Advance state by one measurement interval (Ninter * Ntrial steps). No I/O.
         implicit none
         class (PolymerModel), intent(inout) :: self
@@ -1225,7 +1226,7 @@ contains
     end subroutine advance_one_measurement_interval
 
     subroutine run_burnin_phase(self, burnin)
-        !$acc routine seq
+        ! Note: Removed !$acc routine seq - not used in GPU flat array path
         ! Run burn-in: simburnin = burnin + int(r*burnin), then simburnin*Nchain trialmovetad. No I/O.
         implicit none
         class (PolymerModel), intent(inout) :: self
@@ -1242,7 +1243,7 @@ contains
     end subroutine run_burnin_phase
 
     subroutine run_burnout_only_phase(self, burnout)
-        !$acc routine seq
+        ! Note: Removed !$acc routine seq - not used in GPU flat array path
         ! Run burnout block: unbound_all + burnout*Nchain trialmovetad. No I/O.
         implicit none
         class (PolymerModel), intent(inout) :: self
@@ -1260,7 +1261,7 @@ contains
     end subroutine run_burnout_only_phase
 
     subroutine run_burnoutM_one_phase(self, Ninter)
-        !$acc routine seq
+        ! Note: Removed !$acc routine seq - not used in GPU flat array path
         ! Run one burnoutM step: unbound_all + Ninter*Nchain trialmovetad. No I/O.
         implicit none
         class (PolymerModel), intent(inout) :: self

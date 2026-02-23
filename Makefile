@@ -1,4 +1,4 @@
-.PHONY: all build build-gcc build-gcc-noacc debug env install test doc sif
+.PHONY: all build build-gcc build-gcc-noacc build-nvhpc build-nvhpc-a100 build-nvhpc-v100 debug env install test doc sif
 
 build:
 	rm -rf cmake-build
@@ -20,6 +20,36 @@ build-gcc-noacc:
 	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build -S . -DENABLE_OPENACC=OFF \
 		-DCMAKE_Fortran_COMPILER=gfortran -DCMAKE_C_COMPILER=gcc
 	cmake --build cmake-build --target 3dpolys_le -- -j 6
+
+# Build with NVHPC compiler (nvfortran) with full GPU support and OpenACC
+# Load NVHPC, openmpi, and hdf5: e.g. "module load nvhpc openmpi hdf5 && make build-nvhpc"
+# Auto-detects GPU architecture or specify with: make build-nvhpc GPU_ARCH=cc80
+build-nvhpc:
+	rm -rf cmake-build
+	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build -S . -DENABLE_OPENACC=ON \
+		-DCMAKE_Fortran_COMPILER=nvfortran -DCMAKE_C_COMPILER=nvc \
+		$(if $(GPU_ARCH),-DGPU_ARCH=$(GPU_ARCH),)
+	cmake --build cmake-build --target 3dpolys_le -- -j 6
+
+# Build with NVHPC for NVIDIA A100 GPU (compute capability 8.0)
+build-nvhpc-a100:
+	$(MAKE) build-nvhpc GPU_ARCH=cc80
+
+# Build with NVHPC for NVIDIA V100 GPU (compute capability 7.0)
+build-nvhpc-v100:
+	$(MAKE) build-nvhpc GPU_ARCH=cc70
+
+# Build with NVHPC for NVIDIA T4 GPU (compute capability 7.5)
+build-nvhpc-t4:
+	$(MAKE) build-nvhpc GPU_ARCH=cc75
+
+# Build with NVHPC for NVIDIA P100 GPU (compute capability 6.0)
+build-nvhpc-p100:
+	$(MAKE) build-nvhpc GPU_ARCH=cc60
+
+# Build with NVHPC for NVIDIA H100 GPU (compute capability 9.0)
+build-nvhpc-h100:
+	$(MAKE) build-nvhpc GPU_ARCH=cc90
 
 debug:
 	rm -rf cmake-build-debug
