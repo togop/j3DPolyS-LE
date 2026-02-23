@@ -4,4 +4,4 @@ url = "https://test.pypi.org/simple/"
 publish-url = "https://test.pypi.org/legacy/"
 explicit = true
 username = "__token__"
-password = "pypi-AgENdGVzdC5weXBpLm9yZwIkNmFiNWQ4ZjUtZjQzMC00ODIwLTliNDEtZDdhMmZhMDZkNjE1AAIUWzEsWyJweTNkcG9seXMtbGUiXV0AAixbMixbImM5YTczOGZlLWU5YTEtNGVlZC1iZjcxLTFlODY0MzUzMWY0ZCJdXQAABiCYWPnRWPSM0Bbloy0WLh0Qo_N8ydh7iEEI-_qgHjYsQQ"
+password = "_REPLACE_"
