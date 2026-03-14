@@ -152,8 +152,23 @@ function run(output_folder::String; hic_wildcard::String = DEFAULT_HIC_WILDCARD,
         hic_log = log10.(replace(hic, 0.0 => 1e-10))
         
         res_kb = resolution / 1000
+        n = size(hic_log, 1)
+        # Axis formatters: show bin indices as genomic position in kb (like Python FuncFormatter)
+        tick_step = max(1, n ÷ 10)
+        tick_pos = 1:tick_step:n
+        tick_labels = round.(Int, (tick_pos .* res_kb))
         
-        p = heatmap(hic_log, colormap=get_plots_colormap(cmap), title=replace(title, "{hic_file}" => basename(hic_file)))
+        # Title: clean hic_file like Python (replace '_hic_003.hdf5', '' and './')
+        hic_file_clean = replace(hic_file, "_hic_003.hdf5" => "")
+        hic_file_clean = replace(hic_file_clean, "./" => "")
+        title_str = replace(title, "{hic_file}" => hic_file_clean)
+        title_str = replace(title_str, "{output_folder}" => output_folder)
+        title_str = replace(title_str, "{resolution}" => string(resolution))
+        title_str = replace(title_str, "{balanced}" => string(balanced))
+        
+        p = heatmap(hic_log, colormap=get_plots_colormap(cmap), title=title_str,
+                    xticks=(tick_pos, string.(tick_labels)),
+                    yticks=(tick_pos, string.(tick_labels)))
         
         if length(clim) > 1
             plot!(p, clims=(clim[1], clim[2]))
@@ -163,7 +178,7 @@ function run(output_folder::String; hic_wildcard::String = DEFAULT_HIC_WILDCARD,
         extension = split(basename_file, ".")[end]
         plot_file = joinpath(output_folder, replace(basename_file, ".$extension" => "_$(cmap).$(plot_format)"))
         
-        savefig(p, plot_file)
+        savefig(p, plot_file; dpi=DEFAULT_DPI)
         @info "Hic plot saved in file $plot_file"
     end
 end

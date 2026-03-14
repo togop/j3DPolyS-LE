@@ -567,7 +567,7 @@ function cli_parser()
             help = "Contact radius in lattice units"
             arg_type = Float64
             default = 0.0
-        "--list_contact_radii", "-k"
+        "--list_contact_radii", "-lr"
             help = "List of contact radii"
             nargs = '+'
             default = ["2.84"]

@@ -958,6 +958,11 @@ dev = [
     { name = "pytest-flake8" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "cooler" },
@@ -978,6 +983,9 @@ requires-dist = [
     { name = "setuptools", specifier = "<81" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8.3.5" }]
 
 [[package]]
 name = "pycodestyle"

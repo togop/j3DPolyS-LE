@@ -26,8 +26,8 @@ function cli_parser()
         "--boundary", "-b"
             help = "Boundary file in TSV format"
             arg_type = String
-        "--boundary_direction", "-d"
-            help = "Impermeability direction applied to all boundaries"
+        "--boundary_direction", "-bd"
+            help = "Impermeability direction applied to all boundaries: -1: opposite, 0: both, 1: same direction"
             arg_type = Int
             default = 0
         "--tads_boundary", "-t"
@@ -49,14 +49,14 @@ function cli_parser()
             help = "Contact radius in lattice units"
             arg_type = Float64
             default = 0.0
-        "--contact_probability", "-y"
-            help = "Use contact radius probability"
+        "--contact_probability", "-cp"
+            help = "Use contact radius probability: (1 - r^2 / max_r^2)"
             action = :store_true
         "--stats_file", "-f"
             help = "Simulation statistics' repository file"
             default = "./sim_stats.csv"
-        "--resolution", "-q"
-            help = "Resolution to downscale Chip-seq output data"
+        "--resolution", "-res"
+            help = "Resolution to downscale Chip-seq output data in .bedGraph format (default 2kb)"
             arg_type = Int
             default = HicAnalysis.SIM_RESOLUTION
         "--replace"

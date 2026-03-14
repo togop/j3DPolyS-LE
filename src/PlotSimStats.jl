@@ -102,12 +102,16 @@ function plot_for_radius(subplot, r::String, z_col::String, color, sim_stats_all
         # Convert column names (km values) to numeric
         km_numeric = [parse(Float64, string(k)) for k in km_values]
         
-        # Create heatmap with proper axis labels
-        return heatmap(data_matrix, 
+        # Cell annotations (like Python annot=True, fmt='.2f')
+        ann = [(j, i, @sprintf("%.2f", data_matrix[i, j])) for i in 1:size(data_matrix, 1) for j in 1:size(data_matrix, 2)]
+        
+        # Create heatmap with proper axis labels, colorbar label, and cell value annotations
+        return heatmap(data_matrix,
                       xticks=(1:length(km_numeric), [@sprintf("%.2e", k) for k in km_numeric]),
                       yticks=(1:length(nlef_values), string.(nlef_values)),
-                      xlabel="km", ylabel="Nlef", 
-                      title=z_col,
+                      xlabel="km", ylabel="Nlef",
+                      right_title=z_col,  # colorbar label (like cbar_kws={'label': z_col})
+                      annotations=ann,
                       colormap=get_plots_colormap(args["cmap"]))
     else
         return scatter3d!(subplot, x, y, z, color=color, marker=:circle)
@@ -139,12 +143,12 @@ function loop_radii(radii::Vector{String}, list_nlef::Union{Vector{Int}, Nothing
         
         if args["plot_mode"] == PLOT_HMAP && subplot !== nothing
             basename_file = basename(args["stats_file"])
-            title!(fig, "Heatmap of '$z_col' with contact radius:$r for: \n$basename_file")
-            xlabel!(fig, "km")
-            ylabel!(fig, "Nlef")
+            title!(subplot, "Heatmap of '$z_col' with contact radius:$r for: \n$basename_file")
+            xlabel!(subplot, "km")
+            ylabel!(subplot, "Nlef")
             
             file_name = "$(basename_file)_$(args["plot_mode"])_$(z_col)_r$(r).$(args["file_extension"])"
-            savefig(fig, joinpath(args["output_folder"], file_name))
+            savefig(subplot, joinpath(args["output_folder"], file_name))
             @info "Plot saved in $file_name"
         end
     end
@@ -211,8 +215,8 @@ function main()
             nargs = '*'
             arg_type = Int
             default = Int[]
-        "--list_contact_radii", "-k"
-            help = "Show data only for the list of contact radii"
+        "--list_contact_radii", "-lr"
+            help = "Show data only for the list of contact radii with a different color for every contact radius"
             nargs = '+'
             default = ["2.84", "3.55"]
     end

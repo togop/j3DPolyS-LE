@@ -78,3 +78,8 @@ Homepage = "https://gitlab.com/togop/3DPolyS-LE"
 
 [tool.isort]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]
+
