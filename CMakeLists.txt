@@ -12,9 +12,6 @@ set(CMAKE_CXX_LINKER_PREFERENCE_PROPAGATES FALSE)
 #set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
 
 include(mpi.cmake)
-if(NOT hasMPI)
-    return()
-endif()
 
 set(TARGET 3dpolys_le)
 set(SOURCE_FOLDER sim_src)
