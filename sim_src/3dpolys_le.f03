@@ -880,7 +880,9 @@ program mainprogram
     call log%debug('PASSED MPI_Barrier for rank ' // trim(str(rank)))
 
     if (rank == 0) then
-        call log%info(crono%Tac('END Running similations'))
+        if (.not.do_analyse) then
+            call log%info(crono%Tac('END Running similations'))
+        end if
 
         call crono%Tic()
         ! TODO take care of old files or remove them before generating the new one

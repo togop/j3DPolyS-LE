@@ -110,7 +110,7 @@ contains
 
         call log%debug('allocate self%Nchain: ' // trim(str(self%Nchain)) // ' bittable_t: ' // trim(str(bittable_t)))
 
-        ! call deallocate(self) ! make sure it's free
+        call deallocate(self) ! make sure it's free before re-allocate
         allocate (self%config(2, self%Nchain))
         allocate (self%bittable(14, bittable_t))
         allocate (self%dr(3, self%Nchain))
