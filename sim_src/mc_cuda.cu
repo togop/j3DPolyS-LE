@@ -10,16 +10,6 @@
 #define EVMAX 65536
 #define DIRPAD 14
 
-#define CUDA_TRY(call)                                                         \
-    do {                                                                       \
-        cudaError_t _e = (call);                                               \
-        if (_e != cudaSuccess) {                                               \
-            std::fprintf(stderr, "CUDA error %s:%d: %s\n", __FILE__, __LINE__, \
-                         cudaGetErrorString(_e));                              \
-            return -1;                                                         \
-        }                                                                      \
-    } while (0)
-
 struct McShared {
     int *opp;
     float *voisxyz;
@@ -714,99 +704,100 @@ int mc_cuda_create(McCudaState **out, const McCudaParams *p, const int *opp,
     }
 
     const int T = p->T;
-    int rc = 0;
-    auto fail = [&]() {
-        std::free(h_vnn);
-        std::free(h_cnc);
-        std::free(h_nbr);
-        std::free(h_bnd);
-        std::free(h_lf);
-        std::free(h_is);
-        mc_cuda_destroy(s);
-        return -1;
-    };
+    int failed = 0;
 
     if (cudaMalloc(&s->sh.opp, sizeof(int) * DIRPAD) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->sh.voisxyz, sizeof(float) * DIRPAD * 4) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->sh.costhet, sizeof(float) * DIRPAD * DIRPAD) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->sh.voisnn, sizeof(int) * DIRPAD * DIRPAD * DIRPAD) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->sh.connec, sizeof(int) * DIRPAD * DIRPAD * DIRPAD) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->sh.nbr, sizeof(int) * s->Apad * DIRPAD) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->sh.boundary, sizeof(float) * s->Npad * 2) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->sh.loadfac, sizeof(float) * s->Npad) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->sh.istate, sizeof(int) * s->Npad) != cudaSuccess)
-        return fail();
+        failed = 1;
+    if (!failed && cudaMalloc(&s->sh.voisxyz, sizeof(float) * DIRPAD * 4) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->sh.costhet, sizeof(float) * DIRPAD * DIRPAD) != cudaSuccess)
+        failed = 1;
+    if (!failed &&
+        cudaMalloc(&s->sh.voisnn, sizeof(int) * DIRPAD * DIRPAD * DIRPAD) != cudaSuccess)
+        failed = 1;
+    if (!failed &&
+        cudaMalloc(&s->sh.connec, sizeof(int) * DIRPAD * DIRPAD * DIRPAD) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->sh.nbr, sizeof(int) * s->Apad * DIRPAD) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->sh.boundary, sizeof(float) * s->Npad * 2) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->sh.loadfac, sizeof(float) * s->Npad) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->sh.istate, sizeof(int) * s->Npad) != cudaSuccess)
+        failed = 1;
 
-    if (cudaMemcpy(s->sh.opp, h_opp, sizeof(int) * DIRPAD, cudaMemcpyHostToDevice) !=
-        cudaSuccess)
-        return fail();
-    if (cudaMemcpy(s->sh.voisxyz, h_vxyz, sizeof(float) * DIRPAD * 4,
+    if (!failed &&
+        cudaMemcpy(s->sh.opp, h_opp, sizeof(int) * DIRPAD, cudaMemcpyHostToDevice) !=
+            cudaSuccess)
+        failed = 1;
+    if (!failed &&
+        cudaMemcpy(s->sh.voisxyz, h_vxyz, sizeof(float) * DIRPAD * 4,
                    cudaMemcpyHostToDevice) != cudaSuccess)
-        return fail();
-    if (cudaMemcpy(s->sh.costhet, h_cth, sizeof(float) * DIRPAD * DIRPAD,
+        failed = 1;
+    if (!failed &&
+        cudaMemcpy(s->sh.costhet, h_cth, sizeof(float) * DIRPAD * DIRPAD,
                    cudaMemcpyHostToDevice) != cudaSuccess)
-        return fail();
-    if (cudaMemcpy(s->sh.voisnn, h_vnn, sizeof(int) * DIRPAD * DIRPAD * DIRPAD,
+        failed = 1;
+    if (!failed &&
+        cudaMemcpy(s->sh.voisnn, h_vnn, sizeof(int) * DIRPAD * DIRPAD * DIRPAD,
                    cudaMemcpyHostToDevice) != cudaSuccess)
-        return fail();
-    if (cudaMemcpy(s->sh.connec, h_cnc, sizeof(int) * DIRPAD * DIRPAD * DIRPAD,
+        failed = 1;
+    if (!failed &&
+        cudaMemcpy(s->sh.connec, h_cnc, sizeof(int) * DIRPAD * DIRPAD * DIRPAD,
                    cudaMemcpyHostToDevice) != cudaSuccess)
-        return fail();
-    if (cudaMemcpy(s->sh.nbr, h_nbr, sizeof(int) * s->Apad * DIRPAD,
+        failed = 1;
+    if (!failed &&
+        cudaMemcpy(s->sh.nbr, h_nbr, sizeof(int) * s->Apad * DIRPAD,
                    cudaMemcpyHostToDevice) != cudaSuccess)
-        return fail();
-    if (cudaMemcpy(s->sh.boundary, h_bnd, sizeof(float) * s->Npad * 2,
+        failed = 1;
+    if (!failed &&
+        cudaMemcpy(s->sh.boundary, h_bnd, sizeof(float) * s->Npad * 2,
                    cudaMemcpyHostToDevice) != cudaSuccess)
-        return fail();
-    if (cudaMemcpy(s->sh.loadfac, h_lf, sizeof(float) * s->Npad,
+        failed = 1;
+    if (!failed &&
+        cudaMemcpy(s->sh.loadfac, h_lf, sizeof(float) * s->Npad,
                    cudaMemcpyHostToDevice) != cudaSuccess)
-        return fail();
-    if (cudaMemcpy(s->sh.istate, h_is, sizeof(int) * s->Npad,
+        failed = 1;
+    if (!failed &&
+        cudaMemcpy(s->sh.istate, h_is, sizeof(int) * s->Npad,
                    cudaMemcpyHostToDevice) != cudaSuccess)
-        return fail();
+        failed = 1;
 
-    if (cudaMalloc(&s->d_config, sizeof(int) * T * s->Npad * 2) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->d_contact, sizeof(int) * T * s->Npad * 3) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->d_dr, sizeof(float) * T * s->Npad * 3) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->d_occ, sizeof(int) * T * s->Apad) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->d_nint, sizeof(int) * T * s->Apad) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->d_nfree, sizeof(int) * T) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->d_rng, sizeof(unsigned long long) * T * 2) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->d_nsteps_t, sizeof(int) * T) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->d_ev_n, sizeof(int) * T * EVMAX) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->d_ev_id, sizeof(int) * T * EVMAX) != cudaSuccess)
-        return fail();
-    if (cudaMalloc(&s->d_ev_cnt, sizeof(int) * T) != cudaSuccess)
-        return fail();
-    if (cudaMemset(s->d_ev_cnt, 0, sizeof(int) * T) != cudaSuccess)
-        return fail();
-    if (cudaMemset(s->d_config, 0, sizeof(int) * T * s->Npad * 2) != cudaSuccess)
-        return fail();
-    if (cudaMemset(s->d_contact, 0, sizeof(int) * T * s->Npad * 3) != cudaSuccess)
-        return fail();
-    if (cudaMemset(s->d_dr, 0, sizeof(float) * T * s->Npad * 3) != cudaSuccess)
-        return fail();
-    if (cudaMemset(s->d_occ, 0, sizeof(int) * T * s->Apad) != cudaSuccess)
-        return fail();
-    if (cudaMemset(s->d_nint, 0, sizeof(int) * T * s->Apad) != cudaSuccess)
-        return fail();
+    if (!failed && cudaMalloc(&s->d_config, sizeof(int) * T * s->Npad * 2) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->d_contact, sizeof(int) * T * s->Npad * 3) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->d_dr, sizeof(float) * T * s->Npad * 3) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->d_occ, sizeof(int) * T * s->Apad) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->d_nint, sizeof(int) * T * s->Apad) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->d_nfree, sizeof(int) * T) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->d_rng, sizeof(unsigned long long) * T * 2) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->d_nsteps_t, sizeof(int) * T) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->d_ev_n, sizeof(int) * T * EVMAX) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->d_ev_id, sizeof(int) * T * EVMAX) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMalloc(&s->d_ev_cnt, sizeof(int) * T) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMemset(s->d_ev_cnt, 0, sizeof(int) * T) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMemset(s->d_config, 0, sizeof(int) * T * s->Npad * 2) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMemset(s->d_contact, 0, sizeof(int) * T * s->Npad * 3) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMemset(s->d_dr, 0, sizeof(float) * T * s->Npad * 3) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMemset(s->d_occ, 0, sizeof(int) * T * s->Apad) != cudaSuccess)
+        failed = 1;
+    if (!failed && cudaMemset(s->d_nint, 0, sizeof(int) * T * s->Apad) != cudaSuccess)
+        failed = 1;
 
     std::free(h_vnn);
     std::free(h_cnc);
@@ -814,7 +805,10 @@ int mc_cuda_create(McCudaState **out, const McCudaParams *p, const int *opp,
     std::free(h_bnd);
     std::free(h_lf);
     std::free(h_is);
-    (void)rc;
+    if (failed) {
+        mc_cuda_destroy(s);
+        return -1;
+    }
     *out = s;
     return 0;
 }

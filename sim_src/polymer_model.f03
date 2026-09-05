@@ -29,14 +29,14 @@ module PolymerModel_mod
         real, public :: kb, ku, km, Ea, Ei, kint = 1.17
         logical, public :: z_loop = .false.
         logical, public :: unidirectional = .false.
-        ! allocatable
-        integer, dimension(:, :), allocatable :: config
-        integer, dimension(:, :), allocatable :: bittable
-        real, dimension(:, :), allocatable :: dr
-        integer, dimension(:, :), allocatable :: contact
-        real, dimension(:, :), allocatable :: boundary
-        real, dimension(:), allocatable :: loading_sites_factor
-        integer, dimension(:), allocatable :: interaction_sites_state
+        ! allocatable polymer state (public so the optional CUDA binder can upload/download)
+        integer, dimension(:, :), allocatable, public :: config
+        integer, dimension(:, :), allocatable, public :: bittable
+        real, dimension(:, :), allocatable, public :: dr
+        integer, dimension(:, :), allocatable, public :: contact
+        real, dimension(:, :), allocatable, public :: boundary
+        real, dimension(:), allocatable, public :: loading_sites_factor
+        integer, dimension(:), allocatable, public :: interaction_sites_state
 
     contains
         procedure, public :: init, do_simulation, trialmoveex, trialmovetad, trialbound, trialunbound, unbound_all, &

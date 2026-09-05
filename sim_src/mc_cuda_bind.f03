@@ -14,30 +14,7 @@ module mc_cuda_mod
 
     type(Logger) :: log = Logger('mc_cuda_mod', LOG_INFO)
 
-contains
-
-#ifndef USE_CUDA
-
-    integer function mc_cuda_is_compiled()
-        mc_cuda_is_compiled = 0
-    end function mc_cuda_is_compiled
-
-    integer function mc_cuda_has_device()
-        mc_cuda_has_device = 0
-    end function mc_cuda_has_device
-
-    subroutine run_cuda_rank(models, ntraj, rank, Ninter, Nmeas, burnin, burnout, burnoutM, seed, success)
-        type(PolymerModel), intent(inout) :: models(:)
-        integer, intent(in) :: ntraj, rank, Ninter, Nmeas, burnin, burnout, burnoutM, seed
-        logical, intent(out) :: success
-        success = .false.
-        if (ntraj < 0 .or. rank < 0 .or. Ninter < 0 .or. Nmeas < 0) return
-        if (burnin < 0 .or. burnout < 0 .or. burnoutM < 0 .or. seed == 0) return
-        if (size(models) < 0) return
-    end subroutine run_cuda_rank
-
-#else
-
+#ifdef USE_CUDA
     type, bind(C) :: McCudaParamsC
         integer(c_int) :: T, N, naddr, nlef0
         integer(c_int) :: iku, ikm, ikb
@@ -130,6 +107,31 @@ contains
             type(c_ptr), value :: s
         end subroutine mc_cuda_destroy
     end interface
+#endif
+
+contains
+
+#ifndef USE_CUDA
+
+    integer function mc_cuda_is_compiled()
+        mc_cuda_is_compiled = 0
+    end function mc_cuda_is_compiled
+
+    integer function mc_cuda_has_device()
+        mc_cuda_has_device = 0
+    end function mc_cuda_has_device
+
+    subroutine run_cuda_rank(models, ntraj, rank, Ninter, Nmeas, burnin, burnout, burnoutM, seed, success)
+        type(PolymerModel), intent(inout) :: models(:)
+        integer, intent(in) :: ntraj, rank, Ninter, Nmeas, burnin, burnout, burnoutM, seed
+        logical, intent(out) :: success
+        success = .false.
+        if (ntraj < 0 .or. rank < 0 .or. Ninter < 0 .or. Nmeas < 0) return
+        if (burnin < 0 .or. burnout < 0 .or. burnoutM < 0 .or. seed == 0) return
+        if (size(models) < 0) return
+    end subroutine run_cuda_rank
+
+#else
 
     integer function mc_cuda_is_compiled()
         mc_cuda_is_compiled = int(mc_cuda_compiled())
@@ -247,8 +249,13 @@ contains
                 return
             end if
             meas = meas + 1
-            call download_all(st, models, ntraj, N, meas, snap_cfg, snap_con, snap_dr, &
+            rc = download_all(st, models, ntraj, N, meas, snap_cfg, snap_con, snap_dr, &
                     snap_nlef, all_ev_n, all_ev_id, all_ev_cnt, evcap, bufn, bufid, evbuf)
+            if (rc /= 0) then
+                call log%warn('CUDA burn-in download failed')
+                call mc_cuda_destroy(st)
+                return
+            end if
             call log%info('CUDA burn-in measurement stored for T=' // trim(str(ntraj)))
         end if
 
@@ -263,8 +270,13 @@ contains
             end if
             step0 = step0 + Ninter
             meas = meas + 1
-            call download_all(st, models, ntraj, N, meas, snap_cfg, snap_con, snap_dr, &
+            rc = download_all(st, models, ntraj, N, meas, snap_cfg, snap_con, snap_dr, &
                     snap_nlef, all_ev_n, all_ev_id, all_ev_cnt, evcap, bufn, bufid, evbuf)
+            if (rc /= 0) then
+                call log%warn('CUDA mixed download failed')
+                call mc_cuda_destroy(st)
+                return
+            end if
             call log%info('CUDA measurement ' // trim(str(j)) // ' stored for T=' // trim(str(ntraj)))
         end do
 
@@ -277,8 +289,13 @@ contains
                 return
             end if
             meas = meas + 1
-            call download_all(st, models, ntraj, N, meas, snap_cfg, snap_con, snap_dr, &
+            rc = download_all(st, models, ntraj, N, meas, snap_cfg, snap_con, snap_dr, &
                     snap_nlef, all_ev_n, all_ev_id, all_ev_cnt, evcap, bufn, bufid, evbuf)
+            if (rc /= 0) then
+                call log%warn('CUDA burnout download failed')
+                call mc_cuda_destroy(st)
+                return
+            end if
             call log%info('CUDA fix burn-out measurement stored')
         end if
 
@@ -295,8 +312,13 @@ contains
                     return
                 end if
                 meas = meas + 1
-                call download_all(st, models, ntraj, N, meas, snap_cfg, snap_con, snap_dr, &
+                rc = download_all(st, models, ntraj, N, meas, snap_cfg, snap_con, snap_dr, &
                         snap_nlef, all_ev_n, all_ev_id, all_ev_cnt, evcap, bufn, bufid, evbuf)
+                if (rc /= 0) then
+                    call log%warn('CUDA burnoutM download failed')
+                    call mc_cuda_destroy(st)
+                    return
+                end if
                 call log%info('CUDA burn-out measurement ' // trim(str(j)) // ' stored')
             end do
         end if
@@ -325,7 +347,7 @@ contains
         call log%info('CUDA batch finished, wrote snapshots in trajectory-major order')
     end subroutine run_cuda_rank
 
-    subroutine download_all(st, models, ntraj, N, meas, snap_cfg, snap_con, snap_dr, &
+    integer function download_all(st, models, ntraj, N, meas, snap_cfg, snap_con, snap_dr, &
             snap_nlef, all_ev_n, all_ev_id, all_ev_cnt, evcap, bufn, bufid, evbuf)
         type(c_ptr), intent(in) :: st
         type(PolymerModel), intent(in) :: models(:)
@@ -338,30 +360,36 @@ contains
         integer, allocatable :: tmp_cfg(:, :), tmp_con(:, :)
         real, allocatable :: tmp_dr(:, :)
 
+        download_all = -1
         allocate(tmp_cfg(2, N), tmp_con(3, N), tmp_dr(3, N))
         do t = 1, ntraj
             nfree = models(t)%Nleffree
             rc = mc_cuda_download_traj(st, t - 1, tmp_cfg, tmp_con, c_null_ptr, tmp_dr, nfree)
-            if (rc == 0) then
-                snap_cfg(:, :, meas, t) = tmp_cfg
-                snap_con(:, :, meas, t) = tmp_con
-                snap_dr(:, :, meas, t) = tmp_dr
-                snap_nlef(meas, t) = nfree
+            if (rc /= 0) then
+                deallocate(tmp_cfg, tmp_con, tmp_dr)
+                return
             end if
+            snap_cfg(:, :, meas, t) = tmp_cfg
+            snap_con(:, :, meas, t) = tmp_con
+            snap_dr(:, :, meas, t) = tmp_dr
+            snap_nlef(meas, t) = nfree
             evc = 0
             rc = mc_cuda_download_unbind(st, t - 1, evbuf, bufn, bufid, evc)
-            if (rc == 0) then
-                do i = 1, evc
-                    if (all_ev_cnt(t) < evcap) then
-                        all_ev_cnt(t) = all_ev_cnt(t) + 1
-                        all_ev_n(all_ev_cnt(t), t) = bufn(i)
-                        all_ev_id(all_ev_cnt(t), t) = bufid(i)
-                    end if
-                end do
+            if (rc /= 0) then
+                deallocate(tmp_cfg, tmp_con, tmp_dr)
+                return
             end if
+            do i = 1, evc
+                if (all_ev_cnt(t) < evcap) then
+                    all_ev_cnt(t) = all_ev_cnt(t) + 1
+                    all_ev_n(all_ev_cnt(t), t) = bufn(i)
+                    all_ev_id(all_ev_cnt(t), t) = bufid(i)
+                end if
+            end do
         end do
         deallocate(tmp_cfg, tmp_con, tmp_dr)
-    end subroutine download_all
+        download_all = 0
+    end function download_all
 
 #endif
 
