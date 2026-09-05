@@ -6,9 +6,12 @@ build:
 	cmake --build cmake-build --target 3dpolys_le -- -j 6
 
 # Optional CUDA MC backend (requires nvcc / CUDA toolkit). Default `build` stays CPU-only.
+# Override GPU archs if needed, e.g. Tesla T4:  make build-cuda CUDA_ARCHS=75
+CUDA_ARCHS ?=
 build-cuda:
 	rm -rf cmake-build-cuda
-	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build-cuda -S . -DUSE_CUDA=ON
+	cmake -G "Unix Makefiles" -Bcmake-build-cuda -S . -DUSE_CUDA=ON \
+		$(if $(CUDA_ARCHS),-DCMAKE_CUDA_ARCHITECTURES=$(CUDA_ARCHS),)
 	cmake --build cmake-build-cuda --target 3dpolys_le -- -j 6
 
 debug:

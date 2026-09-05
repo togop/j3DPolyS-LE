@@ -20,6 +20,11 @@ cmake --build cmake-build-cuda --target 3dpolys_le
 
 # or
 make build-cuda
+
+# CUDA 13 dropped sm_60 (Pascal). Default archs are chosen from the nvcc version.
+# Tesla T4 (sm_75), or any explicit list:
+make build-cuda CUDA_ARCHS=75
+# cmake -B cmake-build-cuda -S . -DUSE_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=75
 ```
 
 `-DUSE_CUDA=ON` enables `enable_language(CUDA)`, compiles `sim_src/mc_cuda.cu`,
