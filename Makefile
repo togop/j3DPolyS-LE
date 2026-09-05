@@ -1,9 +1,15 @@
-.PHONY: all build debug env install test doc sif
+.PHONY: all build build-cuda debug env install test doc sif
 
 build:
 	rm -rf cmake-build
 	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build -S . -DENABLE_OPENMP=ON -DENABLE_OPENACC=ON
 	cmake --build cmake-build --target 3dpolys_le -- -j 6
+
+# Optional CUDA MC backend (requires nvcc / CUDA toolkit). Default `build` stays CPU-only.
+build-cuda:
+	rm -rf cmake-build-cuda
+	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build-cuda -S . -DUSE_CUDA=ON
+	cmake --build cmake-build-cuda --target 3dpolys_le -- -j 6
 
 debug:
 	cmake -G "CodeBlocks - Unix Makefiles" -Bcmake-build-debug -S . -DCMAKE_BUILD_TYPE=Debug

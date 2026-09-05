@@ -16,11 +16,37 @@ include(mpi.cmake)
 set(TARGET 3dpolys_le)
 set(SOURCE_FOLDER sim_src)
 # Unified sources compiled into executable only (no static libs from same sources = no duplicate symbol linker errors)
-set(SOURCE_FILES ${SOURCE_FOLDER}/logging.f03 ${SOURCE_FOLDER}/randomnumber.f03 ${SOURCE_FOLDER}/kinds.f03 ${SOURCE_FOLDER}/timers.f03 ${SOURCE_FOLDER}/lib_conf.f90 ${SOURCE_FOLDER}/lattice_data.f03 ${SOURCE_FOLDER}/polymer_model.f03 ${SOURCE_FOLDER}/analyse.f03 ${SOURCE_FOLDER}/3dpolys_le.f03)
+set(SOURCE_FILES ${SOURCE_FOLDER}/logging.f03 ${SOURCE_FOLDER}/randomnumber.f03 ${SOURCE_FOLDER}/kinds.f03 ${SOURCE_FOLDER}/timers.f03 ${SOURCE_FOLDER}/lib_conf.f90 ${SOURCE_FOLDER}/lattice_data.f03 ${SOURCE_FOLDER}/polymer_model.f03 ${SOURCE_FOLDER}/analyse.f03 ${SOURCE_FOLDER}/mc_cuda_bind.f03 ${SOURCE_FOLDER}/3dpolys_le.f03)
 set(PACKAGE py3dpolys_le/bin)
 
 set(CMAKE_Fortran_SOURCE_FILE_EXTENSIONS f03;f90)
 set_source_files_properties(${SOURCE_FILES} PROPERTIES LANGUAGE Fortran)
+
+# Optional CUDA MC backend (nvcc + ISO_C_BINDING). Default OFF so gfortran+MPI+HDF5
+# still builds on machines without a CUDA toolkit.
+option(USE_CUDA "Build optional CUDA MC backend" OFF)
+if(USE_CUDA)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(NOT CMAKE_CUDA_COMPILER)
+        message(FATAL_ERROR "USE_CUDA=ON but no CUDA compiler (nvcc) was found")
+    endif()
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+        set(CMAKE_CUDA_ARCHITECTURES "60;70;75;80;86;89")
+    endif()
+    set(CMAKE_CUDA_STANDARD 14)
+    list(APPEND SOURCE_FILES ${SOURCE_FOLDER}/mc_cuda.cu)
+    set_source_files_properties(${SOURCE_FOLDER}/mc_cuda.cu PROPERTIES LANGUAGE CUDA)
+    set_source_files_properties(${SOURCE_FOLDER}/mc_cuda_bind.f03 PROPERTIES COMPILE_FLAGS "-cpp -DUSE_CUDA")
+    # cudart is typically a shared library; drop the Release -static Fortran flag
+    string(REPLACE "-static" "" CMAKE_Fortran_FLAGS_RELEASE "${CMAKE_Fortran_FLAGS_RELEASE}")
+    message(STATUS "USE_CUDA=ON  CUDA compiler: ${CMAKE_CUDA_COMPILER}")
+else()
+    set_source_files_properties(${SOURCE_FOLDER}/mc_cuda_bind.f03 PROPERTIES COMPILE_FLAGS "-cpp")
+    message(STATUS "USE_CUDA=OFF  (sequential Fortran MC only)")
+endif()
 
 set(CMAKE_CXX_STANDARD 14)
 
@@ -105,6 +131,10 @@ endif()
 
 add_executable(${TARGET} ${SOURCE_FILES})
 target_link_libraries(${TARGET} PRIVATE MPI::MPI_Fortran ${HDF5_Fortran_LIBRARIES} ${HDF5_Fortran_HL_LIBRARIES})
+if(USE_CUDA)
+    target_include_directories(${TARGET} PRIVATE ${SOURCE_FOLDER})
+    target_link_libraries(${TARGET} PRIVATE CUDA::cudart)
+endif()
 
 set_target_properties(${TARGET} PROPERTIES LINKER_LANGUAGE Fortran)
 

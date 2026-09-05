@@ -8,6 +8,7 @@ Manifest.toml
 # Build artifacts
 build/
 cmake-build/
+cmake-build-cuda/
 cmake-build-debug/
 *.so
 *.dylib

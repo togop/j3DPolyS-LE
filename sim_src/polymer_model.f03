@@ -521,7 +521,8 @@ contains
                 if (.not. self%z_loop) return
                 !if n+1 already occupied & z-loop, try to swap
                 if ((self%contact(3, n + 1).eq.1).or.(n.eq.(self%Nchain - 1))) return ! if same direction or at the end do not swap
-                if (connec(1, self%config(2, n + 1), self%contact(2, n + 1)).eq.0) return !if break the slip-link of n+1 do not swap
+                ! bond n->n+1 is config(2,n); config(2,n+1) is the next bond (was a Z-loop swap bug)
+                if (connec(1, self%config(2, n), self%contact(2, n + 1)).eq.0) return !if break the slip-link of n+1 do not swap
                 con = self%contact(:, n + 1)
 
                 iv = connec(1, opp(self%config(2, n)), self%contact(2, n))
@@ -532,7 +533,7 @@ contains
                 self%contact(1, id) = n + 1
                 self%contact(2, id) = opp(iv)
 
-                iv = connec(1, self%config(2, n + 1), con(2))
+                iv = connec(1, self%config(2, n), con(2))
                 id = con(1)
                 self%contact(1, n) = id
                 self%contact(2, n) = iv
