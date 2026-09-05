@@ -1,0 +1,190 @@
+#!/bin/bash
+# Helper script to run 3dpolys_le with mpirun/mpiexec and proper MPI settings
+# Usage: mpirun_3dpolys_le -n <num_procs> [3dpolys_le args]
+#        mpirun_3dpolys_le -n <num_procs> -- [3dpolys_le args]  (explicit separator for OpenMPI)
+# Example: mpirun_3dpolys_le -n 4 -o:./out/demo_run test/demo_run_shell.cfg
+# Note: The script automatically detects MPI implementation and handles argument parsing
+
+# Find the 3dpolys_le binary
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+BINARY_PATH=""
+if [ -f "$PROJECT_ROOT/py3dpolys_le/bin/3dpolys_le" ]; then
+    BINARY_PATH="$PROJECT_ROOT/py3dpolys_le/bin/3dpolys_le"
+elif [ -f "$PROJECT_ROOT/build/lib/py3dpolys_le/bin/3dpolys_le" ]; then
+    BINARY_PATH="$PROJECT_ROOT/build/lib/py3dpolys_le/bin/3dpolys_le"
+elif command -v 3dpolys_le &> /dev/null; then
+    BINARY_PATH="3dpolys_le"
+else
+    echo "Error: Could not find 3dpolys_le Fortran binary" >&2
+    exit 1
+fi
+
+# Parse arguments to separate MPI launcher args from program args
+# MPICH requires '--' to separate MPI args from program args
+# We'll look for '--' or try to intelligently split based on common patterns
+MPI_ARGS=()
+PROG_ARGS=()
+FOUND_SEP=false
+IN_MPI_ARGS=true
+
+for arg in "$@"; do
+    if [ "$arg" = "--" ]; then
+        FOUND_SEP=true
+        IN_MPI_ARGS=false
+        continue
+    fi
+    
+    if [ "$FOUND_SEP" = true ]; then
+        # Everything after -- is program args
+        PROG_ARGS+=("$arg")
+    elif [ "$IN_MPI_ARGS" = true ]; then
+        # Try to detect if we've seen -n/-np and its value
+        # Common pattern: -n 4 or -np 4 followed by program args
+        if [[ "$arg" =~ ^-n$ ]] || [[ "$arg" =~ ^-np$ ]]; then
+            MPI_ARGS+=("$arg")
+            # Next arg will be the number of processes
+        elif [[ "$arg" =~ ^[0-9]+$ ]] && ([[ " ${MPI_ARGS[@]} " =~ " -n " ]] || [[ " ${MPI_ARGS[@]} " =~ " -np " ]]); then
+            # This is the number after -n/-np
+            MPI_ARGS+=("$arg")
+            # After -n <num>, everything else is program args
+            IN_MPI_ARGS=false
+        elif [[ "$arg" =~ ^-n[0-9]+$ ]] || [[ "$arg" =~ ^-np[0-9]+$ ]]; then
+            # Combined form: -n4 or -np4
+            MPI_ARGS+=("$arg")
+            IN_MPI_ARGS=false
+        elif [[ "$arg" =~ ^- ]]; then
+            # Starts with dash - could be MPI arg or program arg
+            # If we've already seen -n/-np, assume it's a program arg
+            if [[ " ${MPI_ARGS[@]} " =~ " -n " ]] || [[ " ${MPI_ARGS[@]} " =~ " -np " ]] || [[ " ${MPI_ARGS[@]} " =~ " -n" ]] || [[ " ${MPI_ARGS[@]} " =~ " -np" ]]; then
+                PROG_ARGS+=("$arg")
+                IN_MPI_ARGS=false
+            else
+                # Unknown MPI arg, add it but be ready to switch
+                MPI_ARGS+=("$arg")
+            fi
+        else
+            # Doesn't start with dash - program arg
+            PROG_ARGS+=("$arg")
+            IN_MPI_ARGS=false
+        fi
+    else
+        PROG_ARGS+=("$arg")
+    fi
+done
+
+# Detect MPI implementation
+# Check mpiexec first and determine if it's OpenMPI or MPICH
+MPI_IMPL=""
+if command -v mpiexec &> /dev/null; then
+    if mpiexec --version 2>&1 | grep -q "Open MPI"; then
+        MPI_IMPL="openmpi"
+    elif mpiexec --version 2>&1 | grep -qi "mpich\|hydra"; then
+        MPI_IMPL="mpich"
+    else
+        # Try to detect by checking for Hydra in the path or version string
+        if mpiexec --version 2>&1 | grep -qi "hydra"; then
+            MPI_IMPL="mpich"
+        else
+            # Default to OpenMPI if we can't tell
+            MPI_IMPL="openmpi"
+        fi
+    fi
+elif command -v mpirun &> /dev/null; then
+    if mpirun --version 2>&1 | grep -q "Open MPI"; then
+        MPI_IMPL="openmpi"
+    else
+        MPI_IMPL="unknown"
+    fi
+fi
+
+# Check what the binary was compiled with
+BINARY_MPI=""
+if command -v otool &> /dev/null; then
+    if otool -L "$BINARY_PATH" 2>/dev/null | grep -qi "mpich"; then
+        BINARY_MPI="mpich"
+    elif otool -L "$BINARY_PATH" 2>/dev/null | grep -qi "openmpi\|open-mpi"; then
+        BINARY_MPI="openmpi"
+    fi
+elif command -v ldd &> /dev/null; then
+    if ldd "$BINARY_PATH" 2>/dev/null | grep -qi "mpich"; then
+        BINARY_MPI="mpich"
+    elif ldd "$BINARY_PATH" 2>/dev/null | grep -qi "openmpi\|open-mpi"; then
+        BINARY_MPI="openmpi"
+    fi
+fi
+
+# Warn if there's a mismatch, but allow it (sometimes OpenMPI can work with MPICH-linked binaries)
+if [ -n "$BINARY_MPI" ] && [ -n "$MPI_IMPL" ] && [ "$BINARY_MPI" != "$MPI_IMPL" ]; then
+    echo "Note: Binary was compiled with $BINARY_MPI but launcher is $MPI_IMPL" >&2
+    echo "Attempting to use $MPI_IMPL launcher..." >&2
+fi
+
+# Prefer OpenMPI if available, otherwise use MPICH
+# Note: If you get "Invalid communicator" errors, the binary may need to be rebuilt
+if [ "$MPI_IMPL" = "openmpi" ] || (command -v mpirun &> /dev/null && mpirun --version 2>&1 | grep -q "Open MPI"); then
+    # OpenMPI detected - use it (it was working before, just with OFI finalization error)
+    MPI_CMD="mpirun"
+    # Set OpenMPI environment variables
+    # Note: MCA framework only allows a single ^ at the beginning
+    export OMPI_MCA_btl=^openib,usnic,ofi,tcp
+    export OMPI_MCA_btl_vader_single_copy_mechanism=none
+    export OMPI_MCA_pml=ob1
+    export OMPI_MCA_ofi_interface=""
+    export OMPI_MCA_orte_ess_base_hnp_uri=""
+    export OMPI_MCA_btl_tcp_if_exclude=bridge101,lo,docker0
+    export OMPI_MCA_btl_ofi_use_provider=""
+    # Run with MCA flags (single ^ at beginning)
+    exec mpirun -mca btl ^openib,usnic,ofi,tcp \
+               -mca btl_vader_single_copy_mechanism none \
+               -mca pml ob1 \
+               -mca ofi_interface "" \
+               -mca btl_tcp_if_exclude bridge101,lo,docker0 \
+               "${MPI_ARGS[@]}" "$BINARY_PATH" "${PROG_ARGS[@]}"
+elif [ "$BINARY_MPI" = "mpich" ] || [ "$MPI_IMPL" = "mpich" ]; then
+    # MPICH detected - need to use MPICH's mpiexec (not OpenMPI's)
+    # Find MPICH's mpiexec (might be in a different location than PATH)
+    MPICH_MPIEXEC=""
+    # Check common Homebrew locations first
+    if [ -f "/opt/homebrew/opt/mpich/bin/mpiexec" ]; then
+        MPICH_MPIEXEC="/opt/homebrew/opt/mpich/bin/mpiexec"
+    elif [ -f "/usr/local/opt/mpich/bin/mpiexec" ]; then
+        MPICH_MPIEXEC="/usr/local/opt/mpich/bin/mpiexec"
+    # Check if PATH mpiexec is actually MPICH
+    elif command -v mpiexec &> /dev/null && mpiexec --version 2>&1 | grep -qi "mpich\|hydra"; then
+        MPICH_MPIEXEC="mpiexec"
+    else
+        echo "Error: Binary was compiled with MPICH but MPICH's mpiexec not found" >&2
+        echo "Please ensure MPICH is installed and its bin directory is in PATH" >&2
+        echo "Or install OpenMPI and rebuild the binary with OpenMPI" >&2
+        exit 1
+    fi
+    
+    # Use the wrapper script which sets environment variables
+    WRAPPER_SCRIPT="$SCRIPT_DIR/3dpolys_le"
+    if [ ! -f "$WRAPPER_SCRIPT" ]; then
+        echo "Error: Could not find wrapper script $WRAPPER_SCRIPT" >&2
+        exit 1
+    fi
+    
+    # Set MPICH-specific environment variables
+    export MPIR_CVAR_CH3_NOLOCAL=0
+    export MPICH_OFI_NIC_AUTO=0
+    export MPICH_OFI_NIC=""
+    
+    # Run MPICH's mpiexec with the wrapper script
+    exec "$MPICH_MPIEXEC" "${MPI_ARGS[@]}" "$WRAPPER_SCRIPT" "${PROG_ARGS[@]}"
+elif [ "$MPI_IMPL" = "openmpi" ] || command -v mpirun &> /dev/null; then
+    # Generic mpirun (try OpenMPI settings)
+    MPI_CMD="mpirun"
+    export OMPI_MCA_btl=^openib,usnic,ofi,tcp
+    export OMPI_MCA_btl_vader_single_copy_mechanism=none
+    export OMPI_MCA_pml=ob1
+    export OMPI_MCA_ofi_interface=""
+    exec mpirun "$@" "$BINARY_PATH"
+else
+    echo "Error: No MPI implementation found (mpirun or mpiexec)" >&2
+    exit 1
+fi
+

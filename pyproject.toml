@@ -5,7 +5,7 @@ build-backend = 'setuptools.build_meta'
 
 [project]
 name = 'py3dpolys_le'
-version = '2025.2'
+version = '2025.3'
 description = '3D Polymer Simulations - Loop Extrusion model'
 readme = "README.md"
 requires-python = '>=3.10'
@@ -77,4 +77,9 @@ Homepage = "https://gitlab.com/togop/3DPolyS-LE"
 #universal = true
 
 [tool.isort]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]
 

@@ -22,10 +22,10 @@ character(len = 1000) function find_path_program()
 end function find_path_program
 
 subroutine print_version()
-    character(*), parameter :: VERSION = '2025.2'
+    character(*), parameter :: VERSION = '2026.1'
     character(1000) :: program_location = './', find_path_program
     character(1000) :: program_folder
-    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2025.2'
+    character(25) :: var_name, program_name = '3dpolys_le', program__version = '2026.1'
     character(2) :: eq_sign = '='
     character(1) :: path_separator, path_sep
     logical :: file_exists
@@ -98,6 +98,9 @@ subroutine print_help()
             & , s=<sim_out_folder> to continue from a finished simulation output folder.'
     print*, '   -z|--z_loop : Allow z_loop for LEFs move, where LEFs can traverse one another. Default: false'
     print*, '   -u|--unidirectional : Unidirectional mode for LEFs move otherwise bidirectional. Default: false=bidirectional'
+    print*, '   --seed:<seed_value> : Set the random seed for reproducibility. Default: random (based on system clock)'
+    print*, '   --no-cuda  Disable the optional CUDA Monte-Carlo backend at runtime (sequential CPU).'
+    print*, '   --cuda     Request the CUDA backend. No-op / warning if not built with -DUSE_CUDA=ON.'
     print*, '<3dpolys_le.cfg file>: path to the inpit.dat file. Default: ./3dpolys_le.cfg'
     print*, '<output folder>: path to output folder. Default: the folder of the <3dpolys_le.cfg file>'
     print*, 'inpiut.cfg format:'
@@ -125,11 +128,14 @@ subroutine print_help()
 end subroutine print_help
 
 subroutine check_iostat(io_unit, iostat)
+    use mpi
     integer, intent(in) :: io_unit
     integer, intent(in) :: iostat
+    integer :: ierr
     if (iostat /= 0) then
         close(io_unit)
         call print_help()
+        call MPI_Finalize(ierr)
         call exit(1)
     end if
 end subroutine check_iostat
@@ -139,6 +145,7 @@ program mainprogram
     use lattice_data_mod
     use PolymerModel_mod
     use analyse_mod
+    use mc_cuda_mod
     use mpi
     use logging_mod
     use lib_conf
@@ -168,6 +175,7 @@ program mainprogram
     !real :: pt
     !real*8 :: randomnumber, r
     ! real :: seed
+    integer :: random_seed_value = -1  ! -1 means use random seed based on system clock
     type(Timer) :: crono
     real, dimension(:, :), allocatable :: boundary  ! (strand -/+, permeability)
     real, dimension(:), allocatable :: loading_sites_factor
@@ -196,6 +204,12 @@ program mainprogram
     logical :: z_loop = .false.
     logical :: unidirectional = .false.
     logical :: file_exists
+    logical :: no_cuda = .false.
+    logical :: want_cuda = .false.
+    logical :: use_cuda_rt = .false.
+    logical :: cuda_ok = .false.
+    integer :: cuda_seed = 0
+    type(PolymerModel), allocatable :: models(:)
 
     type :: BoundarySite
         character(len = 20) :: name
@@ -253,6 +267,13 @@ program mainprogram
                 global_log_level = str2loglevel(trim(input_options(i + 1:)))
                 !print*, 'log_level', global_log_level
                 call log%set_level(global_log_level)
+            elseif (index(input_options, '--seed:') > 0) then
+                i = index(input_options, ':')
+                opt_s = trim(input_options(i + 1:))
+                READ(opt_s, *) random_seed_value
+                if (rank == 0) then
+                    call log%info('Random seed set to: ' // trim(str(random_seed_value)))
+                end if
             elseif (index(input_options, '--hic3d:') > 0) then
                 i = index(input_options, ':')
                 opt_s = trim(input_options(i + 1:))
@@ -354,14 +375,23 @@ program mainprogram
                 if (rank == 0) then
                     call log%info('Init folding mode: ' // init_mode)
                 end if
+            elseif (index(input_options, '--no-cuda') > 0) then
+                no_cuda = .true.
+                if (rank == 0) then
+                    call log%info('CUDA backend disabled by --no-cuda')
+                end if
+            elseif (index(input_options, '--cuda') > 0) then
+                want_cuda = .true.
             elseif ((index(input_options, '--help') > 0).or.(index(input_options, '-h') > 0)) then
-                call print_help()
+                if (rank == 0) call print_help()
+                call MPI_Finalize(ierr)
                 call exit(0)
             else
                 if (rank == 0) then
                     call log%info('unrecognized option: ' // trim(input_options))
+                    call print_help()
                 end if
-                call print_help()
+                call MPI_Finalize(ierr)
                 call exit(0)
             end if
             ai = ai + 1
@@ -381,12 +411,18 @@ program mainprogram
     !start = MPI_Wtime()
 
     !initialize random generator
-    call SYSTEM_CLOCK(time)
-    call srand(time)
-    call random_seed()  ! use PUT=seed_int
-    ! call random_number(seed)
-    ! seed = 7 ! used only for synchronize compare with the original code
-    !call initializerandomnumbergenerator(dble(seed))
+    if (random_seed_value == -1) then
+        ! Use random seed based on system clock
+        call SYSTEM_CLOCK(time)
+        cuda_seed = time
+        call srand(time)
+        call random_seed()
+    else
+        ! Use specified seed for reproducibility
+        cuda_seed = random_seed_value
+        call srand(random_seed_value)
+        call random_seed(put=[(random_seed_value, i=1,12)])
+    end if
 
     i = index(input_dat_file, path_sep, .true.)
     if (i>=0) then
@@ -414,6 +450,7 @@ program mainprogram
             call log%error('Could not find or open input configuration file: ' // trim(input_dat_file))
             call print_help()
         end if
+        call MPI_Finalize(ierr)
         call exit(1)
     end if
     call read_config('Nchain',    Nchain)
@@ -775,6 +812,36 @@ program mainprogram
         end if
     end if
 
+    if ((rank == 0).and.(.not.do_analyse)) then
+        call crono%Tic()
+        call log%info('START Running simulations ...')
+    end if
+
+    if (rank == 0) then
+        if (mc_cuda_is_compiled() == 1) then
+            call log%info('CUDA MC backend: compiled=yes')
+            if (mc_cuda_has_device() == 1) then
+                call log%info('CUDA device: found')
+            else
+                call log%info('CUDA device: none')
+            end if
+        else
+            call log%info('CUDA MC backend: compiled=no')
+            if (want_cuda) then
+                call log%warn('--cuda ignored: binary was not built with -DUSE_CUDA=ON')
+            end if
+        end if
+    end if
+
+    use_cuda_rt = (mc_cuda_is_compiled() == 1) .and. (.not. no_cuda) .and. (mc_cuda_has_device() == 1) &
+            .and. (rank_Niter > 0) .and. (.not. do_analyse)
+
+    if (use_cuda_rt) then
+        call log%info('MC method: CUDA, T=' // trim(str(rank_Niter)) // ' (rank ' // trim(str(rank)) // ')')
+    else
+        call log%info('MC method: sequential, T=' // trim(str(rank_Niter)) // ' (rank ' // trim(str(rank)) // ')')
+    end if
+
     call log%info('Running simulations for rank:' // trim(str(rank)) // ' #trajectories:' // trim(str(rank_Niter)) // ' ...')
 
     params = ModelParameters(L = L, Nchain = Nchain, iku = iku, ikm = ikm, ikb = ikb, Nleffree = Nlef, &
@@ -799,32 +866,89 @@ program mainprogram
         call log%debug('L:' // trim(str(L)) // ', Nchain:' // trim(str(Nchain)) // ' Nchain:' // trim(str(Niter)) &
                 // ' Nmeas:' // trim(str(Nmeas)))
 
-        do i = 1, rank_Niter
-            trajectory_i = rank * rank_Niter + i
-            !call crono%Tic()
+        if (use_cuda_rt) then
+            allocate(models(rank_Niter))
+            do i = 1, rank_Niter
+                trajectory_i = rank * rank_Niter + i
+                models(i)%L = L
+                models(i)%Nchain = Nchain
+                models(i)%iku = iku
+                models(i)%ikm = ikm
+                models(i)%ikb = ikb
+                models(i)%Nleffree = Nlef
+                models(i)%kb = kb
+                models(i)%ku = ku
+                models(i)%km = km
+                models(i)%Ea = Ea
+                models(i)%Ei = Ei
+                models(i)%kint = kint
+                models(i)%z_loop = z_loop
+                models(i)%unidirectional = unidirectional
 
-            !generate initial configuration
-            model = PolymerModel(L = L, Nchain = Nchain, iku = iku, ikm = ikm, ikb = ikb, Nleffree = Nlef, &
-                    kb = kb, ku = ku, km = km, Ea = Ea, Ei = Ei, z_loop = z_loop, unidirectional = unidirectional, kint = kint)
+                if ((rank == 0).and.(i == 1)) then
+                    save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')
+                    call log%info('Save parameters in file: ' // save_input_cfg_file)
+                    open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
+                    call models(i)%output_parameters(20, init_mode, interaction_sites, boundary_file, lef_loading_sites, &
+                            basal_loading_factor, boundary_direction, &
+                            Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact,  &
+                            kb_a = kb_a, ku_a = ku_a, km_a = km_a)
+                    close(20)
+                end if
 
-            if ((rank == 0).and.(i == 1)) then                ! do it only once
-                save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')
-                call log%info('Save parameters in file: ' // save_input_cfg_file)
+                call models(i)%init(boundary, loading_sites_factor, interaction_sites_state, init_mode, trajectory_i)
+            end do
 
-                open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
-                call model%output_parameters(20, init_mode, interaction_sites, boundary_file, lef_loading_sites, &
-                        basal_loading_factor, boundary_direction, &
-                        Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact,  &
-                        km_a = km_a, ku_a = ku_a, kb_a = kb_a)
-                close(20)
+            cuda_ok = .false.
+            call run_cuda_rank(models, rank_Niter, rank, Ninter, Nmeas, burnin, burnout, burnoutM, cuda_seed, cuda_ok)
+            if (.not. cuda_ok) then
+                call log%warn('CUDA batch failed; falling back to sequential do_simulation')
+                do i = 1, rank_Niter
+                    trajectory_i = rank * rank_Niter + i
+                    call models(i)%do_simulation(trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
+                end do
             end if
+            deallocate(models)
+        else
+            do i = 1, rank_Niter
+                trajectory_i = rank * rank_Niter + i
+                !call crono%Tic()
 
-            call model%init(boundary, loading_sites_factor, interaction_sites_state, init_mode, trajectory_i)
+                if ((rank == 0).and.(i == 1)) then                ! do it only once
+                    save_input_cfg_file = trim(trim(output_folder) // '3dpoys_le.cfg')
+                    call log%info('Save parameters in file: ' // save_input_cfg_file)
 
-            call model%do_simulation(trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
+                    open(20, file = save_input_cfg_file, action = 'write', status = 'new', iostat = rc)
+                    call model%output_parameters(20, init_mode, interaction_sites, boundary_file, lef_loading_sites, &
+                            basal_loading_factor, boundary_direction, &
+                            Niter, Ninter, Nmeas, burnin, burnout, burnoutM, radius_contact,  &
+                            kb_a = kb_a, ku_a = ku_a, km_a = km_a)
+                    close(20)
+                end if
 
-            !call log%info(crono%Tac(info = ' tajectory ' // trim(str(trajectory_i)) // ' for rank ' // trim(str(rank))))
-        end do
+                ! generate initial configuration: Set model parameters, then initialize (PolymerModel)
+                model%L = L
+                model%Nchain = Nchain
+                model%iku = iku
+                model%ikm = ikm
+                model%ikb = ikb
+                model%Nleffree = Nlef
+                model%kb = kb
+                model%ku = ku
+                model%km = km
+                model%Ea = Ea
+                model%Ei = Ei
+                model%kint = kint
+                model%z_loop = z_loop
+                model%unidirectional = unidirectional
+
+                call model%init(boundary, loading_sites_factor, interaction_sites_state, init_mode, trajectory_i)
+
+                call model%do_simulation(trajectory_i, Ninter, Nmeas, burnin, burnout, burnoutM)
+
+                !call log%info(crono%Tac(info = ' tajectory ' // trim(str(trajectory_i)) // ' for rank ' // trim(str(rank))))
+            end do
+        end if
 
         close(10)
         close(11)
@@ -844,6 +968,10 @@ program mainprogram
     call log%debug('PASSED MPI_Barrier for rank ' // trim(str(rank)))
 
     if (rank == 0) then
+        if (.not.do_analyse) then
+            call log%info(crono%Tac('END Running similations'))
+        end if
+
         call crono%Tic()
         ! TODO take care of old files or remove them before generating the new one
         inquire(file = trim(trim(output_folder) // 'config.out'), exist = file_exists)

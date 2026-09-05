@@ -183,8 +183,8 @@ and unzip them in our working folder. You should have a subfolder `test` with al
 Run a demo simulation:
 ```
 mpirun 3dpolys_le -o:./out/demo_run test/demo_run_shell.cfg
-3dpolys_le -o:./out/demo_run -a:./out/demo_run/r2.84 test/demo_run_shell.cfg
-3dpolys_le_stats -o ./out/demo_run -a ./out/demo_run/r2.84 -i test/demo_run_shell.cfg -f sim_stats.csv
+3dpolys_le -o:./out/demo_run -r:2.84 -a:./out/demo_run/r2.84 test/demo_run_shell.cfg
+3dpolys_le_stats -o ./out/demo_run -r 2.84 -a ./out/demo_run/r2.84 -i test/demo_run_shell.cfg -f sim_stats.csv
 3dpolys_le_runner multi_decay_plot -o ./out/demo_run -a ./out/demo_run/r2.84 -i test/demo_run_shell.cfg
 ```
 

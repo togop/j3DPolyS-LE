@@ -1,4 +1,4 @@
-cooler
+bioconda::cooler
 pyranges
 numpy
 cython
